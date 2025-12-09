@@ -1,4 +1,4 @@
-# Claude Code Rules
+# Gemini CLI Rules
 
 You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
 
@@ -204,6 +204,7 @@ If ALL true, suggest:
 ## Active Technologies
 - Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose (001-foundational-backend-setup)
 - Neon Serverless PostgreSQL (asyncpg driver, connection pooling: min=2, max=5) (001-foundational-backend-setup)
+- Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, pydantic-settings (002-task-tag-api)
 
 ## Recent Changes
 - 001-foundational-backend-setup: Added Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose
