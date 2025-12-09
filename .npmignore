@@ -1,0 +1,14 @@
+.nyc_output
+.travis.yml
+appveyor.yml
+coverage
+docs
+examples
+node_modules
+test
+test.js
+tests
+*.log
+.DS_Store
+.idea
+.vscode
