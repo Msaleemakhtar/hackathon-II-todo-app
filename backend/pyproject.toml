@@ -1,0 +1,42 @@
+[project]
+name = "todo-app-backend"
+version = "0.1.0"
+description = "Backend for the Todo App"
+authors = [{name = "Your Name", email = "you@example.com"}]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "sqlmodel",
+    "asyncpg",
+    "aiosqlite",
+    "alembic",
+    "bcrypt>=4.0.0",
+    "python-jose[cryptography]",
+    "pydantic-settings",
+    "slowapi",
+    "python-json-logger",
+    "uvicorn[standard]",
+    "psycopg2-binary",
+    "email-validator>=2.3.0",
+    "python-multipart>=0.0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "ruff",
+    "pip-audit",
+    "pre-commit",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "D"]
+ignore = ["D100", "D104", "D107"]
+
+[tool.ruff.format]
+quote-style = "double"

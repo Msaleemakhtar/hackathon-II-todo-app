@@ -1,0 +1,421 @@
+openapi: 3.0.3
+info:
+  title: Todo App Authentication API
+  description: |
+    RESTful authentication API for the Todo App Phase II backend.
+    Provides user registration, login, token management, and protected resource access via JWT tokens.
+  version: 1.0.0
+  contact:
+    name: Todo App Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.todoapp.example.com
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and token management endpoints
+
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Register new user
+      description: Create a new user account with email and password
+      operationId: registerUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              validRegistration:
+                summary: Valid registration
+                value:
+                  email: newuser@example.com
+                  password: SecurePass123!
+                  name: John Doe
+              minimalRegistration:
+                summary: Registration without name
+                value:
+                  email: user@example.com
+                  password: mypassword123
+      responses:
+        '201':
+          description: User successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                email: newuser@example.com
+                name: John Doe
+                created_at: "2025-12-09T10:30:00Z"
+        '400':
+          description: Bad request - validation error or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emailExists:
+                  summary: Email already registered
+                  value:
+                    detail: A user with this email already exists
+                    code: EMAIL_ALREADY_EXISTS
+                passwordTooShort:
+                  summary: Password too short
+                  value:
+                    detail: Password must be at least 8 characters
+                    code: PASSWORD_TOO_SHORT
+                invalidEmail:
+                  summary: Invalid email format
+                  value:
+                    detail: Please provide a valid email address
+                    code: INVALID_EMAIL
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Field validation error
+                code: VALIDATION_ERROR
+                field: email
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Too many authentication attempts. Please try again later
+                code: RATE_LIMIT_EXCEEDED
+
+  /api/v1/auth/login:
+    post:
+      summary: User login
+      description: Authenticate user and issue access and refresh tokens
+      operationId: loginUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  format: email
+                  description: User email address (OAuth2 uses 'username' field)
+                password:
+                  type: string
+                  format: password
+                  description: User password
+            example:
+              username: user@example.com
+              password: SecurePass123!
+      responses:
+        '200':
+          description: Login successful, tokens issued
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie (HttpOnly, Secure, SameSite=Strict)
+              schema:
+                type: string
+                example: refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJleHAiOjE3MDI0NjE2MDAsImlhdCI6MTcwMjQ2MDcwMCwidHlwZSI6ImFjY2VzcyJ9.abc123
+                token_type: bearer
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Invalid email or password
+                code: INVALID_CREDENTIALS
+        '422':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Field validation error
+                code: VALIDATION_ERROR
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Too many authentication attempts. Please try again later
+                code: RATE_LIMIT_EXCEEDED
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Issue a new access token using a valid refresh token from cookie
+      operationId: refreshToken
+      tags:
+        - Authentication
+      parameters:
+        - in: cookie
+          name: refresh_token
+          required: true
+          schema:
+            type: string
+          description: Refresh token from HttpOnly cookie
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                token_type: bearer
+        '401':
+          description: Missing, expired, or invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingToken:
+                  summary: No refresh token cookie
+                  value:
+                    detail: Refresh token not found
+                    code: MISSING_REFRESH_TOKEN
+                expiredToken:
+                  summary: Refresh token expired
+                  value:
+                    detail: Refresh token has expired. Please log in again
+                    code: REFRESH_TOKEN_EXPIRED
+                invalidToken:
+                  summary: Invalid or tampered token
+                  value:
+                    detail: Invalid authentication token
+                    code: INVALID_TOKEN
+
+  /api/v1/auth/me:
+    get:
+      summary: Get current user
+      description: Retrieve the authenticated user's profile information
+      operationId: getCurrentUser
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                email: user@example.com
+                name: John Doe
+                created_at: "2025-12-09T10:30:00Z"
+        '401':
+          description: Missing, expired, or invalid access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingToken:
+                  summary: No Authorization header
+                  value:
+                    detail: Authentication required
+                    code: MISSING_TOKEN
+                expiredToken:
+                  summary: Access token expired
+                  value:
+                    detail: Access token has expired
+                    code: TOKEN_EXPIRED
+                invalidToken:
+                  summary: Invalid or malformed token
+                  value:
+                    detail: Invalid authentication token
+                    code: INVALID_TOKEN
+                invalidTokenType:
+                  summary: Refresh token used as access token
+                  value:
+                    detail: Invalid token type for this operation
+                    code: INVALID_TOKEN_TYPE
+
+  /api/v1/auth/logout:
+    post:
+      summary: User logout
+      description: Clear the refresh token cookie (idempotent operation)
+      operationId: logoutUser
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Logout successful
+          headers:
+            Set-Cookie:
+              description: Cleared refresh token cookie
+              schema:
+                type: string
+                example: refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=0
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Successfully logged out
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token in Authorization header
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: User's password (minimum 8 characters)
+          example: SecurePass123!
+        name:
+          type: string
+          nullable: true
+          description: User's display name (optional)
+          example: John Doe
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+      properties:
+        access_token:
+          type: string
+          description: JWT access token (15 minute expiry)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          enum: [bearer]
+          description: Token type (always 'bearer')
+          example: bearer
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User ID (UUID string)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        name:
+          type: string
+          nullable: true
+          description: User's display name
+          example: John Doe
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp (ISO 8601)
+          example: "2025-12-09T10:30:00Z"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+        - code
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
+          example: Invalid email or password
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - EMAIL_ALREADY_EXISTS
+            - PASSWORD_TOO_SHORT
+            - INVALID_EMAIL
+            - INVALID_CREDENTIALS
+            - TOKEN_EXPIRED
+            - INVALID_TOKEN
+            - MISSING_TOKEN
+            - INVALID_TOKEN_TYPE
+            - REFRESH_TOKEN_EXPIRED
+            - MISSING_REFRESH_TOKEN
+            - RATE_LIMIT_EXCEEDED
+            - VALIDATION_ERROR
+          example: INVALID_CREDENTIALS
+        field:
+          type: string
+          nullable: true
+          description: Field name for validation errors (optional)
+          example: email
+
+  examples:
+    JWTPayload:
+      summary: JWT Token Payload Structure
+      description: |
+        JWT tokens contain the following claims:
+        - sub: User ID (string)
+        - email: User email address
+        - exp: Expiration timestamp (Unix timestamp)
+        - iat: Issued at timestamp (Unix timestamp)
+        - type: Token type ('access' or 'refresh')
+
+        Access tokens expire after 15 minutes.
+        Refresh tokens expire after 7 days.
+      value:
+        sub: "550e8400-e29b-41d4-a716-446655440000"
+        email: "user@example.com"
+        exp: 1702461600
+        iat: 1702460700
+        type: "access"

@@ -200,3 +200,10 @@ After design/architecture work, test for ADR significance:
 If ALL true, suggest:
 📋 Architectural decision detected: [brief-description]
    Document reasoning and tradeoffs? Run `/sp.adr [decision-title]`
+
+## Active Technologies
+- Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose (001-foundational-backend-setup)
+- Neon Serverless PostgreSQL (asyncpg driver, connection pooling: min=2, max=5) (001-foundational-backend-setup)
+
+## Recent Changes
+- 001-foundational-backend-setup: Added Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose
