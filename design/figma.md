@@ -1,141 +1,173 @@
-# Figma Design Review - Component Details
+/sp.specify I need to create a comprehensive task management dashboard UI based on the design in ui.pptx. This should be a
+   modern, responsive web application frontend that implements the complete user interface for managing tasks.
 
-## 1. Screen Name: Register
-*   **Purpose:** Allow new users to create an account.
-*   **Key Elements/Components:**
-    *   Header with "Sign Up" title.
-    *   Input fields for: Username, Email, Password, Confirm Password.
-    *   A "Sign Up" button to submit the registration.
-    *   A link or text indicating "Already have an account? Log In" to navigate to the login screen.
-    *   Illustrative graphic (person interacting with a form).
+   ## Feature Overview
+   Create a full-stack frontend application for the task management system with the following key components:
 
-## 2. Screen Name: Login
-*   **Purpose:** Allow existing users to sign in to their account.
-*   **Key Elements/Components:**
-    *   Header with "Sign In" title.
-    *   Input fields for: Email (or Username), Password.
-    *   A "Sign In" button to submit credentials.
-    *   A link or text for "Forgot Password?".
-    *   A link or text indicating "Don't have an account? Register" to navigate to the registration screen.
-    *   Illustrative graphic (person interacting with a mobile device).
+   ### 1. Dashboard Layout
+   - **Sidebar Navigation** (coral/salmon colored #FF7B7B)
+     - User profile section showing avatar, name, and email
+     - Navigation menu items: Dashboard, Vital Task, My Task, Task Categories, Settings, Help
+     - Logout button at the bottom
 
-## 3. Screen Name: Dashboard
-*   **Purpose:** Provide an overview of tasks, user activity, and quick access to main features.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation: User profile picture, username, navigation links (Dashboard, My Tasks, Account, etc.).
-    *   Main Content Area:
-        *   Welcome message with user's name.
-        *   Summary cards or widgets displaying statistics (e.g., tasks completed, pending tasks, upcoming deadlines).
-        *   List of recent or priority tasks.
-        *   Possibly a quick "Add Task" button or input.
+   - **Header Bar**
+     - Global search input with placeholder "Search your task here..."
+     - Search icon button
+     - Notification bell icon
+     - User settings icon
+     - Current date display (Tuesday 20/06/2023 format)
 
-## 4. Screen Name: My Task / View Task
-*   **Purpose:** Display the detailed information of a single task.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent with Dashboard).
-    *   Task Title (prominently displayed).
-    *   Task Description (detailed text area).
-    *   Task Attributes: Due Date, Priority, Category, Status (e.g., Completed checkbox).
-    *   Buttons for "Edit Task", "Delete Task", or "Mark Complete".
-    *   Possibly a section for comments or subtasks.
+   - **Main Content Area**
+     - Welcome message with user's name and waving hand emoji
+     - Team member avatars (showing collaborative users)
+     - Invite button for adding team members
 
-## 5. Screen Name: Add task
-*   **Purpose:** Provide a form for creating a new task.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Add Task" title.
-    *   Input fields for:
-        *   Task Title/Name (text input).
-        *   Description (textarea).
-        *   Due Date (date picker).
-        *   Priority (dropdown/selection from existing priorities).
-        *   Category (dropdown/selection from existing categories).
-    *   A "Save Task" or "Create Task" button.
-    *   A "Cancel" or "Back" button.
+   ### 2. Dashboard View Components
 
-## 6. Screen Name: Edit (Task)
-*   **Purpose:** Provide a form for modifying an existing task's details.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Edit Task" title.
-    *   Input fields pre-filled with the current task's data for:
-        *   Task Title/Name (text input).
-        *   Description (textarea).
-        *   Due Date (date picker).
-        *   Priority (dropdown/selection).
-        *   Category (dropdown/selection).
-    *   A "Save Changes" or "Update Task" button.
-    *   A "Cancel" or "Back" button.
+   **To-Do Section (Left Panel)**
+   - Date-based task grouping showing current date and "Today" label
+   - "+ Add task" button
+   - Task cards displaying:
+     - Task title (e.g., "Attend Nischal's Birthday Party")
+     - Task description/details
+     - Attached images/thumbnails
+     - Priority badges (Moderate, High, Low) with color coding
+     - Status indicators (Not Started, In Progress, Completed)
+     - Creation date timestamp
+     - Three-dot menu for task actions
 
-## 7. Screen Name: Account Info
-*   **Purpose:** Allow the user to view and update their personal account information.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Account Info" title.
-    *   Input fields pre-filled with current user data for:
-        *   Name/Full Name.
-        *   Email (may or may not be editable).
-        *   Username (may or may not be editable).
-        *   Profile Picture (option to upload/change).
-    *   A "Save Changes" or "Update Profile" button.
-    *   A "Change Password" button/link (to navigate to the Change Password screen).
+   **Task Status Dashboard (Right Top Panel)**
+   - "Task Status" heading with icon
+   - Three circular progress indicators:
+     - Completed tasks (84% - green)
+     - In Progress tasks (46% - blue)
+     - Not Started tasks (13% - gray/red)
+   - Legend showing status labels
 
-## 8. Screen Name: Change Password
-*   **Purpose:** Allow the user to update their account password.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Change Password" title.
-    *   Input fields for:
-        *   Current Password.
-        *   New Password.
-        *   Confirm New Password.
-    *   A "Update Password" button.
-    *   A "Cancel" or "Back" button.
+   **Completed Task Section (Right Bottom Panel)**
+   - "Completed Task" heading with checkbox icon
+   - List of completed tasks showing:
+     - Task title
+     - Brief description
+     - Completion status badge (green "Completed")
+     - Completion timestamp ("Completed 2 days ago")
+     - Associated task image
+     - Three-dot menu for actions
 
-## 9. Screen Name: Task Categories
-*   **Purpose:** Display a list of all defined task categories and allow for their management.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Task Categories" title.
-    *   List/Table of categories, each entry showing:
-        *   Category Name.
-        *   Actions: "Edit" button, "Delete" button.
-    *   A "Create New Category" or "Add Category" button.
+   ### 3. Technical Requirements
 
-## 10. Screen Name: Create Categories
-*   **Purpose:** Provide a form for adding a new task category.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Create Category" title.
-    *   Input field for "Category Name".
-    *   A "Save Category" button.
-    *   A "Cancel" or "Back" button.
+   **Frontend Stack (per Constitution)**
+   - Next.js 16 with App Router
+   - TypeScript with strict mode
+   - shadcn/ui component library for UI elements
+   - Tailwind CSS for styling
+   - Zustand for state management
+   - axios for API calls with JWT interceptors
 
-## 11. Screen Name: Add Task Priority
-*   **Purpose:** Provide a form for defining a new task priority level.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Add Task Priority" title.
-    *   Input field for "Priority Name" (e.g., Low, Medium, High).
-    *   Possibly a field for an associated value or color.
-    *   A "Save Priority" button.
-    *   A "Cancel" or "Back" button.
+   **Key Features to Implement**
+   1. Responsive design (mobile-first approach)
+   2. Optimistic UI updates
+   3. Skeleton loading states
+   4. Toast notifications for user actions
+   5. Search with 300ms debouncing
+   6. Filter and sort capabilities
+   7. Task CRUD operations via API
+   8. JWT authentication integration
+   9. Real-time task status updates
+   10. Drag-and-drop task management (future enhancement)
 
-## 12. Screen Name: Edit Task Priority
-*   **Purpose:** Provide a form for modifying an existing task priority level.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Edit Task Priority" title.
-    *   Input field pre-filled with the current "Priority Name".
-    *   Possibly a field for an associated value or color.
-    *   A "Save Changes" button.
-    *   A "Cancel" or "Back" button.
+   **UI/UX Requirements**
+   - Accessible (ARIA labels, keyboard navigation)
+   - Color contrast meets WCAG AA standards
+   - Smooth animations and transitions
+   - Error boundaries for graceful error handling
+   - Loading states for all async operations
 
-## 13. Screen Name: Edit Task Status
-*   **Purpose:** Provide a form or interface for changing the status of a task.
-*   **Key Elements/Components:**
-    *   Sidebar/Navigation (consistent).
-    *   Header with "Edit Task Status" title.
-    *   Dropdown or radio buttons to select a new status (e.g., "To Do", "In Progress", "Completed", "Archived").
-    *   A "Save Status" button.
-    *   A "Cancel" or "Back" button.
+   **Color Palette**
+   - Primary: Coral/Salmon (#FF6B6B or similar)
+   - Success: Green (#4CAF50)
+   - Info/Progress: Blue (#2196F3)
+   - Warning: Orange (#FF9800)
+   - Error: Red (#F44336)
+   - Background: Light gray (#F5F5F5)
+   - Card background: White (#FFFFFF)
+
+   **API Integration Requirements**
+   - Connect to existing Task and Tag APIs (from feature 002)
+   - Implement JWT token refresh flow
+   - Handle authentication states (logged in/out)
+   - Scope all data to authenticated user
+   - Real-time updates for task completion percentages
+
+   **Performance Targets**
+   - First Contentful Paint < 1.5s
+   - Time to Interactive < 3s
+   - Lighthouse Performance score >= 90
+
+   ### 4. Pages/Routes to Implement
+   1. `/` or `/dashboard` - Main dashboard (the design shown)
+   2. `/vital-tasks` - Vital/important tasks view
+   3. `/my-tasks` - Personal tasks view
+   4. `/categories` - Task categories management
+   5. `/settings` - User settings
+   6. `/help` - Help/support page
+
+   ### 5. Component Breakdown
+   - `Sidebar` - Navigation sidebar component
+   - `Header` - Top header bar with search and notifications
+   - `TaskCard` - Individual task card component
+   - `TaskList` - Container for task cards
+   - `StatusChart` - Circular progress indicators
+   - `CompletedTaskList` - Completed tasks section
+   - `SearchBar` - Debounced search input
+   - `FilterDropdown` - Filter by status, priority, tags
+   - `PriorityBadge` - Priority indicator component
+   - `StatusBadge` - Status indicator component
+   - `UserAvatar` - User profile avatar component
+   - `TeamAvatars` - Avatar group component
+
+   ### 6. State Management (Zustand Stores)
+   - `authStore` - User authentication state
+   - `taskStore` - Task data and operations
+   - `uiStore` - UI state (sidebar, modals, toasts)
+   - `filterStore` - Filter and sort preferences
+
+   ### 7. Data Flow
+   1. User authenticates → JWT stored → redirected to dashboard
+   2. Dashboard loads → fetch user tasks from API
+   3. Display tasks in appropriate sections (pending/completed)
+   4. Calculate status percentages for charts
+   5. User interacts → optimistic UI update → API call → sync on response
+   6. Real-time updates via periodic polling or WebSocket (future)
+
+   ### 8. Acceptance Criteria
+   - [ ] User can view all their tasks in the dashboard
+   - [ ] Tasks display with correct title, description, priority, and status
+   - [ ] Task status percentages calculate and display correctly
+   - [ ] User can search tasks and see filtered results
+   - [ ] User can filter tasks by status, priority, and tags
+   - [ ] User can create new tasks via "+ Add task" button
+   - [ ] User can edit tasks via three-dot menu
+   - [ ] User can delete tasks with confirmation
+   - [ ] User can mark tasks as complete/incomplete
+   - [ ] Completed tasks appear in the completed section
+   - [ ] UI is responsive on mobile, tablet, and desktop
+   - [ ] All interactions show loading states
+   - [ ] Errors display user-friendly toast messages
+   - [ ] Navigation between sections works smoothly
+   - [ ] User profile displays correct name and email
+
+   ### 9. Out of Scope for This Feature
+   - Team collaboration features (invite functionality UI only, no backend)
+   - Task attachments/file uploads
+   - Recurring task UI
+   - Calendar view
+   - Gantt chart or timeline views
+   - Export/import functionality
+   - Dark mode (can be added later)
+
+   ### 10. Dependencies
+   - Feature 001: Foundational backend setup (completed)
+   - Feature 002: Task and Tag API (completed)
+   - User authentication system (needs to be implemented or referenced)
+   Create or update the feature specification from a natural language feature description. (project)

@@ -1,8 +1,7 @@
-Dockerfile
+node_modules/
+.git/
+Dockerfile*
 .dockerignore
-.git
-.gitignore
-README.md
-!backend/
-!frontend/
-!packages/
+*.log*
+.env*
+coverage/
