@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from .core.config import settings, validate_settings
 from .core.exceptions import AppException
 from .core.logging_config import setup_logging
-from .routers import auth
+from .routers import auth, tags, tasks
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -67,3 +67,5 @@ async def health_check():
     return {"status": "healthy"}
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["Tasks"])
+app.include_router(tags.router, prefix="/api/v1/tags", tags=["Tags"])

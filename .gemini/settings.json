@@ -12,6 +12,9 @@
       "args": [
         "@playwright/mcp@latest"
       ]
+    },
+    "figma": {
+      "httpUrl": "https://mcp.figma.com/mcp"
     }
   }
 }

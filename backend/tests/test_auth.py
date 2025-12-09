@@ -121,32 +121,36 @@ async def test_login_invalid_credentials(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_success(client: AsyncClient, db_session):
+async def test_get_current_user_success(client: AsyncClient):
     """Test retrieving the current authenticated user."""
     # Register a user
     user_email = "me@example.com"
     user_password = "securepassword"
     user_name = "Auth Me"
-    await client.post(
+    register_response = await client.post(
         "/api/v1/auth/register",
         json={"email": user_email, "password": user_password, "name": user_name},
     )
+    assert register_response.status_code == 201
+    registered_user = register_response.json()
 
-    # Fetch the user from the database to get the generated ID
-    result = await db_session.execute(select(User).where(User.email == user_email))
-    user = result.scalar_one_or_none()
-    assert user is not None
+    # Login to get access token
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        data={"username": user_email, "password": user_password},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert login_response.status_code == 200
+    access_token = login_response.json()["access_token"]
 
-    # Manually create an access token for the registered user
-    access_token = create_access_token(user.id, user.email)
-
+    # Get current user info
     response = await client.get(
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"}
     )
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == user_email
-    assert data["id"] == user.id
+    assert data["id"] == registered_user["id"]
     assert data["name"] == user_name
 
 
@@ -171,24 +175,22 @@ async def test_get_current_user_invalid_token(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_expired_token(client: AsyncClient, db_session):
+async def test_get_current_user_expired_token(client: AsyncClient):
     """Test retrieving current user with an expired token."""
     # Register a user
     user_email = "expired@example.com"
     user_password = "securepassword"
-    await client.post(
+    register_response = await client.post(
         "/api/v1/auth/register", json={"email": user_email, "password": user_password}
     )
-
-    # Fetch user to get ID
-    result = await db_session.execute(select(User).where(User.email == user_email))
-    user = result.scalar_one_or_none()
+    assert register_response.status_code == 201
+    user_data = register_response.json()
 
     # Manually create an expired token (by setting expire to a past time)
     now = datetime.now(UTC)
     expired_payload = {
-        "sub": user.id,
-        "email": user.email,
+        "sub": user_data["id"],
+        "email": user_data["email"],
         "exp": now - timedelta(minutes=1),
         "iat": now - timedelta(minutes=5),
         "type": "access",
@@ -235,24 +237,22 @@ async def test_refresh_token_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_refresh_token_expired(client: AsyncClient, db_session):
+async def test_refresh_token_expired(client: AsyncClient):
     """Test refreshing an access token with an expired refresh token."""
     # Register user
     user_email = "refresh_expired@example.com"
     user_password = "password"
-    await client.post(
+    register_response = await client.post(
         "/api/v1/auth/register", json={"email": user_email, "password": user_password}
     )
-
-    # Fetch user to get ID
-    result = await db_session.execute(select(User).where(User.email == user_email))
-    user = result.scalar_one_or_none()
+    assert register_response.status_code == 201
+    user_data = register_response.json()
 
     # Manually create an expired refresh token
     now = datetime.now(UTC)
     expired_refresh_payload = {
-        "sub": user.id,
-        "email": user.email,
+        "sub": user_data["id"],
+        "email": user_data["email"],
         "exp": now - timedelta(days=1),  # Expired 1 day ago
         "iat": now - timedelta(days=2),
         "type": "refresh",

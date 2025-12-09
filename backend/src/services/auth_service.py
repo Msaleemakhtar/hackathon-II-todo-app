@@ -25,7 +25,7 @@ async def register_user(db: AsyncSession, user_data: RegisterRequest) -> UserRes
         raise AppException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user with this email already exists",
-            code="EMAIL_ALREADY_EXISTS"
+            code="EMAIL_ALREADY_EXISTS",
         )
 
     # Hash password
@@ -39,7 +39,7 @@ async def register_user(db: AsyncSession, user_data: RegisterRequest) -> UserRes
         ),
         email=user_data.email,
         password_hash=hashed_password,
-        name=user_data.name
+        name=user_data.name,
     )
 
     db.add(user)
@@ -60,13 +60,14 @@ async def authenticate_user(
         raise AppException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
-            code="INVALID_CREDENTIALS"
+            code="INVALID_CREDENTIALS",
         )
 
     access_token = create_access_token(user.id, user.email)
     refresh_token = create_refresh_token(user.id, user.email)
 
     return access_token, refresh_token, user.id
+
 
 async def refresh_access_token(db: AsyncSession, refresh_token: str) -> str:
     """Refresh an access token using a valid refresh token."""
@@ -78,20 +79,20 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> str:
             raise AppException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid refresh token payload",
-                code="INVALID_TOKEN"
+                code="INVALID_TOKEN",
             )
     except ValueError as e:
         if str(e) == "TOKEN_EXPIRED":
             raise AppException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh token has expired. Please log in again",
-                code="REFRESH_TOKEN_EXPIRED"
+                code="REFRESH_TOKEN_EXPIRED",
             )
         else:
             raise AppException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication token",
-                code="INVALID_TOKEN"
+                code="INVALID_TOKEN",
             )
 
     # Ensure user still exists
@@ -101,7 +102,7 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> str:
         raise AppException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
-            code="INVALID_TOKEN"
+            code="INVALID_TOKEN",
         )
 
     return create_access_token(user.id, user.email)
