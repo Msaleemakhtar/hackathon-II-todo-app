@@ -205,6 +205,8 @@ If ALL true, suggest:
 - Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose (001-foundational-backend-setup)
 - Neon Serverless PostgreSQL (asyncpg driver, connection pooling: min=2, max=5) (001-foundational-backend-setup)
 - Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, pydantic-settings (002-task-tag-api)
+- TypeScript (for frontend) + Next.js 16, React, shadcn/ui, Tailwind CSS, Zustand, axios (003-task-dashboard-ui)
+- N/A (Data is consumed from the backend PostgreSQL database via APIs) (003-task-dashboard-ui)
 
 ## Recent Changes
 - 001-foundational-backend-setup: Added Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose
