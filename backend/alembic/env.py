@@ -13,7 +13,10 @@ backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from src.core.config import settings
-from src.models import *  # Import all models to register with SQLModel metadata
+from src.models.user import User
+from src.models.task import Task
+from src.models.tag import Tag
+from src.models.task_tag_link import TaskTagLink
 
 config = context.config
 

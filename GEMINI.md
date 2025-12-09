@@ -1,4 +1,4 @@
-# Claude Code Rules
+# Gemini CLI Rules
 
 You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
 
@@ -204,6 +204,21 @@ If ALL true, suggest:
 ## Active Technologies
 - Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose (001-foundational-backend-setup)
 - Neon Serverless PostgreSQL (asyncpg driver, connection pooling: min=2, max=5) (001-foundational-backend-setup)
+- Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, pydantic-settings (002-task-tag-api)
 
 ## Recent Changes
 - 001-foundational-backend-setup: Added Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose
+
+### Generic High-Quality Prompt for Figma-to-Code Conversion
+
+Please adhere to the following requirements:
+
+1.  **Styling:** Use `[Styling Solution, e.g., Tailwind CSS via CDN, vanilla CSS in a <style> tag, separate CSS file]`. The final output should be responsive and match the design's layout and spacing precisely.
+
+2.  **Fonts:** Ensure all necessary fonts, such as [Font Name 1], [Font Name 2], are imported (e.g., from Google Fonts) and applied correctly to the corresponding text elements.
+
+3.  **Asset Handling:** All image and icon assets should be [Asset Handling Preference: linked directly from Figma URLs OR downloaded to a local 'assets' folder and update paths].
+
+4.  **Layout Implementation :** For complex layouts like [describe the complex part, e.g., 'the main content grid', 'the navigation bar'], please use [preferred implementation, e.g., 'CSS Grid with 3 columns', 'CSS Flexbox with space-between'] to ensure accurate alignment.
+
+5.  **Code Quality:** The final code should be clean, semantic, and well-formatted.

@@ -17,3 +17,75 @@ class AppException(HTTPException):
         """Initialize the exception with detail and code."""
         super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.code = code
+
+
+class TaskNotFoundException(AppException):
+    """Exception raised when a task is not found."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+            code="TASK_NOT_FOUND",
+        )
+
+
+class TagNotFoundException(AppException):
+    """Exception raised when a tag is not found."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found",
+            code="TAG_NOT_FOUND",
+        )
+
+
+class TagAlreadyExistsException(AppException):
+    """Exception raised when a tag with the same name already exists."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A tag with this name already exists",
+            code="TAG_ALREADY_EXISTS",
+        )
+
+
+class InvalidPaginationException(AppException):
+    """Exception raised when pagination parameters are invalid."""
+
+    def __init__(self, detail: str = "Page and limit must be positive integers"):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail,
+            code="INVALID_PAGINATION",
+        )
+
+
+class InvalidStatusException(AppException):
+    """Exception raised when status filter value is invalid."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Status must be one of: all, pending, completed",
+            code="INVALID_STATUS",
+        )
+
+
+class InvalidSortFieldException(AppException):
+    """Exception raised when sort field is invalid."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sort field must be one of: due_date, priority, created_at, title",
+            code="INVALID_SORT_FIELD",
+        )

@@ -1,0 +1,792 @@
+openapi: 3.0.0
+info:
+  title: Todo App - Task and Tag Management API
+  version: 1.0.0
+  description: API endpoints for managing tasks and tags within the Todo Application.
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Development Server
+
+tags:
+  - name: Tasks
+    description: Operations related to task management
+  - name: Tags
+    description: Operations related to tag management
+  - name: Task-Tag Associations
+    description: Managing relationships between tasks and tags
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UUIDString:
+      type: string
+      format: uuid
+      example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+
+    Timestamp:
+      type: string
+      format: date-time
+      example: "2025-12-09T10:30:00Z"
+
+    TaskBase:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Buy groceries"
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "Milk, bread, eggs"
+        completed:
+          type: boolean
+          default: false
+          example: false
+        priority:
+          type: string
+          enum: [ "low", "medium", "high" ]
+          default: "medium"
+          example: "high"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-12-15T10:00:00Z"
+      required:
+        - title
+
+    TaskCreate:
+      allOf:
+        - $ref: '#/components/schemas/TaskBase'
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "New task title"
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "Updated description"
+        completed:
+          type: boolean
+          example: true
+        priority:
+          type: string
+          enum: [ "low", "medium", "high" ]
+          example: "low"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-12-20T12:00:00Z"
+
+    TaskPartialUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "New task title"
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "Updated description"
+        completed:
+          type: boolean
+          example: true
+        priority:
+          type: string
+          enum: [ "low", "medium", "high" ]
+          example: "low"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-12-20T12:00:00Z"
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          example: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Work"
+        color:
+          type: string
+          nullable: true
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: "#FF5733"
+        user_id:
+          $ref: '#/components/schemas/UUIDString'
+      required:
+        - id
+        - name
+        - user_id
+
+    TagCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Personal"
+        color:
+          type: string
+          nullable: true
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: "#33FF57"
+      required:
+        - name
+
+    TagUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Office"
+        color:
+          type: string
+          nullable: true
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: "#0000FF"
+      required:
+        - name
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          example: 42
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Buy groceries"
+        description:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "Milk, bread, eggs"
+        completed:
+          type: boolean
+          default: false
+          example: false
+        priority:
+          type: string
+          enum: [ "low", "medium", "high" ]
+          default: "medium"
+          example: "high"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-12-15T10:00:00Z"
+        user_id:
+          $ref: '#/components/schemas/UUIDString'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+          default: []
+      required:
+        - id
+        - title
+        - completed
+        - priority
+        - user_id
+        - created_at
+        - updated_at
+
+    PaginatedTasks:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        total:
+          type: integer
+          example: 150
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        pages:
+          type: integer
+          example: 8
+      required:
+        - items
+        - total
+        - page
+        - limit
+        - pages
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: "Human-readable message"
+        code:
+          type: string
+          example: "ERROR_CODE"
+        field:
+          type: string
+          nullable: true
+          example: "optional_field_name"
+      required:
+        - detail
+        - code
+
+    AuthRequiredError:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: "Authentication required"
+        code:
+          type: string
+          example: "MISSING_TOKEN"
+      required:
+        - detail
+        - code
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
+        code:
+          type: string
+          example: "VALIDATION_ERROR"
+      required:
+        - detail
+        - code
+
+
+  responses:
+    AuthRequired:
+      description: Authentication Required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthRequiredError'
+          examples:
+            MissingToken:
+              value:
+                detail: "Authentication required"
+                code: "MISSING_TOKEN"
+            TokenExpired:
+              value:
+                detail: "Access token has expired"
+                code: "TOKEN_EXPIRED"
+            InvalidToken:
+              value:
+                detail: "Invalid authentication token"
+                code: "INVALID_TOKEN"
+
+    TaskNotFound:
+      description: Task Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            TaskNotFound:
+              value:
+                detail: "Task not found"
+                code: "TASK_NOT_FOUND"
+
+    TagNotFound:
+      description: Tag Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            TagNotFound:
+              value:
+                detail: "Tag not found"
+                code: "TAG_NOT_FOUND"
+
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            InvalidTitle:
+              value:
+                detail: "Title is required and must be 1-200 characters"
+                code: "INVALID_TITLE"
+            DescriptionTooLong:
+              value:
+                detail: "Description cannot exceed 1000 characters"
+                code: "DESCRIPTION_TOO_LONG"
+            InvalidPriority:
+              value:
+                detail: "Priority must be low, medium, or high"
+                code: "INVALID_PRIORITY"
+            InvalidDueDate:
+              value:
+                detail: "Due date must be a valid ISO 8601 datetime"
+                code: "INVALID_DUE_DATE"
+            InvalidTagName:
+              value:
+                detail: "Tag name is required and must be 1-50 characters"
+                code: "INVALID_TAG_NAME"
+            TagAlreadyExists:
+              value:
+                detail: "A tag with this name already exists"
+                code: "TAG_ALREADY_EXISTS"
+            InvalidColor:
+              value:
+                detail: "Color must be a valid hex color (e.g., #FF5733)"
+                code: "INVALID_COLOR"
+            InvalidPagination:
+              value:
+                detail: "Page and limit must be positive integers"
+                code: "INVALID_PAGINATION"
+            InvalidStatus:
+              value:
+                detail: "Status must be one of: all, pending, completed"
+                code: "INVALID_STATUS"
+            InvalidSortField:
+              value:
+                detail: "Sort field must be one of: due_date, priority, created_at, title"
+                code: "INVALID_SORT_FIELD"
+
+    ValidationError:
+      description: Validation Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          examples:
+            PydanticValidationError:
+              value:
+                detail:
+                  - loc: ["body", "title"]
+                    msg: "string too short"
+                    type: "value_error.any_str.min_length"
+                code: "VALIDATION_ERROR"
+
+security:
+  - BearerAuth: []
+
+paths:
+  /tasks:
+    post:
+      summary: Create a new Task
+      tags:
+        - Tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      summary: List Tasks
+      tags:
+        - Tasks
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (must be >= 1)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Items per page (1-100, capped at 100)
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Full-text search on title and description
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [ "all", "pending", "completed" ]
+            default: "all"
+          description: Filter tasks by status
+        - in: query
+          name: priority
+          schema:
+            type: string
+            enum: [ "low", "medium", "high" ]
+          description: Filter tasks by priority
+        - in: query
+          name: tag
+          schema:
+            type: string
+          description: Filter by tag ID (integer) or tag name (string)
+        - in: query
+          name: sort
+          schema:
+            type: string
+            pattern: '^-?(due_date|priority|created_at|title)$'
+          description: "Sort field: 'due_date', 'priority', 'created_at', 'title'. Prefix with '-' for descending (e.g., '-created_at')"
+      responses:
+        '200':
+          description: List of tasks with pagination metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTasks'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+
+  /tasks/{task_id}:
+    get:
+      summary: Get a single Task
+      tags:
+        - Tasks
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: integer
+          required: true
+          description: Unique task identifier
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    put:
+      summary: Update a Task (Full)
+      tags:
+        - Tasks
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: integer
+          required: true
+          description: Unique task identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    patch:
+      summary: Update a Task (Partial)
+      tags:
+        - Tasks
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: integer
+          required: true
+          description: Unique task identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskPartialUpdate'
+      responses:
+        '200':
+          description: Task partially updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      summary: Delete a Task
+      tags:
+        - Tasks
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: integer
+          required: true
+          description: Unique task identifier
+      responses:
+        '204':
+          description: Task deleted successfully
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tags:
+    post:
+      summary: Create a new Tag
+      tags:
+        - Tags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagCreate'
+      responses:
+        '201':
+          description: Tag created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      summary: List Tags
+      tags:
+        - Tags
+      responses:
+        '200':
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+
+  /tags/{tag_id}:
+    put:
+      summary: Update a Tag
+      tags:
+        - Tags
+      parameters:
+        - in: path
+          name: tag_id
+          schema:
+            type: integer
+          required: true
+          description: Unique tag identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagUpdate'
+      responses:
+        '200':
+          description: Tag updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TagNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      summary: Delete a Tag
+      tags:
+        - Tags
+      parameters:
+        - in: path
+          name: tag_id
+          schema:
+            type: integer
+          required: true
+          description: Unique tag identifier
+      responses:
+        '204':
+          description: Tag deleted successfully
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TagNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tasks/{task_id}/tags/{tag_id}:
+    post:
+      summary: Associate Tag with Task
+      tags:
+        - Task-Tag Associations
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: integer
+          required: true
+          description: Unique task identifier
+        - in: path
+          name: tag_id
+          schema:
+            type: integer
+          required: true
+          description: Unique tag identifier
+      responses:
+        '201':
+          description: Tag associated successfully (new association)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '200':
+          description: Association already exists (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '404':
+          description: Tag Not Found (or not owned by user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      summary: Dissociate Tag from Task
+      tags:
+        - Task-Tag Associations
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: integer
+          required: true
+          description: Unique task identifier
+        - in: path
+          name: tag_id
+          schema:
+            type: integer
+          required: true
+          description: Unique tag identifier
+      responses:
+        '204':
+          description: Tag dissociated successfully (idempotent)
+        '401':
+          $ref: '#/components/responses/AuthRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '404':
+          description: Tag Not Found (or not owned by user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'

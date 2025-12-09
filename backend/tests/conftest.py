@@ -4,10 +4,13 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
+from unittest.mock import Mock
+from unittest import mock
 
 from src.main import app
 from src.core.config import settings
 from src.core.database import get_db
+from src.routers import auth
 
 # Test database URL (separate from dev database)
 # If TEST_DATABASE_URL is SQLite but not available, fall back to main PostgreSQL database
@@ -57,6 +60,19 @@ async def db_session():
         await transaction.rollback()
         await connection.close()
         await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset rate limiter storage before each test."""
+    # Clear the rate limiter storage for both app and auth router limiters
+    for limiter in [app.state.limiter, auth.limiter]:
+        if hasattr(limiter, '_storage'):
+            limiter._storage.storage.clear()
+        if hasattr(limiter, 'storage'):
+            if hasattr(limiter.storage, 'storage'):
+                limiter.storage.storage.clear()
+    yield
 
 
 @pytest_asyncio.fixture
