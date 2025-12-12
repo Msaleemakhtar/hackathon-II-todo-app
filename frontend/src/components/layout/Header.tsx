@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUIStore } from '@/store/ui-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Bell, Settings } from 'lucide-react';
+import { Search, Bell, Settings, Menu } from 'lucide-react';
 
-const Header = () => {
+const HeaderComponent = () => {
   const router = useRouter();
-  const { searchTerm, setSearchTerm } = useUIStore();
+  const { searchTerm, setSearchTerm, toggleSidebar } = useUIStore();
   const [currentDate, setCurrentDate] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -53,22 +53,33 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+      <div className="flex items-center justify-between gap-3">
+        {/* Mobile Menu Button */}
+        <Button
+          id="mobile-menu-button"
+          variant="ghost"
+          size="sm"
+          className="lg:hidden p-2"
+          onClick={toggleSidebar}
+        >
+          <Menu className="h-5 w-5 text-gray-600" />
+        </Button>
+
         {/* Search Bar */}
         <div className="flex items-center space-x-2 flex-1 max-w-xl">
           <div className="relative flex-1">
             <Input
               type="text"
               placeholder="Search your task here..."
-              className="pr-10"
+              className="pr-10 h-9 md:h-10 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <Button
               size="sm"
               variant="ghost"
-              className="absolute right-0 top-0 h-full px-3"
+              className="absolute right-0 top-0 h-full px-2 md:px-3"
             >
               <Search className="h-4 w-4 text-gray-500" />
             </Button>
@@ -76,7 +87,7 @@ const Header = () => {
         </div>
 
         {/* Right Side Icons and Date */}
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-2 md:space-x-6">
           {/* Notification Icon */}
           <div className="relative" ref={notificationRef}>
             <Button
@@ -141,14 +152,14 @@ const Header = () => {
           <Button
             size="sm"
             variant="ghost"
-            className="p-2"
+            className="p-2 hidden md:flex"
             onClick={handleSettingsClick}
           >
             <Settings className="h-5 w-5 text-gray-600" />
           </Button>
 
           {/* Current Date */}
-          <div className="text-sm font-medium text-gray-700">
+          <div className="text-xs md:text-sm font-medium text-gray-700 hidden sm:block">
             {currentDate}
           </div>
         </div>
@@ -156,5 +167,9 @@ const Header = () => {
     </header>
   );
 };
+
+// Memoize Header to prevent unnecessary re-renders on navigation
+const Header = memo(HeaderComponent);
+Header.displayName = 'Header';
 
 export default Header;

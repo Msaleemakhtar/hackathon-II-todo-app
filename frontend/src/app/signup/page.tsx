@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import apiClient from '@/lib/api-client';
+import { signUp } from '@/lib/auth';
 
 const SignUpPage = () => {
   const router = useRouter();
@@ -45,31 +45,24 @@ const SignUpPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.post('/auth/register', {
-        full_name: `${formData.firstName} ${formData.lastName}`,
+      // Use Better Auth's email/password signUp method
+      const result = await signUp.email({
         email: formData.email,
         password: formData.password,
+        name: `${formData.firstName} ${formData.lastName}`,
       });
 
-      // Auto-login after registration
-      const loginFormData = new URLSearchParams();
-      loginFormData.append('username', formData.email);
-      loginFormData.append('password', formData.password);
+      // Check if sign up was successful
+      if (result.error) {
+        setError(result.error.message || 'Failed to create account. Please try again.');
+        setIsLoading(false);
+        return;
+      }
 
-      const loginResponse = await apiClient.post('/auth/login', loginFormData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
-
-      const { access_token } = loginResponse.data;
-      localStorage.setItem('access_token', access_token);
-
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Redirect to login page after successful registration
+      router.push('/login');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create account. Please try again.');
-    } finally {
+      setError(err.message || 'Failed to create account. Please try again.');
       setIsLoading(false);
     }
   };

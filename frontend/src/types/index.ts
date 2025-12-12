@@ -3,7 +3,8 @@ export type Task = {
   title: string;
   description: string | null;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
+  priority: string; // Dynamic priority from categories
+  status: string; // Task status: pending, in_progress, completed
   due_date: string | null;
   created_at: string;
   updated_at: string;

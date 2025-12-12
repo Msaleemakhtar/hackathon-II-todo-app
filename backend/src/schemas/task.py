@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.schemas.tag import TagRead
 
@@ -18,13 +18,28 @@ class TaskCreate(BaseModel):
     completed: bool = Field(False, description="Completion status")
     priority: str = Field(
         "medium",
-        pattern="^(low|medium|high)$",
-        description="Task priority: low, medium, or high",
+        min_length=1,
+        max_length=50,
+        description="Task priority (validated against user's priority categories)",
+    )
+    status: str = Field(
+        "pending",
+        min_length=1,
+        max_length=50,
+        description="Task status (pending, in_progress, completed)",
     )
     due_date: Optional[datetime] = Field(None, description="Task due date")
     recurrence_rule: Optional[str] = Field(
         None, description="iCal RRULE string for recurring tasks"
     )
+
+    @field_validator("due_date")
+    @classmethod
+    def remove_timezone(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Convert timezone-aware datetime to timezone-naive for database compatibility."""
+        if v is not None and v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
 
 
 class TaskUpdate(BaseModel):
@@ -36,12 +51,23 @@ class TaskUpdate(BaseModel):
     )
     completed: bool = Field(..., description="Completion status")
     priority: str = Field(
-        ..., pattern="^(low|medium|high)$", description="Task priority"
+        ..., min_length=1, max_length=50, description="Task priority (validated against user's priority categories)"
+    )
+    status: str = Field(
+        ..., min_length=1, max_length=50, description="Task status (pending, in_progress, completed)"
     )
     due_date: Optional[datetime] = Field(None, description="Task due date")
     recurrence_rule: Optional[str] = Field(
         None, description="iCal RRULE string for recurring tasks"
     )
+
+    @field_validator("due_date")
+    @classmethod
+    def remove_timezone(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Convert timezone-aware datetime to timezone-naive for database compatibility."""
+        if v is not None and v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
 
 
 class TaskPartialUpdate(BaseModel):
@@ -55,12 +81,23 @@ class TaskPartialUpdate(BaseModel):
     )
     completed: Optional[bool] = Field(None, description="Completion status")
     priority: Optional[str] = Field(
-        None, pattern="^(low|medium|high)$", description="Task priority"
+        None, min_length=1, max_length=50, description="Task priority (validated against user's priority categories)"
+    )
+    status: Optional[str] = Field(
+        None, min_length=1, max_length=50, description="Task status (pending, in_progress, completed)"
     )
     due_date: Optional[datetime] = Field(None, description="Task due date")
     recurrence_rule: Optional[str] = Field(
         None, description="iCal RRULE string for recurring tasks"
     )
+
+    @field_validator("due_date")
+    @classmethod
+    def remove_timezone(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Convert timezone-aware datetime to timezone-naive for database compatibility."""
+        if v is not None and v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
 
 
 class TaskRead(BaseModel):
@@ -73,6 +110,7 @@ class TaskRead(BaseModel):
     description: Optional[str] = Field(None, description="Task description")
     completed: bool = Field(..., description="Completion status")
     priority: str = Field(..., description="Task priority")
+    status: str = Field(..., description="Task status (pending, in_progress, completed)")
     due_date: Optional[datetime] = Field(None, description="Task due date")
     recurrence_rule: Optional[str] = Field(
         None, description="iCal RRULE string for recurring tasks"
