@@ -8,7 +8,7 @@ type TaskDisplay = Task & {
 
 interface TaskListProps {
   tasks: TaskDisplay[];
-  onToggleComplete: (taskId: number, completed: boolean) => void;
+  onToggleComplete: (taskId: number, status: string) => void;
 }
 
 const TaskList = ({ tasks, onToggleComplete }: TaskListProps) => {

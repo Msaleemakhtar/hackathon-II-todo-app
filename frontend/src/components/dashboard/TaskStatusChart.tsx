@@ -47,7 +47,9 @@ const CircularProgress = ({ percentage, color, label, Icon }: CircularProgressPr
         </svg>
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <Icon className="h-5 w-5 mb-1" style={{ color }} />
+          <div style={{ color }}>
+            <Icon className="h-5 w-5 mb-1" />
+          </div>
           <span className="text-lg font-bold text-gray-900">{percentage}%</span>
         </div>
       </div>
@@ -59,9 +61,10 @@ const CircularProgress = ({ percentage, color, label, Icon }: CircularProgressPr
 const TaskStatusChart = ({ tasks }: TaskStatusChartProps) => {
   const totalTasks = tasks.length;
 
-  const completed = tasks.filter(t => t.completed).length;
-  const inProgress = tasks.filter(t => !t.completed && t.is_loading).length;
-  const notStarted = tasks.filter(t => !t.completed && !t.is_loading).length;
+  // Use actual status field for categorization
+  const completed = tasks.filter(t => t.status === 'completed').length;
+  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+  const notStarted = tasks.filter(t => ['not_started', 'pending'].includes(t.status)).length;
 
   const completedPercentage = totalTasks > 0 ? Math.round((completed / totalTasks) * 100) : 0;
   const inProgressPercentage = totalTasks > 0 ? Math.round((inProgress / totalTasks) * 100) : 0;

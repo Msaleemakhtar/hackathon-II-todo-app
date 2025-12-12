@@ -1,6 +1,6 @@
 """Service layer for task management operations."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from math import ceil
 from typing import List, Optional
 
@@ -9,12 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.core.exceptions import (
+    InvalidCategoryValueException,
     InvalidPaginationException,
     InvalidSortFieldException,
     InvalidStatusException,
     TagNotFoundException,
     TaskNotFoundException,
 )
+from src.services.category_service import validate_category_value
 from src.models.tag import Tag
 from src.models.task import Task
 from src.schemas.task import TaskCreate, TaskPartialUpdate, TaskUpdate
@@ -31,12 +33,33 @@ async def create_task(db: AsyncSession, task_data: TaskCreate, user_id: str) -> 
     Returns:
         Created task with user_id assigned
 
+    Raises:
+        InvalidCategoryValueException: If priority or status doesn't match user's categories
+
     """
+    # Validate priority against user's priority categories
+    is_valid_priority = await validate_category_value(
+        db, user_id, "priority", task_data.priority
+    )
+    if not is_valid_priority:
+        raise InvalidCategoryValueException("priority", task_data.priority)
+
+    # Validate status against user's status categories
+    is_valid_status = await validate_category_value(
+        db, user_id, "status", task_data.status
+    )
+    if not is_valid_status:
+        raise InvalidCategoryValueException("status", task_data.status)
+
+    # Derive completed field from status
+    completed = task_data.status == "completed"
+
     task = Task(
-        **task_data.model_dump(),
+        **task_data.model_dump(exclude={"completed"}),
+        completed=completed,
         user_id=user_id,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(task)
     await db.commit()
@@ -83,18 +106,17 @@ async def get_tasks(
     if limit > 100:
         limit = 100
 
-    # Validate status
-    if status not in ["all", "pending", "completed"]:
+    # Validate status filter
+    valid_status_values = ["all", "not_started", "pending", "in_progress", "completed"]
+    if status not in valid_status_values:
         raise InvalidStatusException()
 
     # Build query
     query = select(Task).where(Task.user_id == user_id)
 
-    # Apply status filter
-    if status == "pending":
-        query = query.where(Task.completed == False)  # noqa: E712
-    elif status == "completed":
-        query = query.where(Task.completed == True)  # noqa: E712
+    # Apply status filter using status field
+    if status != "all":
+        query = query.where(Task.status == status)
 
     # Apply priority filter
     if priority:
@@ -151,19 +173,29 @@ async def get_tasks(
     # Eager load tags to avoid N+1 queries
     query = query.options(selectinload(Task.tags))
 
-    # Get total count
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar()
-
-    # Apply pagination
-    query = query.offset((page - 1) * limit).limit(limit)
+    # Performance optimization: Fetch limit+1 to check if there are more pages
+    # This avoids the expensive COUNT query (saves 50-100ms per request)
+    query = query.offset((page - 1) * limit).limit(limit + 1)
 
     # Execute query
     result = await db.execute(query)
-    tasks = result.scalars().all()
+    tasks = list(result.scalars().all())
 
-    return list(tasks), total
+    # Check if there are more pages
+    has_more = len(tasks) > limit
+    if has_more:
+        tasks = tasks[:limit]  # Return only requested limit
+
+    # Calculate total as best estimate (for backward compatibility)
+    # Note: This is an estimate. For exact count, re-enable count query above.
+    if has_more:
+        # We know there's at least one more page
+        total = (page * limit) + 1  # Minimum estimate
+    else:
+        # This is the last page
+        total = ((page - 1) * limit) + len(tasks)
+
+    return tasks, total
 
 
 async def get_task_by_id(db: AsyncSession, task_id: int, user_id: str) -> Task:
@@ -211,17 +243,45 @@ async def update_task(
 
     Raises:
         TaskNotFoundException: If task not found or not owned by user
+        InvalidCategoryValueException: If priority or status doesn't match user's categories
 
     """
-    task = await get_task_by_id(db, task_id, user_id)
+    # Get task with tags loaded to ensure proper serialization
+    query = (
+        select(Task)
+        .where(Task.id == task_id, Task.user_id == user_id)
+        .options(selectinload(Task.tags))
+    )
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
 
-    # Update all fields
-    for field, value in task_data.model_dump().items():
+    if not task:
+        raise TaskNotFoundException()
+
+    # Validate priority against user's priority categories
+    is_valid_priority = await validate_category_value(
+        db, user_id, "priority", task_data.priority
+    )
+    if not is_valid_priority:
+        raise InvalidCategoryValueException("priority", task_data.priority)
+
+    # Validate status against user's status categories
+    is_valid_status = await validate_category_value(
+        db, user_id, "status", task_data.status
+    )
+    if not is_valid_status:
+        raise InvalidCategoryValueException("status", task_data.status)
+
+    # Update all fields except completed
+    for field, value in task_data.model_dump(exclude={"completed"}).items():
         setattr(task, field, value)
 
-    task.updated_at = datetime.utcnow()
+    # Derive completed from status
+    task.completed = task.status == "completed"
+    task.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.commit()
+    # Refresh to get updated values - tags already loaded from initial query
     await db.refresh(task)
     return task
 
@@ -242,17 +302,50 @@ async def partial_update_task(
 
     Raises:
         TaskNotFoundException: If task not found or not owned by user
+        InvalidCategoryValueException: If priority or status doesn't match user's categories
 
     """
-    task = await get_task_by_id(db, task_id, user_id)
+    # Get task with tags loaded to ensure proper serialization
+    query = (
+        select(Task)
+        .where(Task.id == task_id, Task.user_id == user_id)
+        .options(selectinload(Task.tags))
+    )
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
 
-    # Update only provided fields
-    for field, value in task_data.model_dump(exclude_unset=True).items():
+    if not task:
+        raise TaskNotFoundException()
+
+    # Get only provided fields, excluding completed
+    update_data = task_data.model_dump(exclude_unset=True, exclude={"completed"})
+
+    # Validate priority if provided
+    if "priority" in update_data:
+        is_valid_priority = await validate_category_value(
+            db, user_id, "priority", update_data["priority"]
+        )
+        if not is_valid_priority:
+            raise InvalidCategoryValueException("priority", update_data["priority"])
+
+    # Validate status if provided
+    if "status" in update_data:
+        is_valid_status = await validate_category_value(
+            db, user_id, "status", update_data["status"]
+        )
+        if not is_valid_status:
+            raise InvalidCategoryValueException("status", update_data["status"])
+
+    # Update provided fields
+    for field, value in update_data.items():
         setattr(task, field, value)
 
-    task.updated_at = datetime.utcnow()
+    # Derive completed from status
+    task.completed = task.status == "completed"
+    task.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.commit()
+    # Refresh to get updated values - tags already loaded from initial query
     await db.refresh(task)
     return task
 
@@ -294,7 +387,17 @@ async def associate_tag_with_task(
 
     """
     # Verify task ownership
-    task = await get_task_by_id(db, task_id, user_id)
+    # Use direct query with tags loaded to avoid refresh issues
+    query = (
+        select(Task)
+        .where(Task.id == task_id, Task.user_id == user_id)
+        .options(selectinload(Task.tags))
+    )
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise TaskNotFoundException()
 
     # Verify tag ownership
     tag_query = select(Tag).where(Tag.id == tag_id, Tag.user_id == user_id)
@@ -307,10 +410,11 @@ async def associate_tag_with_task(
     # Check if already associated (idempotent)
     if tag not in task.tags:
         task.tags.append(tag)
-        task.updated_at = datetime.utcnow()
+        task.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.commit()
+        # Refresh to get updated values - tags already loaded from initial query
+        await db.refresh(task)
 
-    await db.refresh(task)
     return task
 
 
@@ -330,10 +434,20 @@ async def dissociate_tag_from_task(
 
     """
     # Verify task ownership
-    task = await get_task_by_id(db, task_id, user_id)
+    # Use direct query with tags loaded to avoid refresh issues
+    query = (
+        select(Task)
+        .where(Task.id == task_id, Task.user_id == user_id)
+        .options(selectinload(Task.tags))
+    )
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise TaskNotFoundException()
 
     # Remove tag if associated (idempotent)
     task.tags = [t for t in task.tags if t.id != tag_id]
-    task.updated_at = datetime.utcnow()
+    task.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.commit()

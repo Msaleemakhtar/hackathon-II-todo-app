@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import withAuth from '@/components/withAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,15 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Lock, Save } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { useAuth } from '@/hooks/useAuth';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function SettingsPage() {
+  const { user } = useAuth();
   const [accountInfo, setAccountInfo] = useState({
-    firstName: 'Sundar',
-    lastName: 'Gurung',
-    email: 'sundargurung360@gmail.com',
-    contactNumber: '',
-    position: ''
+    name: '',
+    email: ''
   });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -27,17 +28,47 @@ function SettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        const response = await apiClient.get(`/v1/${user.id}/profile`);
+        setAccountInfo({
+          name: response.data.name || '',
+          email: response.data.email || ''
+        });
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+        setMessage({ type: 'error', text: 'Failed to load profile data.' });
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user?.id]);
+
   const handleUpdateAccountInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
     setIsLoading(true);
 
+    if (!user?.id) {
+      setMessage({ type: 'error', text: 'User not authenticated.' });
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // TODO: Implement actual API call when backend endpoint is ready
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      await apiClient.patch(`/v1/${user.id}/profile`, {
+        name: accountInfo.name
+      });
 
       setMessage({ type: 'success', text: 'Account information updated successfully!' });
     } catch (error) {
+      console.error('Failed to update profile:', error);
       setMessage({ type: 'error', text: 'Failed to update account information.' });
     } finally {
       setIsLoading(false);
@@ -73,12 +104,61 @@ function SettingsPage() {
     }
   };
 
+  if (isLoadingProfile) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        {/* Header Skeleton */}
+        <div className="mb-6 space-y-3">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+
+        {/* Tabs Skeleton */}
+        <div className="space-y-6">
+          {/* Tab Buttons Skeleton */}
+          <div className="flex gap-4">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 flex-1" />
+          </div>
+
+          {/* Tab Content Skeleton */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            {/* Title */}
+            <Skeleton className="h-6 w-56 mb-6" />
+
+            {/* Form Fields Skeleton */}
+            <div className="space-y-6">
+              {/* Name Field */}
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-11 w-full" />
+              </div>
+
+              {/* Email Field */}
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4">
+                <Skeleton className="h-11 flex-1" />
+                <Skeleton className="h-11 flex-1" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings</h1>
-        <p className="text-gray-600">Manage your account settings and preferences</p>
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Settings</h1>
+        <p className="text-sm md:text-base text-gray-600">Manage your account settings and preferences</p>
       </div>
 
       {/* Message Alert */}
@@ -96,49 +176,37 @@ function SettingsPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="account" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="account" className="gap-2">
-            <User className="h-4 w-4" />
-            Account Information
+        <TabsList className="grid w-full grid-cols-2 mb-4 md:mb-6">
+          <TabsTrigger value="account" className="gap-1 md:gap-2 text-xs md:text-sm">
+            <User className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Account Information</span>
+            <span className="sm:hidden">Account</span>
           </TabsTrigger>
-          <TabsTrigger value="password" className="gap-2">
-            <Lock className="h-4 w-4" />
-            Change Password
+          <TabsTrigger value="password" className="gap-1 md:gap-2 text-xs md:text-sm">
+            <Lock className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Change Password</span>
+            <span className="sm:hidden">Password</span>
           </TabsTrigger>
         </TabsList>
 
         {/* Account Information Tab */}
         <TabsContent value="account">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold mb-6 text-gray-900">Account Information</h2>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
+            <h2 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-gray-900">Account Information</h2>
 
             <form onSubmit={handleUpdateAccountInfo} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    value={accountInfo.firstName}
-                    onChange={(e) =>
-                      setAccountInfo({ ...accountInfo, firstName: e.target.value })
-                    }
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    value={accountInfo.lastName}
-                    onChange={(e) =>
-                      setAccountInfo({ ...accountInfo, lastName: e.target.value })
-                    }
-                    className="h-11"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={accountInfo.name}
+                  onChange={(e) =>
+                    setAccountInfo({ ...accountInfo, name: e.target.value })
+                  }
+                  placeholder="Enter your name"
+                  className="h-11"
+                />
               </div>
 
               <div className="space-y-2">
@@ -147,37 +215,11 @@ function SettingsPage() {
                   id="email"
                   type="email"
                   value={accountInfo.email}
-                  onChange={(e) => setAccountInfo({ ...accountInfo, email: e.target.value })}
-                  className="h-11"
+                  disabled
+                  className="h-11 bg-gray-100 cursor-not-allowed"
+                  title="Email cannot be changed"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="contactNumber">Contact Number</Label>
-                <Input
-                  id="contactNumber"
-                  type="tel"
-                  placeholder="Enter your contact number"
-                  value={accountInfo.contactNumber}
-                  onChange={(e) =>
-                    setAccountInfo({ ...accountInfo, contactNumber: e.target.value })
-                  }
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="position">Position</Label>
-                <Input
-                  id="position"
-                  type="text"
-                  placeholder="Enter your position"
-                  value={accountInfo.position}
-                  onChange={(e) =>
-                    setAccountInfo({ ...accountInfo, position: e.target.value })
-                  }
-                  className="h-11"
-                />
+                <p className="text-xs text-gray-500">Email address cannot be changed</p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -199,10 +241,13 @@ function SettingsPage() {
 
         {/* Change Password Tab */}
         <TabsContent value="password">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold mb-6 text-gray-900">Change Password</h2>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
+            <h2 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-gray-900">Change Password</h2>
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 p-4 rounded-lg mb-4">
+              <p className="text-sm">Password management is handled through our authentication system. To change your password, please log out and use the &quot;Forgot Password&quot; feature on the login page.</p>
+            </div>
 
-            <form onSubmit={handleChangePassword} className="space-y-4">
+            <form onSubmit={handleChangePassword} className="space-y-4" style={{ opacity: 0.6, pointerEvents: 'none' }}>
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">Current Password</Label>
                 <Input

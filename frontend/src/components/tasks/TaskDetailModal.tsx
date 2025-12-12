@@ -1,13 +1,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Flag, CheckCircle2, Trash2, X } from 'lucide-react';
+import { Calendar, Clock, Flag, CheckCircle2, Trash2, X, Tag as TagIcon } from 'lucide-react';
+import { useState } from 'react';
 
 interface TaskDetailModalProps {
   task: any;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onToggleComplete: (taskId: number, completed: boolean) => void;
+  onToggleComplete: (taskId: number, status: string) => void;
   onDelete: (taskId: number) => void;
 }
 
@@ -18,6 +19,8 @@ const TaskDetailModal = ({
   onToggleComplete,
   onDelete
 }: TaskDetailModalProps) => {
+  const [isUpdating, setIsUpdating] = useState(false);
+
   if (!task) return null;
 
   const getPriorityColor = (priority: string) => {
@@ -33,8 +36,16 @@ const TaskDetailModal = ({
     }
   };
 
-  const handleToggleComplete = () => {
-    onToggleComplete(task.id, !task.completed);
+  const handleToggleComplete = async () => {
+    setIsUpdating(true);
+    try {
+      await onToggleComplete(task.id, task.status === 'completed' ? 'not_started' : 'completed');
+      // Give a small delay for the state to update before allowing another action
+      setTimeout(() => setIsUpdating(false), 500);
+    } catch (error) {
+      console.error('Failed to toggle task status:', error);
+      setIsUpdating(false);
+    }
   };
 
   const handleDelete = () => {
@@ -69,8 +80,8 @@ const TaskDetailModal = ({
               Priority: {task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Medium'}
             </Badge>
 
-            <Badge className={task.completed ? 'bg-green-100 text-green-700 border-green-200 border' : 'bg-yellow-100 text-yellow-700 border-yellow-200 border'}>
-              Status: {task.completed ? 'Completed' : 'In Progress'}
+            <Badge className={task.status === 'completed' ? 'bg-green-100 text-green-700 border-green-200 border' : 'bg-yellow-100 text-yellow-700 border-yellow-200 border'}>
+              Status: {task.status.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
             </Badge>
           </div>
 
@@ -111,30 +122,46 @@ const TaskDetailModal = ({
             </div>
           </div>
 
-          {/* Additional Notes Section */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3 text-gray-900">Additional Notes</h3>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <p className="text-sm text-gray-600">
-                {task.notes || 'No additional notes available.'}
-              </p>
+          {/* Tags Section */}
+          {task.tags && task.tags.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 text-gray-900">Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {task.tags.map((tag: any) => (
+                  <Badge key={tag.id} className="bg-blue-100 text-blue-700 border-blue-200 border">
+                    <TagIcon className="h-3 w-3 mr-1" />
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <Button
               onClick={handleToggleComplete}
+              disabled={isUpdating}
               className={task.completed ? 'flex-1 bg-gray-600 hover:bg-gray-700' : 'flex-1 bg-green-600 hover:bg-green-700'}
             >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              {task.completed ? 'Mark as Incomplete' : 'Mark as Complete'}
+              {isUpdating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  {task.completed ? 'Mark as Pending' : 'Mark as Complete'}
+                </>
+              )}
             </Button>
 
             <Button
               onClick={handleDelete}
               variant="destructive"
               className="flex-1"
+              disabled={isUpdating}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete Task

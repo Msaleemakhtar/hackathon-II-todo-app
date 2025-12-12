@@ -27,6 +27,19 @@ class TagUpdate(BaseModel):
     )
 
 
+class TagPartialUpdate(BaseModel):
+    """Schema for partial tag update (PATCH)."""
+
+    name: Optional[str] = Field(
+        None, min_length=1, max_length=50, description="Tag name"
+    )
+    color: Optional[str] = Field(
+        None,
+        pattern=r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$",
+        description="Tag color in hex format (e.g., #FF5733)",
+    )
+
+
 class TagRead(BaseModel):
     """Schema for tag response."""
 

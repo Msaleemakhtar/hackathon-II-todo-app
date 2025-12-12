@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from .core.config import settings, validate_settings
 from .core.exceptions import AppException
 from .core.logging_config import setup_logging
-from .routers import auth, tags, tasks
+from .routers import categories, tags, tasks, users
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,  # Environment-configurable
     allow_credentials=True,  # Required for HttpOnly cookies
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
     max_age=600,  # Cache preflight requests for 10 minutes
 )
@@ -66,6 +66,7 @@ async def health_check():
     """Provide a health check endpoint for container orchestration."""
     return {"status": "healthy"}
 
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["Tasks"])
-app.include_router(tags.router, prefix="/api/v1/tags", tags=["Tags"])
+app.include_router(tasks.router, prefix="/api/v1", tags=["Tasks"])
+app.include_router(tags.router, prefix="/api/v1", tags=["Tags"])
+app.include_router(categories.router, prefix="/api/v1", tags=["Categories"])
+app.include_router(users.router, prefix="/api/v1", tags=["Users"])

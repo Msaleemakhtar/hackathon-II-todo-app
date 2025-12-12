@@ -17,6 +17,7 @@ from src.models.user import User
 from src.models.task import Task
 from src.models.tag import Tag
 from src.models.task_tag_link import TaskTagLink
+from src.models.category import Category
 
 config = context.config
 

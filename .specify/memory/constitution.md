@@ -1,37 +1,68 @@
 <!--
 SYNC IMPACT REPORT:
-Version Change: 2.1.1 -> 2.2.0
-Amendment Date: 2025-12-09
+Version Change: 2.2.0 -> 2.3.0
+Amendment Date: 2025-12-10
 
 Modified Principles:
-  - I. Spec-Driven Development:
-    * CHANGED: "Exception for AI Limitations" rule relaxed from rigid "three refinement cycles"
-      to flexible "reasonable refinement efforts" while maintaining strict documentation requirements
-    * RATIONALE: Rigid cycle count was impractical; quality of refinement matters more than count
-
   - IV. User Authentication & JWT Security:
-    * CHANGED: "Authentication Flow" clarified that frontend sends credentials but backend is
-      solely responsible for authenticating users and issuing JWTs
-    * CHANGED: "Security Standards" - removed "optional" status from refresh token rotation and
-      token blacklisting; explicitly marked as OUT OF SCOPE for Phase II with future target
-    * ADDED: "Backend Validation" enhanced with explicit user ID path parameter matching requirement
-      for APIs with user ID in path (e.g., /users/{user_id}/tasks)
-    * RATIONALE: Clarifies architectural responsibilities and eliminates security ambiguity
+    * CHANGED: "Authentication Flow" updated to reflect Better Auth JWT plugin integration
+      where Better Auth handles token issuance and validation against shared secret
+    * CHANGED: "Data Scoping" clarified that JWT user_id is authoritative source, not path parameter
+    * CHANGED: "Security Standards" updated to specify HS256 with Better Auth shared secret
+    * RATIONALE: Aligns implementation with Better Auth's architecture and security model
 
-  - IX. CI/CD Pipeline:
-    * CHANGED: "PR Checks" quality gates restructured - strict coverage and performance thresholds
-      moved to non-blocking "Nightly Pipeline" for main branch health reporting
-    * ADDED: PR coverage rule changed to "must not decrease overall coverage percentage"
-    * RATIONALE: Expensive checks on every PR slowed development; nightly checks maintain standards
-      without blocking iteration
+  - III. Persistent & Relational State:
+    * CHANGED: "Data Isolation" enhanced to specify JWT user_id as authoritative source
+    * ADDED: "Multi-User Isolation Testing" requirement for verifying cross-user access prevention
+    * RATIONALE: Ensures data security when path parameters are validated but not used for queries
+
+  - VI. Frontend Architecture Standards:
+    * ADDED: "Authentication Integration" section requiring Better Auth implementation
+    * ADDED: "API Client Implementation" section requiring client at `@/lib/api-client`
+    * RATIONALE: Specifies frontend requirements for Better Auth integration
+
+  - API Design Standards:
+    * CHANGED: "Endpoint Patterns" updated from `/api/v1/{resources}` to `/api/{user_id}/{resources}`
+    * ADDED: "Path Parameter Validation Requirements" section for user ID validation
+    * RATIONALE: Implements required user isolation pattern with validation
+
+Modified Success Criteria:
+  - Functional Requirements:
+    * CHANGED: User Auth requirement updated to reflect Better Auth with JWT plugin
+    * ADDED: API Migration requirement for endpoint pattern changes
+    * RATIONALE: Reflects new authentication and endpoint patterns
+  - Technical Requirements:
+    * ADDED: Better Auth JWT validation requirement
+    * ADDED: Path validation requirement
+    * ADDED: API Client requirement
+    * ADDED: Multi-User Isolation testing requirement
+    * RATIONALE: Ensures proper implementation of new architecture
+
+Modified Constraints:
+  - Technology Constraints:
+    * ADDED: Better Auth authentication requirement
+    * ADDED: New API endpoint format requirement
+    * ADDED: API Client location requirement
+    * RATIONALE: Enforces new architectural patterns
+  - Security Constraints:
+    * CHANGED: Token management to use Better Auth
+    * CHANGED: Data access scoping to use JWT user_id as authoritative source
+    * ADDED: Token validation with shared secret requirement
+    * ADDED: Data isolation clarification about path parameter authority
+    * RATIONALE: Aligns security requirements with Better Auth implementation
+  - Added Migration Constraints section:
+    * ADDED: Endpoint migration requirements
+    * ADDED: API client creation requirement
+    * ADDED: Validation requirement for migrated endpoints
+    * RATIONALE: Provides clear migration path for existing endpoints
 
 Templates Requiring Updates:
-  - None identified - changes are governance/clarification focused
+  - ✅ plan-template.md - checked, no specific updates needed
+  - ✅ spec-template.md - checked, no specific updates needed
+  - ✅ tasks-template.md - checked, no specific updates needed
 
 Follow-up TODOs:
-  - Create GitHub Actions workflow for Nightly Pipeline (coverage >= 80%, Lighthouse >= 90)
-  - Consider ADR for CI/CD pipeline restructuring decision
-  - Update any existing spec files referencing "three refinement cycles" if present
+  - None identified
 -->
 
 # Todo App - Phase II Constitution
@@ -148,15 +179,18 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
   - Migrations MUST be reversible (include upgrade AND downgrade)
   - Migration naming: `YYYYMMDD_HHMMSS_descriptive_name.py`
 - **Connection Pooling**: Production deployments MUST use connection pooling.
-- **Data Isolation**: ALL database queries MUST scope to the authenticated user's ID.
+- **Data Isolation**: ALL database queries MUST scope to the authenticated user's ID from the JWT token, NOT from the path parameter. The JWT user_id is the authoritative source for determining data access rights.
+- **Multi-User Isolation Testing**: All data access functions MUST include tests that verify User A cannot access User B's data, even with valid authentication.
 
 **Verification**:
 - No raw SQL queries outside of migrations
-- All queries include user_id filter (enforced via FastAPI dependencies)
+- All queries include user_id filter from JWT token (enforced via FastAPI dependencies)
 - Alembic migration history matches production schema
 - Database connection uses async context managers
+- Multi-user isolation tests pass for all endpoints
+- Path parameter user_id validation is enforced at API level
 
-**Rationale**: Neon provides serverless PostgreSQL with automatic scaling, SQLModel provides type-safe data access, and Alembic ensures reproducible schema evolution across environments.
+**Rationale**: Neon provides serverless PostgreSQL with automatic scaling, SQLModel provides type-safe data access, and Alembic ensures reproducible schema evolution across environments. The JWT user_id as the authoritative source ensures that even if path parameters are manipulated, data access remains secure.
 
 ---
 
@@ -167,43 +201,35 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
 **Requirements**:
 
 **Authentication Flow**:
-1. **Frontend Auth**: Better Auth library handles user signup/login UI on Next.js frontend. Frontend collects and sends user credentials to the backend.
-2. **Token Issuance**: Backend is solely responsible for authenticating users and issuing JWT tokens. Frontend MUST NOT issue, sign, or generate JWTs. Upon successful authentication, backend issues:
-   - Access Token: 15-minute expiry, contains user ID and roles
-   - Refresh Token: 7-day expiry, used only for token refresh
-3. **Token Management**: Frontend receives tokens from backend and manages their storage and attachment to requests. Frontend only receives and manages tokens; it never creates them.
-4. **Token Attachment**: Frontend axios interceptor attaches access token to `Authorization: Bearer <token>` header on all protected requests.
-5. **Token Refresh Flow**:
-   - axios interceptor detects 401 Unauthorized response
-   - Interceptor calls `/auth/refresh` with refresh token
-   - New access token received and stored
-   - Original request retried with new token
-   - If refresh fails, redirect to login
-6. **Backend Validation**: FastAPI dependency validates access token on all protected endpoints:
-   - Verify signature with secret key
+1. **Frontend Auth**: Better Auth library handles user signup/login UI on Next.js frontend with JWT plugin enabled. Frontend uses Better Auth client-side session management for user authentication state.
+2. **Token Issuance**: Better Auth handles JWT token generation and management on the frontend. The Better Auth JWT plugin issues access tokens that are validated by the backend using a shared secret.
+3. **Token Management**: Better Auth automatically manages token refresh and storage. Frontend MUST use Better Auth's built-in session management rather than implementing custom token storage.
+4. **Token Attachment**: Frontend axios interceptor retrieves the Better Auth JWT token from the session and attaches it to `Authorization: Bearer <token>` header on all protected requests.
+5. **Token Refresh Flow**: Better Auth handles automatic token refresh when needed. The backend only validates tokens according to the shared secret.
+6. **Backend Validation**: FastAPI dependency validates Better Auth JWT tokens on all protected endpoints using the shared secret:
+   - Verify signature with Better Auth shared secret key
    - Check expiration
    - Extract user_id from payload
-   - **Path Parameter Matching**: When user ID appears in the API path (e.g., `/api/v1/users/{user_id}/tasks`), the backend MUST compare the `user_id` extracted from the validated JWT against the `user_id` path parameter. If they do not match, return 403 Forbidden. This prevents users from accessing other users' resources even with a valid token.
-7. **Data Scoping**: User ID from JWT payload MUST scope ALL database queries.
-8. **Secure Storage**:
-   - Refresh tokens stored in HttpOnly, Secure, SameSite=Strict cookies
-   - Access tokens stored in memory only (NOT localStorage)
+   - **Path Parameter Matching**: When user ID appears in the API path (e.g., `/api/{user_id}/tasks`), the backend MUST compare the `user_id` extracted from the validated JWT against the `user_id` path parameter. If they do not match, return 403 Forbidden. This prevents users from accessing other users' resources even with a valid token.
+   - **Data Scoping**: User ID from JWT payload MUST scope ALL database queries. All queries MUST be based on the JWT user_id, NOT the path parameter, to ensure data integrity.
+7. **Secure Storage**: Better Auth manages token storage using browser storage mechanisms. The JWT plugin ensures secure handling of tokens.
 
-**JWT Token Structure**:
+**JWT Token Structure** (issued by Better Auth):
 ```json
 {
   "sub": "<user_id>",
   "email": "<user_email>",
   "exp": "<expiration_timestamp>",
   "iat": "<issued_at_timestamp>",
-  "type": "access|refresh"
+  "role": "<user_role>"
 }
 ```
 
 **Security Standards**:
-- MUST use RS256 or HS256 algorithm (RS256 preferred for production)
+- MUST use HS256 algorithm with Better Auth shared secret
 - Secret keys MUST be at least 256 bits
 - Rate limiting on auth endpoints: 5 attempts per minute per IP
+- All API endpoints that accept user_id in path MUST validate that the JWT user_id matches the path user_id
 
 **Phase II Scope Boundaries**:
 The following security features are explicitly OUT OF SCOPE for Phase II and targeted for future implementation:
@@ -214,12 +240,12 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 **Verification**:
 - All protected routes return 401 without valid token
-- Expired tokens return 401 and trigger refresh flow
-- Refresh tokens cannot be used as access tokens
+- Expired tokens return 401 and trigger refresh flow through Better Auth
 - User A cannot access User B's data (data isolation test)
 - Path parameter user ID mismatches return 403 Forbidden
+- All database queries are scoped to JWT user_id, not path parameter
 
-**Rationale**: Short-lived access tokens limit damage from token theft, refresh tokens enable seamless UX, and proper token storage prevents XSS/CSRF attacks. Backend-only JWT issuance ensures cryptographic operations remain server-side where secrets can be properly protected.
+**Rationale**: Using Better Auth's JWT plugin simplifies frontend authentication while maintaining security through shared secret validation on the backend. The path parameter validation ensures that users can only access resources that belong to them.
 
 ---
 
@@ -300,6 +326,19 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - Zustand for global state (auth state, user preferences)
 - React Query or SWR for server state (tasks, tags)
 - Local component state for UI-only state
+
+**Authentication Integration**:
+- Better Auth library MUST be used for all authentication functionality
+- User sessions managed through Better Auth client-side session management
+- API client at `@/lib/api-client` MUST be implemented to handle Better Auth token attachment
+- Axios interceptor MUST retrieve Better Auth JWT token and attach to `Authorization: Bearer <token>` header
+- User ID MUST be extracted from Better Auth session for URL construction with new API pattern
+
+**API Client Implementation**:
+- Create API client at `@/lib/api-client` that integrates with Better Auth
+- Client MUST construct URLs using the pattern `/api/{user_id}/{resources}` using the user ID from session
+- Client MUST handle 403 Forbidden responses by redirecting to appropriate error states
+- Client MUST handle 401 Unauthorized responses by allowing Better Auth to manage token refresh
 
 **Environment Variables**:
 - `NEXT_PUBLIC_` prefix for browser-exposed variables
@@ -593,12 +632,12 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 | Operation       | Method | Path                          | Success Code |
 |-----------------|--------|-------------------------------|--------------|
-| List resources  | GET    | /api/v1/{resources}           | 200          |
-| Get resource    | GET    | /api/v1/{resources}/{id}      | 200          |
-| Create resource | POST   | /api/v1/{resources}           | 201          |
-| Update resource | PUT    | /api/v1/{resources}/{id}      | 200          |
-| Partial update  | PATCH  | /api/v1/{resources}/{id}      | 200          |
-| Delete resource | DELETE | /api/v1/{resources}/{id}      | 204          |
+| List resources  | GET    | /api/{user_id}/{resources}    | 200          |
+| Get resource    | GET    | /api/{user_id}/{resources}/{id}| 200          |
+| Create resource | POST   | /api/{user_id}/{resources}    | 201          |
+| Update resource | PUT    | /api/{user_id}/{resources}/{id}| 200          |
+| Partial update  | PATCH  | /api/{user_id}/{resources}/{id}| 200          |
+| Delete resource | DELETE | /api/{user_id}/{resources}/{id}| 204          |
 
 ### Authentication Endpoints
 
@@ -632,14 +671,21 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 }
 ```
 
+### Path Parameter Validation Requirements
+
+- All endpoints with `{user_id}` in the path MUST validate that the path parameter matches the JWT user_id
+- Validation MUST occur before executing the business logic
+- Mismatched user_id values MUST return HTTP 403 Forbidden
+- All database queries MUST be scoped using the JWT user_id, NOT the path parameter
+
 ---
 
 ## Success Criteria (Phase II Completion)
 
 ### Functional Requirements
-- [ ] **User Auth**: Users can register, login, logout, and refresh tokens
-- [ ] **Task CRUD**: All basic task operations work correctly
-- [ ] **Data Isolation**: Users only see their own tasks and tags
+- [ ] **User Auth**: Better Auth integration works with JWT plugin for user registration, login, logout, and token refresh
+- [ ] **Task CRUD**: All basic task operations work correctly with new API pattern
+- [ ] **Data Isolation**: Users only see their own tasks and tags; path parameter validation prevents cross-user access
 - [ ] **Priorities**: Tasks can be assigned and filtered by priority
 - [ ] **Tags**: Users can create, edit, delete, and assign tags
 - [ ] **Search**: Full-text search returns relevant results
@@ -647,6 +693,7 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - [ ] **Due Dates**: Tasks display due date indicators correctly
 - [ ] **Notifications**: Browser notifications trigger for due tasks (P3)
 - [ ] **Recurring Tasks**: RRULE parsing and next occurrence calculation (P3)
+- [ ] **API Migration**: All user-specific endpoints migrated to `/api/{user_id}/{resources}` pattern with proper validation
 
 ### Technical Requirements
 - [ ] **AI-Generated Code**: All code generated from specs with exceptions documented
@@ -655,7 +702,10 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - [ ] **CI Pipeline**: All PR checks pass (lint, test, build) on every PR
 - [ ] **Docker**: Both services run via `docker-compose up`
 - [ ] **API Docs**: OpenAPI documentation accurate and complete
-- [ ] **JWT Security**: Token refresh flow works correctly
+- [ ] **JWT Security**: Better Auth JWT validation works correctly with shared secret
+- [ ] **Path Validation**: All endpoints with user_id in path validate against JWT user_id
+- [ ] **API Client**: API client implemented at `@/lib/api-client` with Better Auth integration
+- [ ] **Multi-User Isolation**: Tests verify that users can't access other users' resources
 - [ ] **Performance**: Lighthouse score >= 90 (verified in nightly pipeline)
 
 ### Documentation Requirements
@@ -679,17 +729,27 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **Backend**: Python 3.11+, FastAPI, uv only
 - **Database**: PostgreSQL (Neon Serverless) only
 - **ORM**: SQLModel only (no raw SQLAlchemy)
+- **Authentication**: Better Auth with JWT plugin for frontend authentication
+- **API Endpoint Format**: All user-specific endpoints MUST follow the `/api/{user_id}/{resources}` pattern
+- **API Client Location**: MUST be implemented at `@/lib/api-client` with Better Auth integration
 
 ### Security Constraints
 - **No Secrets in Code**: All secrets via environment variables
-- **Token Storage**: Access tokens in memory, refresh in HttpOnly cookies
-- **Data Access**: All queries scoped to authenticated user
-- **Path Parameter Validation**: User ID in path must match JWT user ID
+- **Token Management**: Better Auth handles token storage and refresh
+- **Data Access**: All queries scoped to authenticated user JWT user_id (NOT path parameter)
+- **Path Parameter Validation**: User ID in path must match JWT user_id; mismatch returns 403 Forbidden
+- **Token Validation**: Backend validates Better Auth JWTs using shared secret
+- **Data Isolation**: Path parameter user_id is NOT authoritative for data access decisions
 
 ### Performance Constraints
 - **API Response Time**: p95 < 200ms for CRUD operations
 - **Frontend TTI**: Time to Interactive < 3 seconds
 - **Database Queries**: No N+1 queries (use eager loading)
+
+### Migration Constraints
+- **Endpoint Migration**: All existing `/api/v1/{resources}` endpoints MUST be migrated to `/api/{user_id}/{resources}` pattern
+- **API Client Creation**: API client at `@/lib/api-client` must be created before endpoint migration
+- **Validation Requirements**: All migrated endpoints MUST implement path parameter validation
 
 ---
 
@@ -803,4 +863,4 @@ Any deviation from this constitution MUST be:
 
 ---
 
-**Version**: 2.2.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-09
+**Version**: 2.3.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-10

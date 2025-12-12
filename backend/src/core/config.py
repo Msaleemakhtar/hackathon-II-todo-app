@@ -23,22 +23,23 @@ class Settings(BaseSettings):
     )
 
     # Database pooling settings (primarily for PostgreSQL)
-    DB_POOL_MIN: int = 2
-    DB_POOL_MAX: int = 5
+    # Optimized for medium-scale concurrent usage (10-100 users)
+    DB_POOL_MIN: int = 5  # Increased from 2 for better responsiveness
+    DB_POOL_MAX: int = 10  # Increased from 5 for higher concurrency
     DB_POOL_RECYCLE: int = 3600
     DB_CONNECTION_TIMEOUT: int = 30
 
-    # JWT
-    JWT_SECRET_KEY: str = Field(
-        ..., min_length=64, description="JWT secret (64+ hex chars)"
+    # Better Auth
+    BETTER_AUTH_SECRET: str = Field(
+        ..., min_length=32, description="Better Auth secret (32+ chars)"
     )
 
-    @field_validator("JWT_SECRET_KEY")
+    @field_validator("BETTER_AUTH_SECRET")
     @classmethod
-    def validate_jwt_secret(cls, v: str) -> str:
-        """Validate that the JWT secret key is at least 64 characters long."""
-        if len(v) < 64:
-            raise ValueError("JWT_SECRET_KEY must be at least 64 characters (256 bits)")
+    def validate_better_auth_secret(cls, v: str) -> str:
+        """Validate that the Better Auth secret key is at least 32 characters long."""
+        if len(v) < 32:
+            raise ValueError("BETTER_AUTH_SECRET must be at least 32 characters")
         return v
 
     # CORS
@@ -63,5 +64,5 @@ settings = Settings()
 # Startup validation
 def validate_settings():
     """Validate settings on application startup."""
-    assert len(settings.JWT_SECRET_KEY) >= 64, "JWT secret too short"
+    assert len(settings.BETTER_AUTH_SECRET) >= 32, "Better Auth secret too short"
     print(f"✅ Settings validated: {settings.APP_NAME}")

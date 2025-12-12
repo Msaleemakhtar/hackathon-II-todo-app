@@ -1,80 +1,191 @@
 import React, { useState } from 'react';
+import { useCategories } from '@/hooks/useCategories';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle2, Calendar, AlertCircle, Flag } from 'lucide-react';
 
 interface CreateTaskFormProps {
-  onSubmit: (taskData: { title: string; description: string; priority: 'low' | 'medium' | 'high'; dueDate: string }) => void;
+  onSubmit: (taskData: { title: string; description: string; priority: string; status: string; dueDate: string }) => void;
+  isLoading?: boolean;
 }
 
-const CreateTaskForm = ({ onSubmit }: CreateTaskFormProps) => {
+const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
+  const { taskPriorities, taskStatuses, isLoadingPriorities, isLoadingStatuses } = useCategories();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [priority, setPriority] = useState('');
+  const [status, setStatus] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ title, description, priority, dueDate });
+
+    // Use the first priority if none selected and priorities are available
+    const selectedPriority = priority || (taskPriorities && taskPriorities.length > 0 ? taskPriorities[0].name : 'medium');
+    const selectedStatus = status || (taskStatuses && taskStatuses.length > 0 ? taskStatuses[0].name : 'not_started');
+
+    await onSubmit({ title, description, priority: selectedPriority, status: selectedStatus, dueDate });
+    // Reset form after successful submission
+    setTitle('');
+    setDescription('');
+    setPriority('');
+    setStatus('');
+    setDueDate('');
+  };
+
+  const getPriorityColor = (priorityName: string) => {
+    const name = priorityName.toLowerCase();
+    if (name.includes('high') || name.includes('urgent')) return 'destructive';
+    if (name.includes('medium')) return 'default';
+    return 'secondary';
+  };
+
+  const getPriorityIcon = (priorityName: string) => {
+    const name = priorityName.toLowerCase();
+    if (name.includes('high') || name.includes('urgent')) return <AlertCircle className="h-3 w-3" />;
+    if (name.includes('medium')) return <Flag className="h-3 w-3" />;
+    return <CheckCircle2 className="h-3 w-3" />;
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-          Title
-        </label>
-        <input
+    <form onSubmit={handleSubmit} className="space-y-3 pt-4">
+      <div className="space-y-2">
+        <Label htmlFor="title" className="text-sm font-semibold text-gray-700">
+          Task Title <span className="text-red-500">*</span>
+        </Label>
+        <Input
           type="text"
           id="title"
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          placeholder="Enter task title..."
+          className="h-11 text-base transition-all duration-200 focus:ring-2 focus:ring-indigo-500"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
         />
+        {title && (
+          <p className="text-xs text-gray-500">{title.length} characters</p>
+        )}
       </div>
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+
+      <div className="space-y-2">
+        <Label htmlFor="description" className="text-sm font-semibold text-gray-700">
           Description
-        </label>
+        </Label>
         <textarea
           id="description"
           rows={3}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          placeholder="Add more details about this task..."
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 resize-none"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+        {description && (
+          <p className="text-xs text-gray-500">{description.length} characters</p>
+        )}
       </div>
-      <div>
-        <label htmlFor="priority" className="block text-sm font-medium text-gray-700">
-          Priority
-        </label>
-        <select
-          id="priority"
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          value={priority}
-          onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-        >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="priority" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Flag className="h-4 w-4" />
+            Priority
+          </Label>
+          {isLoadingPriorities ? (
+            <div className="h-11 rounded-md border border-input bg-muted animate-pulse" />
+          ) : (
+            <div className="space-y-2">
+              {taskPriorities && taskPriorities.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {taskPriorities.map((p) => (
+                    <Badge
+                      key={p.id}
+                      variant={priority === p.name ? getPriorityColor(p.name) : 'outline'}
+                      className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
+                        priority === p.name ? 'ring-2 ring-offset-2 ring-indigo-500' : 'hover:bg-gray-100'
+                      }`}
+                      onClick={() => setPriority(p.name)}
+                    >
+                      {getPriorityIcon(p.name)}
+                      {p.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No priorities available</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="status" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            Status
+          </Label>
+          {isLoadingStatuses ? (
+            <div className="h-11 rounded-md border border-input bg-muted animate-pulse" />
+          ) : (
+            <div className="space-y-2">
+              {taskStatuses && taskStatuses.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {taskStatuses.map((s) => (
+                    <Badge
+                      key={s.id}
+                      variant={status === s.name ? 'default' : 'outline'}
+                      className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
+                        status === s.name ? 'ring-2 ring-offset-2 ring-indigo-500' : 'hover:bg-gray-100'
+                      }`}
+                      onClick={() => setStatus(s.name)}
+                    >
+                      {s.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No statuses available</p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-      <div>
-        <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
+
+      <div className="space-y-2">
+        <Label htmlFor="dueDate" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
           Due Date
-        </label>
-        <input
+        </Label>
+        <Input
           type="date"
           id="dueDate"
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="h-11 transition-all duration-200 focus:ring-2 focus:ring-indigo-500"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
+          min={new Date().toISOString().split('T')[0]}
         />
       </div>
-      <button
-        type="submit"
-        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-      >
-        Create Task
-      </button>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button
+          type="submit"
+          className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+          size="lg"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="h-4 w-4" />
+              Create Task
+            </>
+          )}
+        </Button>
+      </div>
     </form>
   );
 };

@@ -1,0 +1,856 @@
+openapi: 3.0.3
+info:
+  title: Todo App API with Better Auth Integration
+  description: API specification for the Todo App with Better Auth JWT-based authentication
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@todoapp.com
+
+servers:
+  - url: https://api.todoapp.com
+    description: Production server
+  - url: https://staging-api.todoapp.com
+    description: Staging server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: auth
+    description: Authentication operations
+  - name: tasks
+    description: Task operations
+  - name: tags
+    description: Tag operations
+
+paths:
+  # Authentication Endpoints
+  /api/v1/auth/register:
+    post:
+      tags:
+        - auth
+      summary: Register a new user
+      description: Creates a new user account with Better Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "securePassword123"
+                name:
+                  type: string
+                  example: "John Doe"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    description: JWT token for API access
+        '400':
+          description: Invalid input or user already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - auth
+      summary: Login user
+      description: Authenticates user and returns JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    description: JWT token for API access
+        '400':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+
+  /api/v1/auth/refresh:
+    post:
+      tags:
+        - auth
+      summary: Refresh JWT token
+      description: Refreshes the JWT token using a refresh token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: New JWT token
+        '401':
+          description: Invalid or expired refresh token
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Logout user
+      description: Logs out the user and invalidates the session
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+        '401':
+          description: Unauthorized
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - auth
+      summary: Get current user
+      description: Returns information about the currently authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+  # Tasks Endpoints with User ID in Path
+  /api/{user_id}/tasks:
+    get:
+      tags:
+        - tasks
+      summary: Get user's tasks
+      description: Returns a list of tasks for the specified user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/priority'
+        - $ref: '#/components/parameters/tag'
+        - $ref: '#/components/parameters/search'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of user's tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  pages:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+    post:
+      tags:
+        - tasks
+      summary: Create a new task
+      description: Creates a new task for the specified user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskInput'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+
+  /api/{user_id}/tasks/{id}:
+    get:
+      tags:
+        - tasks
+      summary: Get a specific task
+      description: Returns details of a specific task
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/taskId'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Task not found
+    put:
+      tags:
+        - tasks
+      summary: Update a task
+      description: Updates an existing task
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/taskId'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskInput'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Task not found
+    patch:
+      tags:
+        - tasks
+      summary: Partially update a task
+      description: Updates specific fields of an existing task
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/taskId'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "Updated task title"
+                description:
+                  type: string
+                  example: "Updated task description"
+                completed:
+                  type: boolean
+                  example: true
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  example: "high"
+                due_date:
+                  type: string
+                  format: date-time
+                  example: "2023-12-31T23:59:59Z"
+                recurrence_rule:
+                  type: string
+                  example: "FREQ=DAILY;INTERVAL=1"
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Task not found
+    delete:
+      tags:
+        - tasks
+      summary: Delete a task
+      description: Removes a task
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/taskId'
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Task deleted successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Task not found
+
+  # Tags Endpoints with User ID in Path
+  /api/{user_id}/tags:
+    get:
+      tags:
+        - tags
+      summary: Get user's tags
+      description: Returns a list of tags for the specified user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/search'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of user's tags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tag'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  pages:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+    post:
+      tags:
+        - tags
+      summary: Create a new tag
+      description: Creates a new tag for the specified user
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagInput'
+      responses:
+        '201':
+          description: Tag created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+
+  /api/{user_id}/tags/{id}:
+    get:
+      tags:
+        - tags
+      summary: Get a specific tag
+      description: Returns details of a specific tag
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/tagId'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tag details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Tag not found
+    put:
+      tags:
+        - tags
+      summary: Update a tag
+      description: Updates an existing tag
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/tagId'
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagInput'
+      responses:
+        '200':
+          description: Tag updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Tag not found
+    delete:
+      tags:
+        - tags
+      summary: Delete a tag
+      description: Removes a tag
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/tagId'
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Tag deleted successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Tag not found
+
+  # Task-Tag Association
+  /api/{user_id}/tasks/{task_id}/tags/{tag_id}:
+    post:
+      tags:
+        - tasks
+        - tags
+      summary: Associate a tag with a task
+      description: Adds a tag to a task
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/taskId'
+        - $ref: '#/components/parameters/tagId'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tag associated with task successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Task or tag not found
+    delete:
+      tags:
+        - tasks
+        - tags
+      summary: Remove a tag from a task
+      description: Removes a tag from a task
+      parameters:
+        - $ref: '#/components/parameters/userIdPath'
+        - $ref: '#/components/parameters/taskId'
+        - $ref: '#/components/parameters/tagId'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tag removed from task successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - user_id in path does not match JWT user_id
+        '404':
+          description: Task or tag not found
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    userIdPath:
+      name: user_id
+      in: path
+      required: true
+      description: ID of the user whose resources are being accessed
+      schema:
+        type: string
+        example: "user_123456789"
+    taskId:
+      name: id
+      in: path
+      required: true
+      description: Task ID
+      schema:
+        type: integer
+        example: 1
+    tagId:
+      name: id
+      in: path
+      required: true
+      description: Tag ID
+      schema:
+        type: integer
+        example: 1
+    page:
+      name: page
+      in: query
+      description: Page number (default: 1)
+      schema:
+        type: integer
+        default: 1
+    limit:
+      name: limit
+      in: query
+      description: Items per page (default: 20, max: 100)
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+    sort:
+      name: sort
+      in: query
+      description: Field to sort by (prefix with - for descending)
+      schema:
+        type: string
+        example: "title"
+    status:
+      name: status
+      in: query
+      description: Filter by status (all, pending, completed)
+      schema:
+        type: string
+        enum: [all, pending, completed]
+    priority:
+      name: priority
+      in: query
+      description: Filter by priority (low, medium, high)
+      schema:
+        type: string
+        enum: [low, medium, high]
+    tag:
+      name: tag
+      in: query
+      description: Filter by tag ID or name
+      schema:
+        type: string
+    search:
+      name: q
+      in: query
+      description: Search query string
+      schema:
+        type: string
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User ID from Better Auth
+          example: "user_123456789"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        name:
+          type: string
+          description: User's display name
+          example: "John Doe"
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2023-01-01T00:00:00Z"
+      required:
+        - id
+        - email
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique task identifier
+          example: 1
+        title:
+          type: string
+          description: Task title
+          example: "Complete project"
+        description:
+          type: string
+          description: Detailed description
+          example: "Finish the project by end of week"
+        completed:
+          type: boolean
+          description: Completion status
+          example: false
+        priority:
+          type: string
+          enum: [low, medium, high]
+          description: Priority level
+          default: "medium"
+          example: "high"
+        due_date:
+          type: string
+          format: date-time
+          description: Task due date and time
+          example: "2023-12-31T23:59:59Z"
+        recurrence_rule:
+          type: string
+          description: iCal RRULE string
+          example: "FREQ=DAILY;INTERVAL=1"
+        user_id:
+          type: string
+          description: Task owner
+          example: "user_123456789"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2023-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+          example: "2023-01-01T00:00:00Z"
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+      required:
+        - id
+        - title
+        - completed
+        - priority
+        - user_id
+        - created_at
+        - updated_at
+
+    TaskInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Complete project"
+        description:
+          type: string
+          maxLength: 1000
+          example: "Finish the project by end of week"
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: "medium"
+          example: "high"
+        due_date:
+          type: string
+          format: date-time
+          example: "2023-12-31T23:59:59Z"
+        recurrence_rule:
+          type: string
+          example: "FREQ=DAILY;INTERVAL=1"
+      required:
+        - title
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique tag identifier
+          example: 1
+        name:
+          type: string
+          description: Tag display name
+          example: "Work"
+        color:
+          type: string
+          description: Tag color for UI display (hex format)
+          example: "#FF5733"
+        user_id:
+          type: string
+          description: Owner of the tag
+          example: "user_123456789"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2023-01-01T00:00:00Z"
+      required:
+        - id
+        - name
+        - user_id
+        - created_at
+
+    TagInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "Work"
+        color:
+          type: string
+          pattern: "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+          example: "#FF5733"
+      required:
+        - name
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
+          example: "Invalid input provided"
+        code:
+          type: string
+          description: Error code
+          example: "INVALID_INPUT"
+        field:
+          type: string
+          description: Optional field name related to the error
+          example: "email"
+      required:
+        - detail
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - Invalid or missing token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ForbiddenError:
+      description: Forbidden - User does not have access to this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+security:
+  - BearerAuth: []

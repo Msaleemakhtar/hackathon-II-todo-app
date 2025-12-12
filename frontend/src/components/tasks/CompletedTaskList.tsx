@@ -17,7 +17,12 @@ interface CompletedTaskListProps {
 }
 
 const CompletedTaskList = ({ tasks, onRestore, onDelete }: CompletedTaskListProps) => {
-  const completedTasks = tasks.filter(task => task.completed);
+  const completedTasks = tasks
+    .filter(task => task.status === 'completed')
+    .sort((a, b) => {
+      // Sort by updated_at in descending order (most recently completed first)
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
 
   if (completedTasks.length === 0) {
     return (

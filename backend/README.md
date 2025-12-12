@@ -4,17 +4,22 @@ This is the backend service for the Todo App, built with FastAPI, SQLModel, and 
 
 ## Features
 
+- **Better Auth Integration** - Frontend handles authentication, backend validates JWT tokens
 - User Registration & Authentication (JWT based)
 - User Login & Token Refresh with secure token management
 - Access Protected Resources with JWT validation
+- User Profile Management API with CRUD operations
 - Task Management API with CRUD operations, filtering, sorting, and search
-- Tag Management API for task categorization
+- Category Management API for task organization and grouping
+- Tag Management API for task categorization and labeling
 - Task-Tag Association API for many-to-many relationships
-- Database with SQLModel entities (User, Task, Tag, TaskTagLink)
-  - Task: title (max 200 chars), description (max 1000 chars), completed status, priority (low/medium/high), due_date, recurrence_rule (iCal RRULE), timestamps
+- Database with SQLModel entities (User, Task, Category, Tag, TaskTagLink)
+  - Task: title (max 200 chars), description (max 1000 chars), status (pending/in_progress/completed), priority (low/medium/high), due_date, category, recurrence_rule (iCal RRULE), timestamps
+  - Category: name (max 100 chars, unique per user), description (max 500 chars), color (hex format #RRGGBB or #RGB)
   - Tag: name (max 50 chars, unique per user), color (hex format #RRGGBB or #RGB)
   - TaskTagLink: Many-to-many association table with composite primary key (task_id, tag_id)
 - Alembic for database migrations
+- Performance-optimized indexes for common queries
 - Rate limiting on authentication endpoints
 - RESTful API with `/api/v1/` versioning
 - Comprehensive async database operations
@@ -25,6 +30,106 @@ This is the backend service for the Todo App, built with FastAPI, SQLModel, and 
 All backend development **MUST** adhere to the principles defined in:
 - **Main Constitution**: `../.specify/memory/constitution.md`
 - **Backend Guide**: `./CLAUDE.md`
+- **Better Auth Integration**: `../BETTER_AUTH_IMPLEMENTATION.md`
+
+## Better Auth Integration Flow
+
+This backend integrates with a **Better Auth frontend** and validates JWT tokens for API authentication.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         AUTHENTICATION FLOW                      │
+└─────────────────────────────────────────────────────────────────┘
+
+  Frontend (Next.js)              Backend (FastAPI)          Database
+  ──────────────────              ─────────────────          ────────
+
+1. User Signup/Login
+   │
+   ├─> Better Auth (/api/auth)
+   │   Creates session
+   │   Stores in PostgreSQL ───────────────────────────> [Better Auth]
+   │                                                       [Sessions]
+   │
+2. API Request
+   │
+   ├─> GET /api/auth/token
+   │   (generates JWT from session)
+   │
+   │<── JWT Token (15 min expiry)
+   │    Signed with BETTER_AUTH_SECRET
+   │    Payload: {user_id, email, exp}
+   │
+3. Backend API Call
+   │
+   ├─> GET /api/v1/tasks
+   │   Header: Authorization: Bearer <JWT>
+   │                            │
+   │                            ├──> JWT Validation
+   │                            │    (python-jose)
+   │                            │    - Verify signature
+   │                            │    - Check expiration
+   │                            │    - Extract user_id
+   │                            │
+   │                            ├──> Query Database
+   │                            │    WHERE user_id = <from_jwt>
+   │                            │    (Data Isolation) ──────> [Tasks]
+   │                            │                             [Tags]
+   │<─────────────────────────-┘                             [Categories]
+   │   Response: User's tasks only
+   │
+
+┌─────────────────────────────────────────────────────────────────┐
+│                         KEY COMPONENTS                           │
+└─────────────────────────────────────────────────────────────────┘
+
+Frontend:
+  • Better Auth server (Next.js API routes)
+  • Session management (PostgreSQL storage)
+  • JWT token generation endpoint (/api/auth/token)
+  • Axios interceptor (auto-adds JWT to requests)
+
+Backend:
+  • JWT validation dependency (src/core/dependencies.py)
+  • User ID extraction from token
+  • Data isolation enforcement (all queries scoped to user_id)
+  • No session storage (stateless authentication)
+
+Shared:
+  • BETTER_AUTH_SECRET (must match between frontend & backend)
+  • PostgreSQL database (separate tables for auth vs. app data)
+
+Security:
+  • JWT tokens expire after 15 minutes
+  • Better Auth sessions persist for 7 days
+  • Automatic token refresh on API calls
+  • HTTPS required in production
+  • CORS configured for frontend origin only
+```
+
+### JWT Token Structure
+
+```json
+{
+  "user_id": "ba_user_abc123",
+  "email": "user@example.com",
+  "exp": 1702345678
+}
+```
+
+### Backend Validation Logic
+
+The backend validates JWT tokens on every protected endpoint:
+
+1. **Extract Token**: From `Authorization: Bearer <token>` header
+2. **Verify Signature**: Using `BETTER_AUTH_SECRET` (python-jose)
+3. **Check Expiration**: Reject if `exp` < current time
+4. **Extract User ID**: Get `user_id` from token payload
+5. **Enforce Data Isolation**: All queries filtered by `user_id`
+
+See `backend/src/core/security.py` and `backend/src/core/dependencies.py` for implementation details.
 
 ## Setup
 
@@ -74,8 +179,10 @@ All backend development **MUST** adhere to the principles defined in:
 2. Create a new project and database
 3. Copy the connection string to your `.env`:
    ```
-   DATABASE_URL=postgresql+asyncpg://[user]:[password]@[host]/[database]
+   DATABASE_URL=postgresql+asyncpg://[user]:[password]@[host]/[database]?ssl=require
    ```
+
+**IMPORTANT**: For asyncpg (async PostgreSQL driver), use `?ssl=require` instead of `?sslmode=require`. The `sslmode` parameter is for psycopg2 (sync driver) only.
 
 **Connection Pooling**: The application uses asyncpg with connection pooling configured for optimal performance:
 - Minimum pool size: 2 connections
@@ -96,15 +203,36 @@ DATABASE_URL=postgresql+asyncpg://todouser:todopass@localhost:5432/todo_dev
 
 ### Run Database Migrations
 
+**IMPORTANT**: Ensure all models are imported in `alembic/env.py` before generating migrations:
+- ✅ User
+- ✅ Task
+- ✅ Tag
+- ✅ TaskTagLink
+- ✅ Category (added in migration fix)
+
+Apply existing migrations:
 ```bash
 uv run alembic upgrade head
 ```
 
 To create new migrations after model changes:
 ```bash
+# Generate migration
 uv run alembic revision --autogenerate -m "Description of changes"
+
+# Review the generated migration file in alembic/versions/
+# IMPORTANT: Check for any references to Better Auth tables (user, account, session, verification)
+# Remove any DROP TABLE statements for Better Auth tables
+
+# Apply the migration
 uv run alembic upgrade head
 ```
+
+**Migration Best Practices**:
+1. Always review auto-generated migrations before applying
+2. Never drop Better Auth tables (user, account, session, verification)
+3. Import `sqlmodel.sql.sqltypes` if using AutoString types
+4. Test migrations on a development database first
 
 ### Run the Application
 
@@ -123,31 +251,50 @@ The API will be available at:
 - `GET /health` - Health check endpoint for monitoring and orchestration
 
 ### Authentication (`/api/v1/auth`)
-- `POST /api/v1/auth/register` - Register a new user
-- `POST /api/v1/auth/login` - Login and receive JWT tokens
-- `POST /api/v1/auth/refresh` - Refresh access token using refresh token
+
+**Note**: Authentication is handled by **Better Auth** on the frontend. The backend validates JWT tokens.
+
+- `POST /api/v1/auth/register` - Register a new user (legacy, use Better Auth instead)
+- `POST /api/v1/auth/login` - Login and receive JWT tokens (legacy, use Better Auth instead)
+- `POST /api/v1/auth/refresh` - Refresh access token using refresh token (legacy)
 - `GET /api/v1/auth/me` - Get current authenticated user profile (protected)
 
 **Rate Limiting**: Authentication endpoints are rate-limited to prevent abuse.
+
+**Recommended Flow**: Use Better Auth on the frontend (`/api/auth/*` routes) for all authentication operations.
+
+### Users (`/api/v1/users`)
+All user endpoints require authentication via Bearer token.
+
+- `GET /api/v1/users/me` - Get current user profile
+- `PUT /api/v1/users/me` - Update current user profile (name, email, preferences)
+- `DELETE /api/v1/users/me` - Delete current user account
 
 ### Tasks (`/api/v1/tasks`)
 All task endpoints require authentication via Bearer token.
 
 - `POST /api/v1/tasks` - Create a new task
 - `GET /api/v1/tasks` - List tasks with filtering, sorting, and pagination
-  - Query params: `page`, `limit`, `q` (search), `status` (all/pending/completed), `priority` (low/medium/high), `tag` (ID or name), `sort` (due_date/priority/created_at/title, prefix with `-` for descending)
+  - Query params: `page`, `limit`, `q` (search), `status` (all/pending/in_progress/completed), `priority` (low/medium/high), `category_id` (integer), `tag` (ID or name), `sort` (due_date/priority/created_at/title, prefix with `-` for descending)
 - `GET /api/v1/tasks/{task_id}` - Get a specific task
 - `PUT /api/v1/tasks/{task_id}` - Update all fields of a task
-- `PATCH /api/v1/tasks/{task_id}` - Partially update a task (e.g., mark complete)
+- `PATCH /api/v1/tasks/{task_id}` - Partially update a task (e.g., mark complete, change status)
 - `DELETE /api/v1/tasks/{task_id}` - Delete a task
+
+### Categories (`/api/v1/categories`)
+All category endpoints require authentication via Bearer token.
+- `GET /api/v1/categories/{category_id}` - Get a specific category with task count
+- `PUT /api/v1/categories/{category_id}` - Update a category
+- `DELETE /api/v1/categories/{category_id}` - Delete a category (sets category_id to NULL for associated tasks)
 
 ### Tags (`/api/v1/tags`)
 All tag endpoints require authentication via Bearer token.
 
 - `POST /api/v1/tags` - Create a new tag
 - `GET /api/v1/tags` - List all tags for the authenticated user
+- `GET /api/v1/tags/{tag_id}` - Get a specific tag
 - `PUT /api/v1/tags/{tag_id}` - Update a tag
-- `DELETE /api/v1/tags/{tag_id}` - Delete a tag
+- `DELETE /api/v1/tags/{tag_id}` - Delete a tag (removes tag associations from tasks)
 
 ### Task-Tag Association (`/api/v1/tasks/{task_id}/tags/{tag_id}`)
 Endpoints for managing many-to-many relationships between tasks and tags.
@@ -165,16 +312,31 @@ Endpoints for managing many-to-many relationships between tasks and tags.
   "id": 1,
   "title": "Complete project",
   "description": "Finish the todo app",
+  "status": "in_progress",
   "completed": false,
   "priority": "high",
   "due_date": "2025-12-31T23:59:59Z",
   "recurrence_rule": null,
-  "user_id": "user-uuid",
+  "category_id": 2,
+  "user_id": "ba_user_abc123",
   "created_at": "2025-12-09T10:00:00Z",
   "updated_at": "2025-12-09T10:00:00Z",
   "tags": [
-    {"id": 1, "name": "work", "color": "#FF5733", "user_id": "user-uuid"}
+    {"id": 1, "name": "work", "color": "#FF5733", "user_id": "ba_user_abc123"}
   ]
+}
+```
+
+**Category Response (`CategoryRead`):**
+```json
+{
+  "id": 2,
+  "name": "Work Projects",
+  "description": "Tasks related to work and professional development",
+  "color": "#3B82F6",
+  "user_id": "ba_user_abc123",
+  "created_at": "2025-12-09T10:00:00Z",
+  "updated_at": "2025-12-09T10:00:00Z"
 }
 ```
 
@@ -231,10 +393,17 @@ All error responses include a descriptive message in JSON format:
 **Task Validation:**
 - `title`: Required, 1-200 characters
 - `description`: Optional, max 1000 characters
-- `completed`: Boolean (defaults to false)
+- `status`: Must be one of: "pending", "in_progress", "completed" (defaults to "pending")
+- `completed`: Boolean (auto-computed from status: status == "completed")
 - `priority`: Must be one of: "low", "medium", "high" (defaults to "medium")
 - `due_date`: Optional ISO 8601 datetime
 - `recurrence_rule`: Optional string in iCal RRULE format (e.g., "FREQ=DAILY;COUNT=10")
+- `category_id`: Optional integer (foreign key to categories)
+
+**Category Validation:**
+- `name`: Required, max 100 characters, must be unique per user
+- `description`: Optional, max 500 characters
+- `color`: Optional, must match hex color format: #RRGGBB or #RGB (e.g., "#3B82F6" or "#38F")
 
 **Tag Validation:**
 - `name`: Required, max 50 characters, must be unique per user
@@ -243,8 +412,9 @@ All error responses include a descriptive message in JSON format:
 **Query Parameters (Task Listing):**
 - `page`: Integer >= 1 (default: 1)
 - `limit`: Integer 1-100 (default: 20, capped at 100)
-- `status`: One of "all", "pending", "completed" (default: "all")
+- `status`: One of "all", "pending", "in_progress", "completed" (default: "all")
 - `priority`: One of "low", "medium", "high"
+- `category_id`: Integer (filter by category)
 - `tag`: Tag ID (integer) or tag name (string)
 - `q`: Search string (searches title and description)
 - `sort`: One of "due_date", "priority", "created_at", "title" (prefix with "-" for descending, e.g., "-created_at")
@@ -373,14 +543,29 @@ The backend follows a clean layered architecture:
 - `id`: Integer primary key (auto-increment)
 - `title`: String (1-200 chars, indexed, required)
 - `description`: String (max 1000 chars, optional)
-- `completed`: Boolean (default: false)
-- `priority`: Enum string ("low" | "medium" | "high", default: "medium")
-- `due_date`: DateTime (optional)
+- `status`: Enum string ("pending" | "in_progress" | "completed", default: "pending", indexed)
+- `completed`: Boolean (computed property: status == "completed")
+- `priority`: Enum string ("low" | "medium" | "high", default: "medium", indexed)
+- `due_date`: DateTime (optional, indexed for sorting)
 - `recurrence_rule`: String (iCal RRULE format for recurring tasks, optional)
+- `category_id`: Integer (foreign key to categories.id, optional, indexed, nullable)
+- `user_id`: String (foreign key to users.id, indexed, required)
+- `created_at`: DateTime (auto-set on creation, indexed)
+- `updated_at`: DateTime (auto-updated on modification)
+- **Relationships**: Belongs to one User, belongs to one Category (optional), has many Tags (via TaskTagLink)
+- **Indexes**: Composite index on (user_id, status, priority) for efficient filtering
+
+**Category Entity:**
+- `id`: Integer primary key (auto-increment)
+- `name`: String (max 100 chars, indexed, required)
+- `description`: String (max 500 chars, optional)
+- `color`: String (hex color #RRGGBB or #RGB, optional)
 - `user_id`: String (foreign key to users.id, indexed, required)
 - `created_at`: DateTime (auto-set on creation)
 - `updated_at`: DateTime (auto-updated on modification)
-- **Relationships**: Belongs to one User, has many Tags (via TaskTagLink)
+- **Constraints**: Unique constraint on (name, user_id) - users cannot have duplicate category names
+- **Relationships**: Belongs to one User, has many Tasks
+- **Indexes**: Composite index on (user_id, name) for efficient lookups
 
 **Tag Entity:**
 - `id`: Integer primary key (auto-increment)
@@ -389,6 +574,7 @@ The backend follows a clean layered architecture:
 - `user_id`: String (foreign key to users.id, indexed, required)
 - **Constraints**: Unique constraint on (name, user_id) - users cannot have duplicate tag names
 - **Relationships**: Belongs to one User, has many Tasks (via TaskTagLink)
+- **Indexes**: Composite index on (user_id, name) for efficient lookups
 
 **TaskTagLink Entity:**
 - `task_id`: Integer (foreign key to tasks.id, composite primary key)
@@ -502,7 +688,7 @@ backend/
 
 **1. Database Connection Errors**
 ```bash
-# Verify DATABASE_URL is correct
+# Verify DATABASE_URL is correct and uses ssl=require (NOT sslmode=require)
 echo $DATABASE_URL
 
 # Test PostgreSQL connection (if using Neon)
@@ -511,6 +697,9 @@ psql $DATABASE_URL -c "SELECT version();"
 # Check if migrations are applied
 uv run alembic current
 uv run alembic upgrade head
+
+# If no migrations exist, check alembic/versions/ directory
+ls -la alembic/versions/
 ```
 
 **2. JWT Token Errors**
@@ -543,6 +732,50 @@ uv run pytest -v -s
 uv pip list | grep aiosqlite
 ```
 
+**5. Tasks/Categories Creation Fails**
+```bash
+# Symptom: 404 errors or "table does not exist" when creating tasks/categories
+# Cause: Database migrations not applied
+
+# Solution: Apply migrations
+uv run alembic upgrade head
+
+# Verify tables exist
+uv run python -c "
+import asyncio
+from sqlalchemy import text
+from src.core.database import engine
+
+async def check_tables():
+    async with engine.begin() as conn:
+        result = await conn.execute(text(
+            \"SELECT table_name FROM information_schema.tables WHERE table_schema='public'\"
+        ))
+        print('Tables:', [r[0] for r in result])
+    await engine.dispose()
+
+asyncio.run(check_tables())
+"
+
+# Expected tables: users, tasks, categories, tags, task_tag_link, user, account, session, verification
+```
+
+**6. Category Model Not in Migrations**
+```bash
+# Symptom: Categories table not created even after running migrations
+# Cause: Missing import in alembic/env.py
+
+# Solution: Check alembic/env.py includes all models:
+grep "from src.models" alembic/env.py
+
+# Should see:
+# from src.models.user import User
+# from src.models.task import Task
+# from src.models.tag import Tag
+# from src.models.task_tag_link import TaskTagLink
+# from src.models.category import Category  # This was missing!
+```
+
 **5. Port Already in Use**
 ```bash
 # Find process using port 8000
@@ -561,5 +794,84 @@ uv run uvicorn src.main:app --reload --port 8001
 - Review [Backend Implementation Guide](./CLAUDE.md) for development patterns
 - Consult API documentation at http://localhost:8000/docs
 - Check ADRs in `history/adr/` for architectural decisions
+
+### Migration Issues and Fixes
+
+#### Issue 1: Missing Database Schema (FIXED - December 2025)
+
+**Problem**: Tasks and categories creation failed because no database migrations existed.
+
+**Root Cause**:
+- Empty `alembic/versions/` directory (no migration files)
+- Missing Category model import in `alembic/env.py`
+- Invalid SSL parameter in DATABASE_URL (`sslmode` instead of `ssl`)
+
+**Solution Applied**:
+1. ✅ Added `from src.models.category import Category` to `alembic/env.py:20`
+2. ✅ Fixed DATABASE_URL to use `?ssl=require` for asyncpg compatibility
+3. ✅ Generated initial migration: `dfd778d535ec_initial_migration_with_all_tables.py`
+4. ✅ Removed Better Auth table drops from migration
+5. ✅ Applied migration successfully
+
+**Current Database Schema**:
+```
+✅ users          - FastAPI user records (synced from Better Auth)
+✅ tasks          - Task entities with status, priority, due dates
+✅ categories     - Custom task categories (priority/status types)
+✅ tags           - Task tags with colors
+✅ task_tag_link  - Many-to-many task-tag relationships
+✅ user           - Better Auth user accounts (DO NOT DROP)
+✅ account        - Better Auth credentials (DO NOT DROP)
+✅ session        - Better Auth sessions (DO NOT DROP)
+✅ verification   - Better Auth tokens (DO NOT DROP)
+```
+
+#### Issue 2: Better Auth Table Conflicts
+
+**⚠️ CRITICAL**: Never drop Better Auth tables in migrations:
+- `user` - User account information
+- `account` - Authentication credentials
+- `session` - Active user sessions
+- `verification` - Verification tokens
+
+**Prevention**:
+1. Always review auto-generated migrations before applying
+2. Remove any `op.drop_table()` calls for Better Auth tables
+3. Add comment: `# Note: Better Auth tables are NOT managed by this migration`
+
+**Example of Safe Migration**:
+```python
+def upgrade():
+    # Note: Better Auth tables (user, account, session, verification) are NOT managed by this migration
+
+    # Only modify FastAPI backend tables
+    op.alter_column('categories', 'name', ...)
+    op.create_index('ix_tasks_title', 'tasks', ['title'])
+```
+
+#### Issue 3: AsyncPG SSL Parameter Error
+
+**Problem**: `TypeError: connect() got an unexpected keyword argument 'sslmode'`
+
+**Solution**: Use `ssl=require` instead of `sslmode=require` for asyncpg:
+```bash
+# ❌ Wrong (psycopg2 syntax)
+DATABASE_URL=postgresql+asyncpg://user:pass@host/db?sslmode=require
+
+# ✅ Correct (asyncpg syntax)
+DATABASE_URL=postgresql+asyncpg://user:pass@host/db?ssl=require
+```
+
+#### Issue 4: Missing sqlmodel Import in Migration
+
+**Problem**: `NameError: name 'sqlmodel' is not defined`
+
+**Solution**: Add import to migration file:
+```python
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+import sqlmodel.sql.sqltypes  # Add this line
+```
 
 ---

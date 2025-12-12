@@ -1,21 +1,10 @@
-import { useState, useEffect } from 'react';
-import { UserProfile } from '@/types';
+import { useAuthContext } from '@/contexts/AuthContext';
 
+/**
+ * Hook to access authentication state from centralized AuthContext
+ * This replaces the previous implementation that called useSession directly,
+ * eliminating multiple useSession() calls per page navigation
+ */
 export function useAuth() {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // In a real application, you would fetch the user from an API
-    // or from a token stored in localStorage/sessionStorage.
-    const mockUser: UserProfile = {
-      id: '1',
-      email: 'user@example.com',
-      name: 'Test User',
-    };
-    setUser(mockUser);
-    setLoading(false);
-  }, []);
-
-  return { user, loading };
+  return useAuthContext();
 }

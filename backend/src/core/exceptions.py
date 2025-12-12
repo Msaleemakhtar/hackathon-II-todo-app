@@ -74,7 +74,7 @@ class InvalidStatusException(AppException):
         """Initialize the exception."""
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Status must be one of: all, pending, completed",
+            detail="Status must be one of: all, not_started, pending, in_progress, completed",
             code="INVALID_STATUS",
         )
 
@@ -88,4 +88,64 @@ class InvalidSortFieldException(AppException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Sort field must be one of: due_date, priority, created_at, title",
             code="INVALID_SORT_FIELD",
+        )
+
+
+class CategoryNotFoundException(AppException):
+    """Exception raised when a category is not found."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found",
+            code="CATEGORY_NOT_FOUND",
+        )
+
+
+class CategoryAlreadyExistsException(AppException):
+    """Exception raised when a category with the same name and type already exists."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A category with this name and type already exists",
+            code="CATEGORY_ALREADY_EXISTS",
+        )
+
+
+class CannotDeleteDefaultCategoryException(AppException):
+    """Exception raised when attempting to delete a default category."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete default categories",
+            code="CANNOT_DELETE_DEFAULT_CATEGORY",
+        )
+
+
+class CategoryInUseException(AppException):
+    """Exception raised when attempting to delete a category that is in use."""
+
+    def __init__(self):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete category that is in use by tasks",
+            code="CATEGORY_IN_USE",
+        )
+
+
+class InvalidCategoryValueException(AppException):
+    """Exception raised when a task uses an invalid category value."""
+
+    def __init__(self, category_type: str, value: str):
+        """Initialize the exception."""
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid {category_type}: '{value}'. Must match one of your defined {category_type} categories.",
+            code="INVALID_CATEGORY_VALUE",
         )
