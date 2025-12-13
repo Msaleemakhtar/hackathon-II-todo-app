@@ -1,7 +1,8 @@
 """API router for task management endpoints using user_id in path."""
 
+from datetime import datetime
 from math import ceil
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from src.schemas.task import (
     TaskUpdate,
 )
 from src.services import task_service
+from src.services.recurrence_service import RecurrenceService
 
 router = APIRouter()
 
@@ -240,3 +242,186 @@ async def dissociate_tag_from_task(
     current_user_id = current_user_payload.get("sub")
 
     await task_service.dissociate_tag_from_task(db, task_id, tag_id, current_user_id)
+
+
+# Recurring task endpoints
+
+@router.get(
+    "/{user_id}/tasks/recurring/{task_id}/occurrences",
+    response_model=List[TaskRead]
+)
+async def get_recurring_task_occurrences(
+    user_id: str,
+    task_id: int,
+    request: Request,
+    start_date: Optional[datetime] = Query(None, description="Start date for occurrences"),
+    end_date: Optional[datetime] = Query(None, description="End date for occurrences"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all occurrences of a recurring task within a date range.
+
+    Returns all instances of the recurring task, generating new ones if needed.
+    """
+    # Validate path user_id matches JWT
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Verify the task belongs to the user
+    task = await task_service.get_task_by_id(db, task_id, current_user_id)
+    if not task.recurrence_rule:
+        raise ValueError("Task is not a recurring task")
+
+    # Expand recurring task
+    recurrence_service = RecurrenceService(db)
+    instances = await recurrence_service.expand_recurring_task(
+        task_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    return instances
+
+
+@router.post(
+    "/{user_id}/tasks/recurring/{task_id}/expand",
+    response_model=List[TaskRead],
+    status_code=status.HTTP_201_CREATED
+)
+async def expand_recurring_task(
+    user_id: str,
+    task_id: int,
+    request: Request,
+    start_date: Optional[datetime] = Query(None, description="Start date for expansion"),
+    end_date: Optional[datetime] = Query(None, description="End date for expansion"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Manually trigger expansion of a recurring task.
+
+    Generates task instances for the specified date range.
+    """
+    # Validate path user_id matches JWT
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Verify the task belongs to the user
+    task = await task_service.get_task_by_id(db, task_id, current_user_id)
+
+    # Expand the recurring task
+    recurrence_service = RecurrenceService(db)
+    instances = await recurrence_service.expand_recurring_task(
+        task_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    return instances
+
+
+@router.get(
+    "/{user_id}/tasks/recurring/{task_id}/next",
+    response_model=dict
+)
+async def get_next_occurrence(
+    user_id: str,
+    task_id: int,
+    request: Request,
+    after_date: Optional[datetime] = Query(None, description="Get next occurrence after this date"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get the next occurrence date for a recurring task.
+    """
+    # Validate path user_id matches JWT
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Verify the task belongs to the user
+    task = await task_service.get_task_by_id(db, task_id, current_user_id)
+
+    # Get next occurrence
+    recurrence_service = RecurrenceService(db)
+    next_date = await recurrence_service.get_next_occurrence(task_id, after_date)
+
+    return {"next_occurrence": next_date}
+
+
+@router.patch(
+    "/{user_id}/tasks/recurring/{task_id}/recurrence",
+    response_model=TaskRead
+)
+async def update_recurrence_pattern(
+    user_id: str,
+    task_id: int,
+    request: Request,
+    rrule: str = Query(..., description="New RRULE string"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update the recurrence pattern of a recurring task.
+
+    This will delete future uncompleted instances and regenerate them with the new pattern.
+    """
+    # Validate path user_id matches JWT
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Verify the task belongs to the user
+    await task_service.get_task_by_id(db, task_id, current_user_id)
+
+    # Update recurrence pattern
+    recurrence_service = RecurrenceService(db)
+    updated_task = await recurrence_service.update_recurrence_pattern(task_id, rrule)
+
+    return updated_task
+
+
+@router.delete(
+    "/{user_id}/tasks/recurring/{task_id}/series",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_recurring_series(
+    user_id: str,
+    task_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete a recurring task and all its instances.
+    """
+    # Validate path user_id matches JWT
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Verify the task belongs to the user
+    await task_service.get_task_by_id(db, task_id, current_user_id)
+
+    # Delete the series
+    recurrence_service = RecurrenceService(db)
+    await recurrence_service.delete_recurring_series(task_id)
+
+
+@router.delete(
+    "/{user_id}/tasks/recurring/instance/{instance_id}/following",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_instance_and_following(
+    user_id: str,
+    instance_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete a specific instance and all following instances of a recurring task.
+    """
+    # Validate path user_id matches JWT
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Verify the instance belongs to the user
+    await task_service.get_task_by_id(db, instance_id, current_user_id)
+
+    # Delete instance and following
+    recurrence_service = RecurrenceService(db)
+    await recurrence_service.delete_instance_and_following(instance_id)

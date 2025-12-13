@@ -6,6 +6,10 @@ export type Task = {
   priority: string; // Dynamic priority from categories
   status: string; // Task status: pending, in_progress, completed
   due_date: string | null;
+  recurrence_rule: string | null; // iCal RRULE string
+  parent_task_id: number | null; // Parent task ID for recurring instances
+  is_recurring_instance: boolean; // Whether this is an instance of a recurring task
+  occurrence_date: string | null; // Specific occurrence date for instances
   created_at: string;
   updated_at: string;
   tags: Tag[];

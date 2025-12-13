@@ -4,10 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Calendar, AlertCircle, Flag } from 'lucide-react';
+import { CheckCircle2, Calendar, AlertCircle, Flag, Repeat } from 'lucide-react';
+import { RecurrenceSelector, RecurrencePattern, patternToRRule } from './RecurrenceSelector';
 
 interface CreateTaskFormProps {
-  onSubmit: (taskData: { title: string; description: string; priority: string; status: string; dueDate: string }) => void;
+  onSubmit: (taskData: {
+    title: string;
+    description: string;
+    priority: string;
+    status: string;
+    dueDate: string;
+    recurrenceRule?: string | null;
+  }) => void;
   isLoading?: boolean;
 }
 
@@ -18,6 +26,12 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
   const [priority, setPriority] = useState('');
   const [status, setStatus] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>({
+    frequency: 'none',
+    interval: 1,
+    endType: 'never',
+  });
+  const [showRecurrence, setShowRecurrence] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,13 +40,30 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
     const selectedPriority = priority || (taskPriorities && taskPriorities.length > 0 ? taskPriorities[0].name : 'medium');
     const selectedStatus = status || (taskStatuses && taskStatuses.length > 0 ? taskStatuses[0].name : 'not_started');
 
-    await onSubmit({ title, description, priority: selectedPriority, status: selectedStatus, dueDate });
+    // Convert recurrence pattern to RRULE string
+    const recurrenceRule = patternToRRule(recurrencePattern, dueDate ? new Date(dueDate) : undefined);
+
+    await onSubmit({
+      title,
+      description,
+      priority: selectedPriority,
+      status: selectedStatus,
+      dueDate,
+      recurrenceRule,
+    });
+
     // Reset form after successful submission
     setTitle('');
     setDescription('');
     setPriority('');
     setStatus('');
     setDueDate('');
+    setRecurrencePattern({
+      frequency: 'none',
+      interval: 1,
+      endType: 'never',
+    });
+    setShowRecurrence(false);
   };
 
   const getPriorityColor = (priorityName: string) => {
@@ -164,6 +195,32 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
           onChange={(e) => setDueDate(e.target.value)}
           min={new Date().toISOString().split('T')[0]}
         />
+      </div>
+
+      {/* Recurrence Section */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Repeat className="h-4 w-4" />
+            Recurring Task
+          </Label>
+          <button
+            type="button"
+            onClick={() => setShowRecurrence(!showRecurrence)}
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+          >
+            {showRecurrence ? 'Hide' : 'Show'} Options
+          </button>
+        </div>
+
+        {showRecurrence && (
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <RecurrenceSelector
+              value={recurrencePattern}
+              onChange={setRecurrencePattern}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end gap-3 pt-2">

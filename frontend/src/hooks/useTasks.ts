@@ -76,7 +76,14 @@ export function useTasks() {
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (taskData: { title: string; description: string; priority: string; status: string; dueDate: string }) => {
+    mutationFn: async (taskData: {
+      title: string;
+      description: string;
+      priority: string;
+      status: string;
+      dueDate: string;
+      recurrenceRule?: string | null;
+    }) => {
       if (!user?.id) throw new Error('User not authenticated');
       const payload = {
         title: taskData.title,
@@ -84,6 +91,7 @@ export function useTasks() {
         priority: taskData.priority.toLowerCase(),
         status: taskData.status || 'not_started',
         due_date: taskData.dueDate ? new Date(taskData.dueDate).toISOString() : null,
+        recurrence_rule: taskData.recurrenceRule || null,
       };
       const response = await apiClient.post<Task>(`/v1/${user.id}/tasks`, payload);
       return response.data;
@@ -181,8 +189,14 @@ export function useTasks() {
     isDeletingTask: deleteTaskMutation.isPending,
     updateTaskStatus: (taskId: number, status: string) => updateStatusMutation.mutate({ taskId, status }),
     updateTask: (taskId: number, taskData: Partial<Task>) => updateTaskMutation.mutate({ taskId, taskData }),
-    createTask: (taskData: { title: string; description: string; priority: string; status: string; dueDate: string }) =>
-      createTaskMutation.mutate(taskData),
+    createTask: (taskData: {
+      title: string;
+      description: string;
+      priority: string;
+      status: string;
+      dueDate: string;
+      recurrenceRule?: string | null;
+    }) => createTaskMutation.mutate(taskData),
     deleteTask: (taskId: number) => deleteTaskMutation.mutate(taskId),
     refetch,
   };

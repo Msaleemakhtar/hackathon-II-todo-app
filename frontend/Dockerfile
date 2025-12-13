@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 
 # Install dependencies with frozen lockfile
-RUN bun install --frozen-lockfile --production=false
+RUN bun install --frozen-lockfile
 
 # Stage 2: Builder - Build the application
 FROM oven/bun:1 AS builder
@@ -38,11 +38,15 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
+# Install required utilities and create non-root user for security
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    shadow-utils && \
+    addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
     mkdir -p /app/.next && \
-    chown -R nextjs:nodejs /app
+    chown -R nextjs:nodejs /app && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy necessary files from builder
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
