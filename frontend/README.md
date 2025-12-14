@@ -204,6 +204,8 @@ The frontend uses **Better Auth** for authentication with custom JWT token integ
       │                   │         │         │    - user_id (Better Auth ID)
       │                   │         │         │    - email
       │                   │         │         │    - exp (15 min)
+      │                   │         │         │    - iat (issued at)
+      │                   │         │         │    - type (access)
       │                   │         │         └──> Sign with BETTER_AUTH_SECRET
       │                   │         │
       │                   │         │<─── JWT Token
@@ -255,8 +257,8 @@ JWT Token Bridge (Custom):
   • Endpoint: /api/auth/token (Next.js API route)
   • Generates JWT from Better Auth session
   • Signs with BETTER_AUTH_SECRET (shared with backend)
-  • 15-minute token expiry
-  • Contains: user_id, email, exp
+  • 30-minute token expiry (to match backend validation requirements)
+  • Contains: user_id (sub), email, name, exp, iat, type
 
 Axios Interceptor (Frontend):
   • Automatically fetches JWT before API calls
@@ -283,15 +285,38 @@ Better Auth Session (Primary Auth)
 ├─ Created: On signup/signin
 ├─ Storage: PostgreSQL + HTTP-only cookie
 ├─ Expiry: 7 days (default)
-└─ Used for: Page authentication, JWT generation
+├─ Used for: Page authentication, JWT generation
+└─ Refresh: Automatic session renewal
 
 JWT Token (Backend API Auth)
-├─ Created: On-demand per API request
+├─ Created: On-demand per API request (via /api/auth/token)
 ├─ Storage: None (generated fresh, not cached)
-├─ Expiry: 15 minutes
+├─ Expiry: 30 minutes (to match backend validation requirements)
 ├─ Used for: Backend API authorization
-└─ Contains: {user_id, email, exp}
+├─ Contains: {sub: user_id, email, name, exp, iat, type: "access"}
+└─ Refresh: New JWT generated on each API call if needed
 ```
+
+### JWT Token Verification Process
+
+The auth flow includes verification at multiple levels:
+
+1. **Frontend Token Verification**:
+   - `/api/auth/token` endpoint validates Better Auth session exists
+   - Token payload is validated for required fields (exp, sub, email)
+   - Token expiration is checked against 15-30 minutes range
+   - JWT is signed with the shared BETTER_AUTH_SECRET
+
+2. **Backend Token Verification**:
+   - FastAPI dependency extracts JWT from Authorization header
+   - python-jose validates JWT signature using BETTER_AUTH_SECRET
+   - Token expiry is verified to ensure it's not expired
+   - User ID is extracted from token payload for data isolation
+
+3. **Data Isolation Verification**:
+   - All database queries are scoped to authenticated user_id
+   - Path parameters (user_id) are validated against JWT user_id
+   - Unauthorized access attempts return 404 instead of 403 (no information leakage)
 
 ### Security Features
 
@@ -305,12 +330,14 @@ JWT Token (Backend API Auth)
    - SameSite=Lax (CSRF protection)
 
 3. **Token Security**
-   - Short-lived JWT (15 min expiry)
+   - Short-lived JWT (30 min expiry to match backend requirements)
    - Signed with BETTER_AUTH_SECRET
    - Automatic refresh on API calls
+   - Token payload validation at both frontend and backend
 
 4. **Data Isolation**
    - All API queries scoped to authenticated user_id
+   - Path parameter validation to ensure user_id matches JWT
    - 404 Not Found for unauthorized access (no information leakage)
 
 5. **Environment Security**
@@ -587,6 +614,30 @@ bun run type-check
 # Initialize Better Auth database tables
 bun run scripts/init-better-auth-db.ts
 ```
+
+### Auth Flow Verification
+
+The auth flow has been designed with multiple verification steps to ensure security and reliability:
+
+1. **Setup Verification**:
+   - Confirm `BETTER_AUTH_SECRET` matches between frontend and backend
+   - Verify Better Auth database tables are created
+   - Ensure database connection is established
+
+2. **Session Verification**:
+   - Check Better Auth session cookie exists
+   - Validate session in PostgreSQL database
+   - Verify session hasn't expired
+
+3. **Token Generation Verification**:
+   - Confirm `/api/auth/token` endpoint returns valid JWT
+   - Validate JWT contains required fields (sub, email, exp, iat, type)
+   - Verify token is signed with BETTER_AUTH_SECRET
+
+4. **API Call Verification**:
+   - Test that JWT is automatically added to all API requests
+   - Verify backend accepts and validates the JWT token
+   - Confirm data isolation is enforced (user can only access their own data)
 
 ### Environment Variables Reference
 

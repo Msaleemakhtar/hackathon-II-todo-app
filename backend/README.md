@@ -80,7 +80,7 @@ This backend integrates with a **Better Auth frontend** and validates JWT tokens
    │
 3. Backend API Call
    │
-   ├─> GET /api/v1/tasks
+   ├─> GET /api/v1/{user_id}/tasks
    │   Header: Authorization: Bearer <JWT>
    │                            │
    │                            ├──> JWT Validation

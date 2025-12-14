@@ -118,23 +118,7 @@ docker compose exec backend uv run alembic upgrade head
 
 # 3. Verify all tables were created successfully
 docker compose exec backend uv run python -c "
-import asyncio
-from sqlalchemy import text
-from src.core.database import engine
-async def verify():
-    async with engine.begin() as conn:
-        result = await conn.execute(text('SELECT table_name FROM information_schema.tables WHERE table_schema=\'public\' ORDER BY table_name'))
-        tables = [r[0] for r in result]
-        print('Database tables:', tables)
-        expected = ['account', 'alembic_version', 'categories', 'session', 'tags', 'task_tag_link', 'tasks', 'user', 'users', 'verification']
-        missing = [t for t in expected if t not in tables]
-        if missing:
-            print('⚠️  Missing tables:', missing)
-        else:
-            print('✅ All tables created successfully!')
-    await engine.dispose()
-asyncio.run(verify())
-"
+
 ```
 
 **Expected Database Tables**:
@@ -243,98 +227,8 @@ bun run dev
 - **Containerization**: Docker + Docker Compose
 - **Reverse Proxy**: Nginx (production ready)
 
-### Project Structure
 
-```
-hackathon-II-todo-app/
-├── frontend/                    # Next.js frontend application
-│   ├── src/
-│   │   ├── app/                # Next.js pages and API routes
-│   │   │   ├── api/auth/       # Better Auth endpoints + JWT token
-│   │   │   ├── dashboard/      # Dashboard page
-│   │   │   ├── my-tasks/       # Task management page
-│   │   │   └── ...
-│   │   ├── components/         # React components
-│   │   │   ├── auth/           # Authentication components
-│   │   │   ├── dashboard/      # Dashboard components
-│   │   │   ├── layout/         # Layout components
-│   │   │   ├── tasks/          # Task components
-│   │   │   └── ui/             # shadcn/ui components
-│   │   ├── hooks/              # Custom React hooks
-│   │   ├── lib/                # Utilities and API client
-│   │   ├── store/              # Zustand state stores
-│   │   └── types/              # TypeScript type definitions
-│   ├── scripts/                # Utility scripts
-│   ├── Dockerfile              # Frontend container config
-│   ├── package.json            # Dependencies
-│   └── README.md               # Frontend documentation
-│
-├── backend/                     # FastAPI backend application
-│   ├── src/
-│   │   ├── core/               # Core configuration
-│   │   │   ├── config.py       # Settings (pydantic-settings)
-│   │   │   ├── database.py     # Database engine and session
-│   │   │   ├── security.py     # JWT and password utilities
-│   │   │   ├── dependencies.py # FastAPI dependencies
-│   │   │   └── exceptions.py   # Custom exceptions
-│   │   ├── models/             # SQLModel entities
-│   │   │   ├── user.py         # User model
-│   │   │   ├── task.py         # Task model
-│   │   │   ├── category.py     # Category model
-│   │   │   └── tag.py          # Tag model
-│   │   ├── schemas/            # Pydantic schemas
-│   │   ├── routers/            # API route handlers
-│   │   ├── services/           # Business logic layer
-│   │   └── main.py             # FastAPI app entry point
-│   ├── alembic/                # Database migrations
-│   ├── tests/                  # Unit and integration tests
-│   ├── Dockerfile              # Backend container config
-│   ├── pyproject.toml          # Dependencies (uv)
-│   └── README.md               # Backend documentation
-│
-├── .specify/                    # Spec-Driven Development artifacts
-│   ├── memory/
-│   │   └── constitution.md     # Constitutional governance rules
-│   └── templates/              # Project templates
-│
-├── history/                     # Development history
-│   ├── adr/                    # Architecture Decision Records
-│   └── prompts/                # Prompt History Records (PHRs)
-│
-├── docker-compose.yml          # Multi-container orchestration
-├── .env.example                # Environment variables template
-└── README.md                   # This file
-```
 
----
-
-## 🔐 Authentication Flow
-
-The application uses a **dual-layer authentication system** for optimal security:
-
-1. **Better Auth** (Frontend) - Manages user sessions with PostgreSQL storage
-2. **JWT Tokens** (Backend) - Stateless API authentication with 15-30 minute expiry
-
-### Authentication Sequence
-
-```
-User → Login → Better Auth → Session Cookie (7 days)
-                     ↓
-         API Request → Generate JWT Token → Backend API
-                                                  ↓
-                                       Validate JWT → Query Data
-```
-
-**Key Security Features:**
-- HTTP-only cookies (no JavaScript access)
-- Automatic token refresh on API calls
-- Strict data isolation (users only see their own data)
-- CSRF protection via Better Auth
-- Bcrypt password hashing
-
-See [`BETTER_AUTH_IMPLEMENTATION.md`](./BETTER_AUTH_IMPLEMENTATION.md) for detailed architecture.
-
----
 
 ## 📖 API Documentation
 
@@ -346,57 +240,7 @@ See [`BETTER_AUTH_IMPLEMENTATION.md`](./BETTER_AUTH_IMPLEMENTATION.md) for detai
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
-### Key Endpoints
 
-#### Authentication
-```
-POST   /api/v1/auth/register     Register new user
-POST   /api/v1/auth/login        Login and get JWT tokens
-POST   /api/v1/auth/refresh      Refresh access token
-GET    /api/v1/auth/me           Get current user profile
-```
-
-#### Tasks
-```
-POST   /api/v1/tasks             Create new task
-GET    /api/v1/tasks             List tasks (with filters)
-GET    /api/v1/tasks/{id}        Get task by ID
-PUT    /api/v1/tasks/{id}        Update task
-PATCH  /api/v1/tasks/{id}        Partially update task
-DELETE /api/v1/tasks/{id}        Delete task
-```
-
-#### Categories & Tags
-```
-GET    /api/v1/categories        List categories
-POST   /api/v1/categories        Create category
-GET    /api/v1/tags              List tags
-POST   /api/v1/tags              Create tag
-```
-
-#### Reminders & Notifications
-```
-POST   /api/v1/reminders         Create task reminder
-GET    /api/v1/reminders         List all reminders
-PUT    /api/v1/reminders/{id}    Update reminder
-DELETE /api/v1/reminders/{id}    Delete reminder
-POST   /api/v1/subscriptions     Subscribe to push notifications
-GET    /api/v1/subscriptions     List active subscriptions
-DELETE /api/v1/subscriptions/{id} Unsubscribe
-```
-
-#### Analytics & Monitoring
-```
-POST   /api/analytics/vitals     Track Core Web Vitals
-POST   /api/analytics/events     Track custom events
-GET    /api/analytics/vitals/summary  Get performance summary
-```
-
-**Authentication Required**: All endpoints except `/health`, `/register`, `/login`, and `/api/analytics/*` require a valid JWT token in the `Authorization: Bearer <token>` header.
-
-**Note**: Analytics endpoints accept both authenticated and anonymous requests for comprehensive monitoring.
-
----
 
 ## 🧪 Testing
 
@@ -592,12 +436,6 @@ Copy `.env.example` to `.env` and configure:
 | `VAPID_PUBLIC_KEY` | Web Push public key (auto-generated) | Base64 encoded key |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push key for frontend | Same as VAPID_PUBLIC_KEY |
 
-### Deployment Platforms
-
-**Recommended Platforms:**
-- **Frontend**: Vercel, Netlify, AWS Amplify
-- **Backend**: Railway, Render, DigitalOcean, AWS ECS
-- **Database**: Neon (serverless PostgreSQL), AWS RDS, DigitalOcean Managed Databases
 
 ---
 
@@ -629,32 +467,15 @@ The app can be installed on any device:
 - **Standalone Mode**: Runs in its own window without browser UI
 - **Fast Performance**: Cached assets for instant loading
 
-### Keyboard Shortcuts
 
-Press `?` or `Ctrl+/` to view all shortcuts:
-
-| Shortcut | Action |
-|----------|--------|
-| `N` or `Ctrl+N` | Create new task |
-| `S` or `Ctrl+K` | Search tasks |
-| `?` or `Ctrl+/` | Show keyboard shortcuts |
-| `Esc` | Close modals/dialogs |
-| `↑` / `↓` | Navigate task list |
-| `Enter` | Open selected task |
-| `E` | Edit selected task |
-| `D` | Delete selected task |
-| `Space` | Toggle task completion |
 
 ## 📝 Documentation
 
 - [**Backend Documentation**](./backend/README.md) - FastAPI setup, API reference, database models, advanced features
 - [**Frontend Documentation**](./frontend/README.md) - Next.js setup, components, hooks, PWA features
 - [**Backend Tests**](./backend/tests/README.md) - Test suite documentation and best practices
-- [**Better Auth Integration**](./BETTER_AUTH_IMPLEMENTATION.md) - Authentication architecture
 - [**Constitutional Governance**](./.specify/memory/constitution.md) - Development principles and rules
 - [**Architecture Decision Records**](./history/adr/) - Key architectural decisions
-- [**Implementation Summary**](./resources/IMPLEMENTATION_SUMMARY_PHASE_8_9.md) - Phase 8 & 9 advanced features
-
 ---
 
 ## 🤝 Contributing
@@ -767,16 +588,6 @@ SENTRY_DSN=https://your-server-dsn@sentry.io/project-id
 - Development environment filtering
 - GDPR compliant
 
-**Usage:**
-```typescript
-import { useTaskAnalytics } from '@/hooks/useAnalytics';
-
-const { trackTaskCreated, trackTaskCompleted } = useTaskAnalytics();
-
-// Track events
-trackTaskCreated({ priority: 'high', has_reminder: true });
-trackTaskCompleted({ time_to_complete_hours: 2.5 });
-```
 
 ---
 
@@ -825,16 +636,7 @@ docker compose exec backend uv run alembic upgrade head
 
 # Verify tables were created
 docker compose exec backend uv run python -c "
-import asyncio
-from sqlalchemy import text
-from src.core.database import engine
-async def check():
-    async with engine.begin() as conn:
-        result = await conn.execute(text('SELECT table_name FROM information_schema.tables WHERE table_schema=\'public\''))
-        print([r[0] for r in result])
-    await engine.dispose()
-asyncio.run(check())
-"
+
 ```
 
 **Issue: Better Auth error "relation 'session' does not exist"**
