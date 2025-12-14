@@ -4,6 +4,7 @@ This is the backend service for the Todo App, built with FastAPI, SQLModel, and 
 
 ## Features
 
+### Core API Features
 - **Better Auth Integration** - Frontend handles authentication, backend validates JWT tokens
 - User Registration & Authentication (JWT based)
 - User Login & Token Refresh with secure token management
@@ -13,17 +14,32 @@ This is the backend service for the Todo App, built with FastAPI, SQLModel, and 
 - Category Management API for task organization and grouping
 - Tag Management API for task categorization and labeling
 - Task-Tag Association API for many-to-many relationships
-- Database with SQLModel entities (User, Task, Category, Tag, TaskTagLink)
+- **Reminder Management API** - Task reminders with configurable notification times
+- **Push Notification Subscriptions** - Web Push API for browser notifications
+- Database with SQLModel entities (User, Task, Category, Tag, TaskTagLink, Reminder, UserSubscription, AnalyticsEvent, WebVital)
   - Task: title (max 200 chars), description (max 1000 chars), status (pending/in_progress/completed), priority (low/medium/high), due_date, category, recurrence_rule (iCal RRULE), timestamps
   - Category: name (max 100 chars, unique per user), description (max 500 chars), color (hex format #RRGGBB or #RGB)
   - Tag: name (max 50 chars, unique per user), color (hex format #RRGGBB or #RGB)
   - TaskTagLink: Many-to-many association table with composite primary key (task_id, tag_id)
+  - Reminder: task reminders with scheduled notification times and sent status tracking
+  - UserSubscription: Web Push notification subscriptions (endpoint, keys, user_agent)
+  - AnalyticsEvent: User interaction tracking (event names, properties, timestamps)
+  - WebVital: Core Web Vitals metrics (LCP, FID, CLS, INP, TTFB, FCP, TBT)
 - Alembic for database migrations
 - Performance-optimized indexes for common queries
 - Rate limiting on authentication endpoints
 - RESTful API with `/api/v1/` versioning
 - Comprehensive async database operations
 - Strict data isolation - users can only access their own resources
+
+### Advanced Features
+- **Error Monitoring** - Sentry integration for production error tracking and alerting
+- **Performance Analytics** - Core Web Vitals tracking endpoint for frontend performance monitoring
+- **Event Analytics** - Custom event tracking API for user behavior analysis
+- **Redis Caching** - Optional Redis integration for high-performance caching
+- **Background Workers** - Task scheduler for reminder notifications and cleanup jobs
+- **VAPID Keys** - Web Push authentication for secure push notifications
+- **PII Protection** - Automatic filtering of personally identifiable information in analytics
 
 ## Constitutional Reference
 
@@ -164,12 +180,20 @@ See `backend/src/core/security.py` and `backend/src/core/dependencies.py` for im
     ```
 
     Edit `.env` and configure:
+
+    **Required Variables:**
     - `JWT_SECRET_KEY`: Generate using `openssl rand -hex 32` (required, minimum 64 hex characters)
     - `DATABASE_URL`: Your PostgreSQL connection string (see Database Setup below)
-    - `TEST_DATABASE_URL`: SQLite URL for testing (default: `sqlite+aiosqlite:///./test.db`)
     - `CORS_ORIGINS`: Allowed origins as JSON array (default includes localhost ports)
     - `ENVIRONMENT`: `development` or `production`
+
+    **Optional Variables:**
+    - `TEST_DATABASE_URL`: SQLite URL for testing (default: `sqlite+aiosqlite:///./test.db`)
     - `DEBUG`: `true` for development, `false` for production
+    - `SENTRY_DSN`: Sentry project DSN for error monitoring (production only)
+    - `REDIS_URL`: Redis connection URL for caching (optional, improves performance)
+    - `VAPID_PRIVATE_KEY`: VAPID private key for Web Push notifications (auto-generated if not set)
+    - `VAPID_PUBLIC_KEY`: VAPID public key for Web Push notifications (auto-generated if not set)
 
 ### Database Setup
 
@@ -302,7 +326,34 @@ Endpoints for managing many-to-many relationships between tasks and tags.
 - `POST /api/v1/tasks/{task_id}/tags/{tag_id}` - Associate a tag with a task
 - `DELETE /api/v1/tasks/{task_id}/tags/{tag_id}` - Dissociate a tag from a task
 
-**Data Isolation**: All endpoints enforce strict data isolation. Users can ONLY access their own tasks and tags. Attempts to access another user's resources return `404 Not Found`.
+### Reminders (`/api/v1/reminders`)
+All reminder endpoints require authentication via Bearer token.
+
+- `POST /api/v1/reminders` - Create a new reminder for a task
+- `GET /api/v1/reminders` - List all reminders for the authenticated user
+- `GET /api/v1/reminders/{reminder_id}` - Get a specific reminder
+- `PUT /api/v1/reminders/{reminder_id}` - Update a reminder (reschedule notification)
+- `DELETE /api/v1/reminders/{reminder_id}` - Delete a reminder
+- `GET /api/v1/tasks/{task_id}/reminders` - Get all reminders for a specific task
+
+### Push Notifications (`/api/v1/subscriptions`)
+Endpoints for managing Web Push notification subscriptions.
+
+- `POST /api/v1/subscriptions` - Subscribe to push notifications (requires subscription object from browser)
+- `GET /api/v1/subscriptions` - List all active subscriptions for the authenticated user
+- `DELETE /api/v1/subscriptions/{subscription_id}` - Unsubscribe from push notifications
+- `GET /api/v1/subscriptions/vapid-public-key` - Get VAPID public key for Web Push registration
+
+### Analytics (`/api/analytics`)
+Analytics endpoints for performance monitoring and event tracking.
+
+- `POST /api/analytics/vitals` - Track Core Web Vitals metrics (LCP, FID, CLS, INP, TTFB, FCP, TBT)
+- `POST /api/analytics/events` - Track custom user interaction events
+- `GET /api/analytics/vitals/summary` - Get aggregated performance metrics summary (requires authentication)
+
+**Note**: Analytics endpoints accept both authenticated and anonymous requests. Anonymous events help track overall app performance without PII.
+
+**Data Isolation**: All endpoints enforce strict data isolation. Users can ONLY access their own tasks, tags, reminders, and subscriptions. Attempts to access another user's resources return `404 Not Found`.
 
 ### API Response Formats
 
@@ -649,6 +700,60 @@ backend/
 └── README.md                # This file
 ```
 
+## Advanced Features Configuration
+
+### Error Monitoring (Sentry)
+
+To enable production error tracking, add your Sentry DSN to `.env`:
+
+```bash
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+ENVIRONMENT=production
+```
+
+**Features:**
+- Automatic error capture and reporting
+- Performance monitoring with 10% trace sampling
+- Environment-based filtering (development errors are not sent)
+- No PII data sent to Sentry (send_default_pii=False)
+- Integration with FastAPI exception handlers
+
+### Performance Analytics
+
+The `/api/analytics` endpoints track:
+- **Core Web Vitals**: LCP, FID, CLS, INP, TTFB, FCP, TBT
+- **Custom Events**: User interactions (task created, completed, etc.)
+- **Privacy-First**: PII is automatically filtered from event properties
+- **Anonymous Support**: Accepts both authenticated and anonymous events
+
+### Push Notifications
+
+To enable Web Push notifications:
+
+1. **VAPID Keys**: Automatically generated on first run, or manually set in `.env`:
+   ```bash
+   VAPID_PRIVATE_KEY=your-base64-encoded-private-key
+   VAPID_PUBLIC_KEY=your-base64-encoded-public-key
+   ```
+
+2. **Subscribe**: Frontend calls `POST /api/v1/subscriptions` with browser subscription object
+3. **Send Notifications**: Backend workers use `pywebpush` to send notifications
+4. **Reminders**: Task reminders automatically trigger push notifications
+
+### Redis Caching (Optional)
+
+For improved performance in production:
+
+```bash
+REDIS_URL=redis://localhost:6379/0
+```
+
+**Benefits:**
+- Faster repeated queries
+- Reduced database load
+- Session caching
+- Rate limiting storage
+
 ## Key Dependencies
 
 **Core Framework & Database:**
@@ -669,14 +774,18 @@ backend/
 - `slowapi` - Rate limiting for API endpoints
 - `python-multipart>=0.0.20` - Support for file uploads and form data
 
-**Logging & Monitoring:**
+**Monitoring & Analytics:**
 - `python-json-logger` - Structured JSON logging
+- `sentry-sdk` - Error tracking and performance monitoring
+- `pywebpush` - Web Push notification sending
+- `redis` (optional) - High-performance caching
 
 **Development & Testing:**
 - `pytest` - Testing framework
 - `pytest-asyncio` - Async test support
 - `pytest-cov` - Code coverage reporting
 - `pytest-xdist` - Parallel test execution
+- `pytest-html` - HTML test reports
 - `httpx` - HTTP client for testing API endpoints
 - `ruff` - Fast Python linter and formatter
 - `pip-audit` - Security vulnerability scanner

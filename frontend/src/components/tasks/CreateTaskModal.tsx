@@ -16,8 +16,15 @@ interface CreateTaskModalProps {
 }
 
 const CreateTaskModal = ({ isOpen, onOpenChange, onSubmit, isLoading }: CreateTaskModalProps) => {
+  // Prevent closing modal while loading
+  const handleOpenChange = (open: boolean) => {
+    if (!isLoading) {
+      onOpenChange(open);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-hidden p-0 flex flex-col">
         <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-4">
           <DialogHeader className="space-y-2">

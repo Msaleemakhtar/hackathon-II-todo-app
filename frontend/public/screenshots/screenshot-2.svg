@@ -1,0 +1,95 @@
+<svg width="1170" height="2532" viewBox="0 0 1170 2532" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Mobile device frame -->
+  <rect width="1170" height="2532" fill="#F9FAFB"/>
+
+  <!-- Header -->
+  <rect y="0" width="1170" height="200" fill="#3B82F6"/>
+  <text x="585" y="120" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle">Create New Task</text>
+
+  <!-- Modal/Form background -->
+  <rect x="60" y="250" width="1050" height="1800" rx="30" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+
+  <!-- Form fields -->
+  <!-- Title field -->
+  <text x="100" y="350" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#111827">Task Title</text>
+  <rect x="100" y="380" width="970" height="100" rx="15" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="130" y="445" font-family="Arial, sans-serif" font-size="44" fill="#6B7280">Enter task title...</text>
+
+  <!-- Description field -->
+  <text x="100" y="550" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#111827">Description</text>
+  <rect x="100" y="580" width="970" height="300" rx="15" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="130" y="645" font-family="Arial, sans-serif" font-size="44" fill="#6B7280">Add description...</text>
+
+  <!-- Due Date field -->
+  <text x="100" y="950" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#111827">Due Date</text>
+  <rect x="100" y="980" width="970" height="100" rx="15" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="130" y="1045" font-family="Arial, sans-serif" font-size="44" fill="#3B82F6">📅 Select date</text>
+
+  <!-- Priority field -->
+  <text x="100" y="1150" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#111827">Priority</text>
+
+  <!-- Priority options -->
+  <g>
+    <!-- Low -->
+    <rect x="100" y="1180" width="310" height="90" rx="15" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="170" cy="1225" r="20" fill="none" stroke="#6B7280" stroke-width="3"/>
+    <text x="210" y="1240" font-family="Arial, sans-serif" font-size="40" fill="#6B7280">Low</text>
+
+    <!-- Medium -->
+    <rect x="430" y="1180" width="310" height="90" rx="15" fill="white" stroke="#3B82F6" stroke-width="3"/>
+    <circle cx="500" cy="1225" r="20" fill="#3B82F6"/>
+    <circle cx="500" cy="1225" r="8" fill="white"/>
+    <text x="540" y="1240" font-family="Arial, sans-serif" font-size="40" fill="#3B82F6" font-weight="600">Medium</text>
+
+    <!-- High -->
+    <rect x="760" y="1180" width="310" height="90" rx="15" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="830" cy="1225" r="20" fill="none" stroke="#6B7280" stroke-width="3"/>
+    <text x="870" y="1240" font-family="Arial, sans-serif" font-size="40" fill="#6B7280">High</text>
+  </g>
+
+  <!-- Tags field -->
+  <text x="100" y="1350" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#111827">Tags</text>
+  <rect x="100" y="1380" width="970" height="100" rx="15" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="130" y="1445" font-family="Arial, sans-serif" font-size="44" fill="#6B7280">Add tags...</text>
+
+  <!-- Selected tags -->
+  <g>
+    <rect x="100" y="1510" width="180" height="70" rx="35" fill="#DBEAFE"/>
+    <text x="190" y="1555" font-family="Arial, sans-serif" font-size="36" fill="#3B82F6" text-anchor="middle">Work</text>
+
+    <rect x="300" y="1510" width="200" height="70" rx="35" fill="#D1FAE5"/>
+    <text x="400" y="1555" font-family="Arial, sans-serif" font-size="36" fill="#10B981" text-anchor="middle">Urgent</text>
+  </g>
+
+  <!-- Reminder toggle -->
+  <text x="100" y="1660" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#111827">Set Reminder</text>
+  <rect x="900" y="1625" width="140" height="70" rx="35" fill="#3B82F6"/>
+  <circle cx="990" cy="1660" r="28" fill="white"/>
+
+  <!-- Action buttons -->
+  <!-- Cancel button -->
+  <rect x="100" y="1850" width="470" height="110" rx="20" fill="white" stroke="#E5E7EB" stroke-width="3"/>
+  <text x="335" y="1920" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#6B7280" text-anchor="middle">Cancel</text>
+
+  <!-- Create button -->
+  <rect x="600" y="1850" width="470" height="110" rx="20" fill="#3B82F6"/>
+  <text x="835" y="1920" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="white" text-anchor="middle">Create Task</text>
+
+  <!-- Bottom navigation bar -->
+  <rect y="2350" width="1170" height="182" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+
+  <!-- Nav icons -->
+  <g>
+    <!-- Home icon -->
+    <rect x="150" y="2400" width="70" height="70" rx="10" fill="#E5E7EB"/>
+    <text x="185" y="2510" font-family="Arial, sans-serif" font-size="32" fill="#6B7280" text-anchor="middle">Home</text>
+
+    <!-- Tasks icon (active) -->
+    <rect x="550" y="2400" width="70" height="70" rx="10" fill="#3B82F6"/>
+    <text x="585" y="2510" font-family="Arial, sans-serif" font-size="32" font-weight="600" fill="#3B82F6" text-anchor="middle">Tasks</text>
+
+    <!-- Profile icon -->
+    <circle cx="950" cy="2435" r="35" fill="#E5E7EB"/>
+    <text x="950" y="2510" font-family="Arial, sans-serif" font-size="32" fill="#6B7280" text-anchor="middle">Profile</text>
+  </g>
+</svg>

@@ -14,9 +14,22 @@ interface CompletedTaskListProps {
   tasks: Task[];
   onRestore?: (taskId: number) => void;
   onDelete?: (taskId: number) => void;
+  isUpdating?: boolean;
+  isDeleting?: boolean;
+  // Per-task loading state functions
+  isTaskUpdating?: (taskId: number) => boolean;
+  isTaskDeleting?: (taskId: number) => boolean;
 }
 
-const CompletedTaskList = ({ tasks, onRestore, onDelete }: CompletedTaskListProps) => {
+const CompletedTaskList = ({
+  tasks,
+  onRestore,
+  onDelete,
+  isUpdating = false,
+  isDeleting = false,
+  isTaskUpdating,
+  isTaskDeleting,
+}: CompletedTaskListProps) => {
   const completedTasks = tasks
     .filter(task => task.status === 'completed')
     .sort((a, b) => {
@@ -40,10 +53,17 @@ const CompletedTaskList = ({ tasks, onRestore, onDelete }: CompletedTaskListProp
           ? `Completed ${formatDistanceToNow(new Date(task.updated_at), { addSuffix: true })}`
           : 'Recently completed';
 
+        // Use per-task loading state if available, fallback to global state
+        const taskIsUpdating = isTaskUpdating ? isTaskUpdating(task.id) : isUpdating;
+        const taskIsDeleting = isTaskDeleting ? isTaskDeleting(task.id) : isDeleting;
+        const taskIsOperating = taskIsUpdating || taskIsDeleting;
+
         return (
           <div
             key={task.id}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all ${
+              taskIsOperating ? 'opacity-70' : ''
+            }`}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -60,19 +80,38 @@ const CompletedTaskList = ({ tasks, onRestore, onDelete }: CompletedTaskListProp
               {/* Three-dot menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreVertical className="h-4 w-4 text-gray-500" />
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={taskIsOperating}>
+                    {taskIsOperating ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                    ) : (
+                      <MoreVertical className="h-4 w-4 text-gray-500" />
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onRestore?.(task.id)}>
-                    Restore to Pending
+                  <DropdownMenuItem onClick={() => onRestore?.(task.id)} disabled={taskIsOperating}>
+                    {taskIsUpdating ? (
+                      <>
+                        <div className="h-3 w-3 mr-2 animate-spin rounded-full border-2 border-gray-600 border-t-transparent" />
+                        Restoring...
+                      </>
+                    ) : (
+                      'Restore to Pending'
+                    )}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => onDelete?.(task.id)}
                     className="text-error"
+                    disabled={taskIsOperating}
                   >
-                    Delete
+                    {taskIsDeleting ? (
+                      <>
+                        <div className="h-3 w-3 mr-2 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete'
+                    )}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

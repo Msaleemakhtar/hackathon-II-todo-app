@@ -197,6 +197,38 @@ async def delete_task(
     await task_service.delete_task(db, task_id, current_user_id)
 
 
+@router.post("/{user_id}/tasks/reorder", status_code=status.HTTP_200_OK)
+async def reorder_tasks(
+    user_id: str,
+    request: Request,
+    task_ids: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reorder tasks for a specific user (drag-and-drop functionality).
+
+    **User Story 5 (P2)**: A visual thinker reorders tasks via drag-and-drop
+    to quickly adjust priorities.
+
+    **Request body**: { "task_ids": [3, 1, 2, 5, 4] }
+
+    The order of IDs in the array determines the new sort order.
+    """
+    # Validate that the user_id in the path matches the JWT user_id
+    current_user_payload = await validate_path_user_id(request, user_id, db)
+    current_user_id = current_user_payload.get("sub")
+
+    # Extract task_ids list from request body
+    ordered_task_ids = task_ids.get("task_ids", [])
+
+    if not ordered_task_ids:
+        return {"message": "No task IDs provided"}
+
+    # Persist the new task order
+    await task_service.reorder_tasks(db, ordered_task_ids, current_user_id)
+
+    return {"message": "Tasks reordered successfully"}
+
+
 @router.post(
     "/{user_id}/tasks/{task_id}/tags/{tag_id}",
     response_model=TaskRead,
