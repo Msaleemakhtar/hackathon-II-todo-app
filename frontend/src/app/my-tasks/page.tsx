@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Flag, Search, Plus, Edit } from 'lucide-react';
 import { Task } from '@/types';
+import { toast } from 'sonner';
 
 // Code-split modals for better initial page load performance
 const CreateTaskModal = dynamic(() => import('@/components/tasks/CreateTaskModal'), {
@@ -47,45 +48,70 @@ function MyTasksPage() {
 
   const handleUpdateTask = useCallback(async (taskData: { title: string; description: string; priority: string; dueDate: string; tagIds: number[] }) => {
     if (editingTask) {
-      // Update task properties
-      await updateTask(editingTask.id, {
-        title: taskData.title,
-        description: taskData.description,
-        priority: taskData.priority,
-        due_date: taskData.dueDate || null,
-      });
+      try {
+        // Update task properties
+        await updateTask(editingTask.id, {
+          title: taskData.title,
+          description: taskData.description,
+          priority: taskData.priority,
+          due_date: taskData.dueDate || null,
+        });
 
-      // Handle tag changes
-      const currentTagIds = editingTask.tags?.map(tag => tag.id) || [];
-      const newTagIds = taskData.tagIds;
+        // Close modal immediately after the main update completes
+        setEditingTask(null);
 
-      // Find tags to add and remove
-      const tagsToAdd = newTagIds.filter(id => !currentTagIds.includes(id));
-      const tagsToRemove = currentTagIds.filter(id => !newTagIds.includes(id));
+        // Handle tag changes in the background after closing the modal
+        const currentTagIds = editingTask.tags?.map(tag => tag.id) || [];
+        const newTagIds = taskData.tagIds;
 
-      // Batch tag operations - run all API calls in parallel for much better performance
-      const tagOperations = [
-        ...tagsToAdd.map(tagId =>
-          associateTagWithTask(editingTask.id, tagId).catch(err => {
-            console.error('Failed to associate tag:', err);
-          })
-        ),
-        ...tagsToRemove.map(tagId =>
-          dissociateTagFromTask(editingTask.id, tagId).catch(err => {
-            console.error('Failed to dissociate tag:', err);
-          })
-        ),
-      ];
+        // Find tags to add and remove
+        const tagsToAdd = newTagIds.filter(id => !currentTagIds.includes(id));
+        const tagsToRemove = currentTagIds.filter(id => !newTagIds.includes(id));
 
-      // Wait for all tag operations to complete in parallel
-      await Promise.all(tagOperations);
+        // Process tag operations in the background without waiting for them
+        if (tagsToAdd.length > 0 || tagsToRemove.length > 0) {
+          // Create a separate promise that runs in the background
+          const processTagChanges = async () => {
+            // Batch tag operations - run all API calls in parallel for much better performance
+            const tagOperations = [
+              ...tagsToAdd.map(tagId =>
+                associateTagWithTask(editingTask.id, tagId).catch(err => {
+                  console.error('Failed to associate tag:', err);
+                })
+              ),
+              ...tagsToRemove.map(tagId =>
+                dissociateTagFromTask(editingTask.id, tagId).catch(err => {
+                  console.error('Failed to dissociate tag:', err);
+                })
+              ),
+            ];
 
-      // Refetch tasks to get updated tag associations
-      await refetch();
+            // Wait for all tag operations to complete in parallel
+            await Promise.all(tagOperations);
 
-      setEditingTask(null);
+            // Refetch tasks to get updated tag associations
+            await refetch();
+          };
+
+          // Execute the tag operations in the background without awaiting
+          processTagChanges().catch(console.error);
+        }
+      } catch (error) {
+        // Handle error silently since it's already handled in the mutation
+        console.error('Failed to update task:', error);
+      }
     }
   }, [editingTask, updateTask, associateTagWithTask, dissociateTagFromTask, refetch]);
+
+  const handleDeleteTask = useCallback(async (taskId: number) => {
+    try {
+      await deleteTask(taskId);
+      toast.success('Task deleted');
+    } catch (error) {
+      // Error toast is already shown by the mutation
+      console.error('Delete failed:', error);
+    }
+  }, [deleteTask]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
@@ -250,6 +276,7 @@ function MyTasksPage() {
         isOpen={!!editingTask}
         onOpenChange={(open) => !open && setEditingTask(null)}
         onSubmit={handleUpdateTask}
+        isLoading={isUpdatingTask}
       />
 
       {selectedTask && (
@@ -258,7 +285,7 @@ function MyTasksPage() {
           isOpen={!!selectedTask}
           onOpenChange={handleCloseModal}
           onToggleComplete={updateTaskStatus}
-          onDelete={deleteTask}
+          onDelete={handleDeleteTask}
         />
       )}
     </div>

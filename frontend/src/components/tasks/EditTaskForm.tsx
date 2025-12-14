@@ -11,9 +11,10 @@ import { X, Tags, Calendar, Flag, AlertCircle, CheckCircle2, Sparkles, Plus } fr
 interface EditTaskFormProps {
   task: Task;
   onSubmit: (taskData: { title: string; description: string; priority: string; dueDate: string; tagIds: number[] }) => void;
+  isLoading?: boolean;
 }
 
-const EditTaskForm = ({ task, onSubmit }: EditTaskFormProps) => {
+const EditTaskForm = ({ task, onSubmit, isLoading }: EditTaskFormProps) => {
   const { tags, isLoadingTags, createTag } = useTags();
   const { taskPriorities, isLoadingPriorities } = useCategories();
   const [title, setTitle] = useState(task.title || '');
@@ -282,9 +283,19 @@ const EditTaskForm = ({ task, onSubmit }: EditTaskFormProps) => {
           type="submit"
           className="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
           size="lg"
+          disabled={isLoading}
         >
-          <CheckCircle2 className="h-4 w-4" />
-          Update Task
+          {isLoading ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Updating...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="h-4 w-4" />
+              Update Task
+            </>
+          )}
         </Button>
       </div>
     </form>

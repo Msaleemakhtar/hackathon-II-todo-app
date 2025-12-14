@@ -3,6 +3,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Flag, CheckCircle2, Trash2, X, Tag as TagIcon } from 'lucide-react';
 import { useState } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface TaskDetailModalProps {
   task: any;
@@ -20,6 +30,7 @@ const TaskDetailModal = ({
   onDelete
 }: TaskDetailModalProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (!task) return null;
 
@@ -49,10 +60,14 @@ const TaskDetailModal = ({
   };
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this task?')) {
-      onDelete(task.id);
-      onOpenChange(false);
-    }
+    onDelete(task.id);
+    onOpenChange(false);
+  };
+
+  const handleDeleteWithConfirmation = () => {
+    setShowDeleteDialog(false);
+    onDelete(task.id);
+    onOpenChange(false);
   };
 
   return (
@@ -158,7 +173,7 @@ const TaskDetailModal = ({
             </Button>
 
             <Button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteDialog(true)}
               variant="destructive"
               className="flex-1"
               disabled={isUpdating}
@@ -167,6 +182,27 @@ const TaskDetailModal = ({
               Delete Task
             </Button>
           </div>
+
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure you want to delete this task?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the task "{task.title}"
+                  and remove it from your task list.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteWithConfirmation}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  Delete Task
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Button
             onClick={() => onOpenChange(false)}

@@ -1,0 +1,84 @@
+<svg width="1170" height="2532" viewBox="0 0 1170 2532" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Mobile device frame -->
+  <rect width="1170" height="2532" fill="#F9FAFB"/>
+
+  <!-- Header -->
+  <rect y="0" width="1170" height="200" fill="#3B82F6"/>
+  <text x="585" y="120" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle">My Tasks</text>
+
+  <!-- Search bar -->
+  <rect x="60" y="220" width="1050" height="120" rx="60" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="140" y="295" font-family="Arial, sans-serif" font-size="48" fill="#9CA3AF">Search tasks...</text>
+
+  <!-- Filter tabs -->
+  <rect x="60" y="380" width="340" height="90" rx="45" fill="#3B82F6"/>
+  <text x="230" y="440" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="white" text-anchor="middle">All</text>
+
+  <rect x="420" y="380" width="340" height="90" rx="45" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="590" y="440" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#6B7280" text-anchor="middle">Active</text>
+
+  <rect x="780" y="380" width="340" height="90" rx="45" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="950" y="440" font-family="Arial, sans-serif" font-size="42" font-weight="600" fill="#6B7280" text-anchor="middle">Completed</text>
+
+  <!-- Task cards -->
+  <!-- Task 1 -->
+  <g>
+    <rect x="60" y="520" width="1050" height="200" rx="20" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="140" cy="620" r="30" fill="none" stroke="#3B82F6" stroke-width="4"/>
+    <text x="200" y="605" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#111827">Complete project proposal</text>
+    <text x="200" y="660" font-family="Arial, sans-serif" font-size="36" fill="#6B7280">Due: Today</text>
+  </g>
+
+  <!-- Task 2 -->
+  <g>
+    <rect x="60" y="750" width="1050" height="200" rx="20" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="140" cy="850" r="30" fill="none" stroke="#3B82F6" stroke-width="4"/>
+    <text x="200" y="835" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#111827">Review pull requests</text>
+    <text x="200" y="890" font-family="Arial, sans-serif" font-size="36" fill="#6B7280">Due: Tomorrow</text>
+  </g>
+
+  <!-- Task 3 - Completed -->
+  <g>
+    <rect x="60" y="980" width="1050" height="200" rx="20" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="140" cy="1080" r="30" fill="#10B981"/>
+    <path d="M125 1080l10 10 20-20" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <text x="200" y="1065" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#9CA3AF" text-decoration="line-through">Update documentation</text>
+    <text x="200" y="1120" font-family="Arial, sans-serif" font-size="36" fill="#10B981">Completed</text>
+  </g>
+
+  <!-- Task 4 -->
+  <g>
+    <rect x="60" y="1210" width="1050" height="200" rx="20" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="140" cy="1310" r="30" fill="none" stroke="#3B82F6" stroke-width="4"/>
+    <text x="200" y="1295" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#111827">Team meeting preparation</text>
+    <text x="200" y="1350" font-family="Arial, sans-serif" font-size="36" fill="#6B7280">Due: Next week</text>
+  </g>
+
+  <!-- Task 5 -->
+  <g>
+    <rect x="60" y="1440" width="1050" height="200" rx="20" fill="white" stroke="#E5E7EB" stroke-width="2"/>
+    <circle cx="140" cy="1540" r="30" fill="none" stroke="#3B82F6" stroke-width="4"/>
+    <text x="200" y="1525" font-family="Arial, sans-serif" font-size="48" font-weight="600" fill="#111827">Design new feature mockups</text>
+    <text x="200" y="1580" font-family="Arial, sans-serif" font-size="36" fill="#6B7280">No due date</text>
+  </g>
+
+  <!-- Floating action button -->
+  <circle cx="1000" cy="2300" r="100" fill="#3B82F6" filter="url(#shadow)"/>
+  <line x1="1000" y1="2250" x2="1000" y2="2350" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <line x1="950" y1="2300" x2="1050" y2="2300" stroke="white" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Shadow filter -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dx="0" dy="8" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>

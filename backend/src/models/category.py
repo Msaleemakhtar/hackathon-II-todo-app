@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Optional
 from datetime import datetime, timezone
 
 from sqlmodel import Field, Relationship, SQLModel
+from src.utils.timezone_utils import get_utc_now
 
 if TYPE_CHECKING:
     from .user import User
@@ -20,8 +21,8 @@ class Category(CategoryBase, table=True):
     __tablename__ = "categories"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: get_utc_now().replace(tzinfo=None), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: get_utc_now().replace(tzinfo=None), nullable=False)
 
     # Relationships
     user: "User" = Relationship(back_populates="categories")

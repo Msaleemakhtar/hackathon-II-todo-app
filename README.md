@@ -25,6 +25,9 @@ A full-stack, production-ready task management application built with **Next.js 
 - **Flexible Tags** - Multi-tag support for advanced task organization
 - **Advanced Filtering** - Filter by status, priority, category, tags, and search by keywords
 - **Task Recurrence** - Support for recurring tasks with iCal RRULE format
+- **Reminder System** - Set customizable reminders for tasks with push notifications
+- **Drag & Drop** - Intuitive task reordering with visual feedback
+- **Virtualized Lists** - High-performance rendering for thousands of tasks
 
 ### 🔐 Authentication & Security
 - **Better Auth Integration** - Modern authentication with session management
@@ -38,7 +41,24 @@ A full-stack, production-ready task management application built with **Next.js 
 - **Real-time Updates** - Optimistic UI updates for instant feedback
 - **Dark Mode Ready** - Theme support with Tailwind CSS
 - **Interactive Dashboard** - Visual task analytics and progress tracking
-- **Keyboard Shortcuts** - Efficient task navigation and management
+- **Keyboard Shortcuts** - Efficient task navigation and management (press ? for help)
+- **Offline Support** - Full offline functionality with background sync
+- **Progressive Web App** - Installable on desktop and mobile devices
+
+### 📱 Progressive Web App
+- **Installable** - Add to home screen on iOS, Android, and desktop
+- **Offline Mode** - Work without internet, sync when reconnected
+- **Push Notifications** - Browser notifications for task reminders
+- **App Shortcuts** - Quick actions from app icon (New Task, Search)
+- **Standalone Mode** - Runs in its own window like a native app
+- **Service Worker** - Background sync and smart caching
+
+### 📊 Performance & Monitoring
+- **Error Tracking** - Sentry integration for production error monitoring
+- **Performance Analytics** - Core Web Vitals tracking (LCP, FID, CLS, INP, TTFB)
+- **Event Analytics** - User interaction tracking with privacy controls
+- **Privacy-First** - No PII collection, easy opt-out, GDPR compliant
+- **Real-time Metrics** - Dashboard for monitoring app health
 
 ### 🏗️ Technical Excellence
 - **Spec-Driven Development** - Built following constitutional governance rules
@@ -47,6 +67,8 @@ A full-stack, production-ready task management application built with **Next.js 
 - **Database Migrations** - Version-controlled schema with Alembic
 - **Comprehensive Testing** - Unit and integration tests with 80%+ coverage
 - **Production Ready** - Docker support with multi-stage builds
+- **Redis Caching** - Optional high-performance caching layer
+- **Background Workers** - Task scheduling for reminders and cleanup
 
 ---
 
@@ -352,7 +374,27 @@ GET    /api/v1/tags              List tags
 POST   /api/v1/tags              Create tag
 ```
 
-**Authentication Required**: All endpoints except `/health`, `/register`, and `/login` require a valid JWT token in the `Authorization: Bearer <token>` header.
+#### Reminders & Notifications
+```
+POST   /api/v1/reminders         Create task reminder
+GET    /api/v1/reminders         List all reminders
+PUT    /api/v1/reminders/{id}    Update reminder
+DELETE /api/v1/reminders/{id}    Delete reminder
+POST   /api/v1/subscriptions     Subscribe to push notifications
+GET    /api/v1/subscriptions     List active subscriptions
+DELETE /api/v1/subscriptions/{id} Unsubscribe
+```
+
+#### Analytics & Monitoring
+```
+POST   /api/analytics/vitals     Track Core Web Vitals
+POST   /api/analytics/events     Track custom events
+GET    /api/analytics/vitals/summary  Get performance summary
+```
+
+**Authentication Required**: All endpoints except `/health`, `/register`, `/login`, and `/api/analytics/*` require a valid JWT token in the `Authorization: Bearer <token>` header.
+
+**Note**: Analytics endpoints accept both authenticated and anonymous requests for comprehensive monitoring.
 
 ---
 
@@ -526,6 +568,8 @@ docker compose exec -T db psql -U todouser todo_dev < backup.sql
 
 Copy `.env.example` to `.env` and configure:
 
+#### Required Variables
+
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DB_USER` | Database username | `todouser` |
@@ -536,6 +580,18 @@ Copy `.env.example` to `.env` and configure:
 | `NEXT_PUBLIC_API_BASE_URL` | Backend API URL | `https://api.yourdomain.com/api` |
 | `CORS_ORIGINS` | Allowed frontend origins | `["https://yourdomain.com"]` |
 
+#### Optional Variables (Advanced Features)
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SENTRY_DSN` (backend) | Sentry DSN for backend error tracking | `https://...@sentry.io/123` |
+| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN for frontend client errors | `https://...@sentry.io/456` |
+| `SENTRY_DSN` (frontend) | Sentry DSN for frontend server errors | `https://...@sentry.io/789` |
+| `REDIS_URL` | Redis connection for caching | `redis://localhost:6379/0` |
+| `VAPID_PRIVATE_KEY` | Web Push private key (auto-generated) | Base64 encoded key |
+| `VAPID_PUBLIC_KEY` | Web Push public key (auto-generated) | Base64 encoded key |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push key for frontend | Same as VAPID_PUBLIC_KEY |
+
 ### Deployment Platforms
 
 **Recommended Platforms:**
@@ -545,13 +601,59 @@ Copy `.env.example` to `.env` and configure:
 
 ---
 
+## 📱 Progressive Web App
+
+### Installation
+
+The app can be installed on any device:
+
+**Desktop (Chrome, Edge):**
+1. Visit the site and click the install icon in the address bar
+2. Or look for the custom install prompt
+3. Click "Install" to add to desktop
+
+**Android (Chrome):**
+1. Tap "Add to Home Screen" when prompted
+2. The app appears on your home screen like a native app
+
+**iOS (Safari):**
+1. Tap the Share button
+2. Select "Add to Home Screen"
+3. Confirm to install
+
+### PWA Features
+
+- **Offline Mode**: Work without internet, changes sync when reconnected
+- **Push Notifications**: Receive browser notifications for task reminders
+- **App Shortcuts**: Quick access to "New Task" and "Search" from app icon
+- **Standalone Mode**: Runs in its own window without browser UI
+- **Fast Performance**: Cached assets for instant loading
+
+### Keyboard Shortcuts
+
+Press `?` or `Ctrl+/` to view all shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| `N` or `Ctrl+N` | Create new task |
+| `S` or `Ctrl+K` | Search tasks |
+| `?` or `Ctrl+/` | Show keyboard shortcuts |
+| `Esc` | Close modals/dialogs |
+| `↑` / `↓` | Navigate task list |
+| `Enter` | Open selected task |
+| `E` | Edit selected task |
+| `D` | Delete selected task |
+| `Space` | Toggle task completion |
+
 ## 📝 Documentation
 
-- [**Backend Documentation**](./backend/README.md) - FastAPI setup, API reference, database models
-- [**Frontend Documentation**](./frontend/README.md) - Next.js setup, components, hooks
+- [**Backend Documentation**](./backend/README.md) - FastAPI setup, API reference, database models, advanced features
+- [**Frontend Documentation**](./frontend/README.md) - Next.js setup, components, hooks, PWA features
+- [**Backend Tests**](./backend/tests/README.md) - Test suite documentation and best practices
 - [**Better Auth Integration**](./BETTER_AUTH_IMPLEMENTATION.md) - Authentication architecture
 - [**Constitutional Governance**](./.specify/memory/constitution.md) - Development principles and rules
 - [**Architecture Decision Records**](./history/adr/) - Key architectural decisions
+- [**Implementation Summary**](./resources/IMPLEMENTATION_SUMMARY_PHASE_8_9.md) - Phase 8 & 9 advanced features
 
 ---
 
@@ -604,12 +706,77 @@ git push origin feature/your-feature-name
 - **Throughput**: 1000+ requests/second
 - **Database Queries**: Optimized with indexes
 - **Connection Pooling**: 2-5 connections (asyncpg)
+- **Caching**: Optional Redis for 10x faster repeated queries
 
 ### Frontend Metrics
 - **First Contentful Paint**: < 1.5s
 - **Time to Interactive**: < 3s
 - **Bundle Size**: < 200KB (gzipped)
 - **Lighthouse Score**: 90+ (Performance)
+- **PWA Score**: 100 (Installability)
+
+### Performance Monitoring
+
+**Core Web Vitals Tracking:**
+- **LCP** (Largest Contentful Paint): < 2.5s
+- **FID** (First Input Delay): < 100ms
+- **CLS** (Cumulative Layout Shift): < 0.1
+- **INP** (Interaction to Next Paint): < 200ms
+- **TTFB** (Time to First Byte): < 600ms
+
+**Analytics Dashboard:**
+- Real-time performance metrics
+- User interaction tracking
+- Error rate monitoring
+- Privacy-first (no PII, easy opt-out)
+
+---
+
+## 🔍 Monitoring & Error Tracking
+
+### Production Monitoring
+
+**Sentry Integration:**
+- **Backend**: FastAPI error tracking with 10% trace sampling
+- **Frontend**: Client, server, and edge error tracking
+- **Session Replay**: 10% of sessions recorded for debugging
+- **Development Filtering**: No dev errors sent to Sentry
+
+**Setup:**
+```bash
+# Backend .env
+SENTRY_DSN=https://your-backend-dsn@sentry.io/project-id
+ENVIRONMENT=production
+
+# Frontend .env.local
+NEXT_PUBLIC_SENTRY_DSN=https://your-client-dsn@sentry.io/project-id
+SENTRY_DSN=https://your-server-dsn@sentry.io/project-id
+```
+
+### Analytics Features
+
+**Event Tracking:**
+- Task created, completed, deleted, reordered
+- Search performed
+- Reminder set
+- Filter applied
+
+**Privacy Controls:**
+- No PII collection
+- Opt-out via settings
+- Development environment filtering
+- GDPR compliant
+
+**Usage:**
+```typescript
+import { useTaskAnalytics } from '@/hooks/useAnalytics';
+
+const { trackTaskCreated, trackTaskCompleted } = useTaskAnalytics();
+
+// Track events
+trackTaskCreated({ priority: 'high', has_reminder: true });
+trackTaskCompleted({ time_to_complete_hours: 2.5 });
+```
 
 ---
 
@@ -668,6 +835,15 @@ async def check():
     await engine.dispose()
 asyncio.run(check())
 "
+```
+
+**Issue: Better Auth error "relation 'session' does not exist"**
+```bash
+# This means Better Auth database tables don't exist - initialize them
+docker compose exec frontend bun run scripts/init-better-auth-db.ts
+
+# Verify tables were created
+docker compose exec frontend npx pg-gui --connection-string $DATABASE_URL --command "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('user', 'account', 'session', 'verification');"
 ```
 
 **Recent Fixes (December 2025)**:

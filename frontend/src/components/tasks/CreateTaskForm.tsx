@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Calendar, AlertCircle, Flag, Repeat } from 'lucide-react';
+import { CheckCircle2, Calendar, AlertCircle, Flag, Repeat, Bell } from 'lucide-react';
 import { RecurrenceSelector, RecurrencePattern, patternToRRule } from './RecurrenceSelector';
+import { ReminderSelector, ReminderConfig } from './ReminderSelector';
 
 interface CreateTaskFormProps {
   onSubmit: (taskData: {
@@ -15,6 +16,7 @@ interface CreateTaskFormProps {
     status: string;
     dueDate: string;
     recurrenceRule?: string | null;
+    reminderConfig?: ReminderConfig | null;
   }) => void;
   isLoading?: boolean;
 }
@@ -32,6 +34,12 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
     endType: 'never',
   });
   const [showRecurrence, setShowRecurrence] = useState(false);
+  const [reminderConfig, setReminderConfig] = useState<ReminderConfig>({
+    timing: 'none',
+    channel: 'browser',
+    message: '',
+  });
+  const [showReminder, setShowReminder] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +51,9 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
     // Convert recurrence pattern to RRULE string
     const recurrenceRule = patternToRRule(recurrencePattern, dueDate ? new Date(dueDate) : undefined);
 
+    // Only include reminder config if timing is not 'none'
+    const reminderData = reminderConfig.timing !== 'none' ? reminderConfig : null;
+
     await onSubmit({
       title,
       description,
@@ -50,6 +61,7 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
       status: selectedStatus,
       dueDate,
       recurrenceRule,
+      reminderConfig: reminderData,
     });
 
     // Reset form after successful submission
@@ -64,6 +76,12 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
       endType: 'never',
     });
     setShowRecurrence(false);
+    setReminderConfig({
+      timing: 'none',
+      channel: 'browser',
+      message: '',
+    });
+    setShowReminder(false);
   };
 
   const getPriorityColor = (priorityName: string) => {
@@ -218,6 +236,33 @@ const CreateTaskForm = ({ onSubmit, isLoading }: CreateTaskFormProps) => {
             <RecurrenceSelector
               value={recurrencePattern}
               onChange={setRecurrencePattern}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Reminder Section */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Task Reminder
+          </Label>
+          <button
+            type="button"
+            onClick={() => setShowReminder(!showReminder)}
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+          >
+            {showReminder ? 'Hide' : 'Show'} Options
+          </button>
+        </div>
+
+        {showReminder && (
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <ReminderSelector
+              value={reminderConfig}
+              onChange={setReminderConfig}
+              dueDate={dueDate}
             />
           </div>
         )}

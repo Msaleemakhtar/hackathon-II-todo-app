@@ -4,16 +4,30 @@ This is the frontend for the Todo App, built with Next.js 16, React 19, TypeScri
 
 ## Features
 
+### Core Features
 - **Better Auth Integration** - Full authentication flow with session management and PostgreSQL storage
 - **JWT Token Management** - Automatic token generation and refresh for backend API calls
 - **Task Dashboard** - Visual overview of tasks with status charts and quick actions
 - **Task Management** - Create, update, delete, and filter tasks with priority levels and status tracking
 - **Category System** - Organize tasks into categories for better organization
 - **Tag System** - Organize tasks with custom tags and colors for flexible categorization
+- **Reminder System** - Set reminders for tasks with customizable notification times
+- **Drag & Drop** - Reorder tasks with intuitive drag-and-drop interface
+- **Virtualized Lists** - High-performance rendering for large task lists
 - **Responsive Design** - Mobile-first UI built with Tailwind CSS and shadcn/ui components
 - **Real-time State Management** - Client-side state with Zustand
 - **Protected Routes** - Automatic authentication and route protection with HOC
 - **Type-Safe API Client** - Axios-based client with TypeScript types and automatic JWT injection
+
+### Advanced Features
+- **Progressive Web App (PWA)** - Installable app with offline support and native-like experience
+- **Push Notifications** - Browser push notifications for task reminders
+- **Offline Mode** - Full offline functionality with background sync
+- **Keyboard Shortcuts** - Efficient navigation and task management with hotkeys
+- **Performance Monitoring** - Core Web Vitals tracking and analytics
+- **Error Tracking** - Sentry integration for production error monitoring
+- **Analytics** - Privacy-first user interaction tracking with opt-out support
+- **Service Worker** - Background sync, offline caching, and push notification support
 
 ## Constitutional Reference
 
@@ -66,9 +80,20 @@ All frontend development **MUST** adhere to the principles defined in:
    # Database URL (PostgreSQL - same as backend)
    # For Neon Serverless PostgreSQL, include ?sslmode=require
    DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require
+
+   # Error Monitoring (Sentry) - Optional, production only
+   NEXT_PUBLIC_SENTRY_DSN=https://your-client-sentry-dsn@sentry.io/project-id
+   SENTRY_DSN=https://your-server-sentry-dsn@sentry.io/project-id
+   SENTRY_ORG=your-sentry-org
+   SENTRY_PROJECT=your-sentry-project
+
+   # PWA Configuration - Optional
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key-from-backend
    ```
 
-   **⚠️ CRITICAL:** `BETTER_AUTH_SECRET` must match the value in `backend/.env`
+   **⚠️ CRITICAL:**
+   - `BETTER_AUTH_SECRET` must match the value in `backend/.env`
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` should match the value from backend's `/api/v1/subscriptions/vapid-public-key` endpoint
 
 ### Database Initialization (Better Auth Tables)
 
@@ -332,6 +357,26 @@ See [BETTER_AUTH_IMPLEMENTATION.md](../BETTER_AUTH_IMPLEMENTATION.md) for detail
 - Edit functionality
 - Tag management
 
+**`src/components/tasks/DraggableTaskList.tsx`**
+- Drag-and-drop task reordering
+- Visual feedback during drag operations
+- Optimistic UI updates
+
+**`src/components/tasks/VirtualizedTaskList.tsx`**
+- High-performance virtualized rendering
+- Handles thousands of tasks efficiently
+- Windowing for memory optimization
+
+**`src/components/tasks/ReminderSelector.tsx`**
+- Visual reminder time selection
+- Preset options (1h, 1d, 1w before due date)
+- Custom date/time picker
+
+**`src/components/tasks/SortableTaskCard.tsx`**
+- Task card with drag-and-drop support
+- Priority and status indicators
+- Quick actions (complete, edit, delete)
+
 ### Dashboard Components
 
 **`src/components/dashboard/TaskStatusChart.tsx`**
@@ -351,6 +396,34 @@ See [BETTER_AUTH_IMPLEMENTATION.md](../BETTER_AUTH_IMPLEMENTATION.md) for detail
 - Password validation
 - Email verification (optional)
 
+### PWA & Advanced Components
+
+**`src/components/PWAInstallPrompt.tsx`**
+- Custom PWA installation UI
+- Dismissible prompt with 7-day timeout
+- Auto-hides if app is already installed
+- Responsive design for mobile and desktop
+
+**`src/components/OfflineIndicator.tsx`**
+- Network status indicator
+- Visual feedback when offline
+- Background sync status
+
+**`src/components/KeyboardShortcutsHelp.tsx`**
+- Keyboard shortcuts reference modal
+- Context-sensitive help
+- Searchable shortcut list
+
+**`src/components/notifications/NotificationPermissionPrompt.tsx`**
+- Push notification permission request UI
+- Educational messaging
+- One-time dismissal
+
+**`src/components/notifications/NotificationSettings.tsx`**
+- Notification preferences management
+- Subscribe/unsubscribe controls
+- Test notification button
+
 ### UI Components (shadcn/ui)
 
 Located in `src/components/ui/`:
@@ -366,6 +439,10 @@ Located in `src/components/ui/`:
 - `tabs.tsx` - Tab navigation
 - `label.tsx` - Form labels
 - `table.tsx` - Data tables
+- `calendar.tsx` - Date picker calendar
+- `popover.tsx` - Popover component
+- `radio-group.tsx` - Radio button groups
+- `textarea.tsx` - Multi-line text input
 
 ## State Management
 
@@ -406,6 +483,32 @@ const { isCreateModalOpen, setCreateModalOpen } = useUIStore();
 - Tag fetching and management
 - Create, update, delete tags
 - Tag-based task filtering
+
+**`src/hooks/useAnalytics.ts`**
+- General event tracking with privacy controls
+- Pre-defined task events (created, completed, deleted, reordered)
+- Opt-in/opt-out functionality
+- PII filtering and development environment filtering
+
+**`src/hooks/useNotifications.ts`**
+- Web Push notification subscription management
+- Permission request handling
+- Subscription lifecycle (subscribe, unsubscribe, update)
+- VAPID key integration
+
+**`src/hooks/useKeyboardShortcuts.ts`**
+- Global keyboard shortcut registration
+- Context-aware hotkeys
+- Customizable key bindings
+
+**`src/hooks/useOffline.ts`**
+- Network status detection
+- Offline/online state management
+- Background sync coordination
+
+**`src/hooks/useDebounce.ts`**
+- Input debouncing for search and filters
+- Performance optimization for expensive operations
 
 ## API Integration
 
@@ -582,6 +685,96 @@ frontend/
 - **`autoprefixer@10.4.20`** - CSS vendor prefixing
 - **`postcss@8.4.49`** - CSS processing
 
+## Progressive Web App (PWA) Features
+
+### Installation
+
+The app can be installed as a Progressive Web App on supported browsers:
+
+1. **Desktop (Chrome, Edge)**:
+   - Visit the site and look for the install prompt in the address bar
+   - Or use the custom install prompt that appears automatically
+   - Click "Install" to add the app to your desktop
+
+2. **Android (Chrome)**:
+   - Visit the site and tap the "Add to Home Screen" prompt
+   - Or use the browser menu → "Install app"
+   - The app will appear on your home screen like a native app
+
+3. **iOS (Safari)**:
+   - Visit the site and tap the Share button
+   - Scroll down and tap "Add to Home Screen"
+   - Confirm to add the app icon to your home screen
+
+### PWA Features
+
+**Offline Support:**
+- Tasks cached for offline viewing
+- Create, edit, and delete tasks while offline
+- Automatic sync when connection is restored
+- Offline fallback page for unavailable resources
+
+**App Shortcuts:**
+- Quick access to common actions from app icon
+- "New Task" - Create a task immediately
+- "Search Tasks" - Open search interface
+
+**Standalone Mode:**
+- Runs in its own window without browser UI
+- Custom splash screen
+- Native app-like experience
+
+**Push Notifications:**
+- Browser push notifications for task reminders
+- Permission-based (user opt-in required)
+- Works even when app is closed
+- Configurable notification times
+
+### Keyboard Shortcuts
+
+Press `?` or `Ctrl+/` to view all shortcuts. Common shortcuts include:
+
+| Shortcut | Action |
+|----------|--------|
+| `N` or `Ctrl+N` | Create new task |
+| `S` or `Ctrl+K` | Search tasks |
+| `?` or `Ctrl+/` | Show keyboard shortcuts help |
+| `Esc` | Close modals/dialogs |
+| `↑` / `↓` | Navigate task list |
+| `Enter` | Open selected task |
+| `E` | Edit selected task |
+| `D` | Delete selected task |
+| `Space` | Toggle task completion |
+
+### Analytics & Privacy
+
+**Performance Tracking:**
+- Core Web Vitals (LCP, FID, CLS, INP, TTFB, FCP, TBT)
+- Automatic reporting to backend analytics endpoint
+- Helps identify and fix performance issues
+
+**Event Tracking:**
+- User interactions (task created, completed, deleted, etc.)
+- Privacy-first approach (no PII collected)
+- Automatic consent management
+- Easy opt-out via settings
+
+**Opt-Out:**
+```typescript
+import { useAnalytics } from '@/hooks/useAnalytics';
+
+const { optOut, optIn, hasConsent } = useAnalytics();
+
+// Check consent status
+console.log(hasConsent); // true/false
+
+// Opt out of analytics
+optOut();
+
+// Opt back in
+optIn();
+```
+
 ## Testing the Application
 
 ### 1. Start the Backend
@@ -690,7 +883,18 @@ bun run scripts/init-better-auth-db.ts
 psql $DATABASE_URL -c "\dt"
 ```
 
-**6. PostgreSQL Reserved Keyword Issues**
+**6. "relation 'session' does not exist" Error**
+If you encounter this error in the logs, it means the Better Auth tables were not created:
+
+```bash
+# Initialize Better Auth tables in the database
+bun run scripts/init-better-auth-db.ts
+
+# Verify the tables were created
+psql $DATABASE_URL -c "\dt" | grep -E "(user|account|session|verification)"
+```
+
+**7. PostgreSQL Reserved Keyword Issues**
 If you encounter errors like `relation "user" does not exist`, this may be due to the reserved PostgreSQL keyword "user". The Better Auth tables are defined with proper quoting to handle this:
 
 ```sql
@@ -727,6 +931,47 @@ bun install
 # Restart dev server
 bun run dev
 ```
+
+**9. Sentry Not Capturing Errors**
+```bash
+# Verify Sentry DSN is set
+echo $NEXT_PUBLIC_SENTRY_DSN
+echo $SENTRY_DSN
+
+# Check environment
+echo $NEXT_PUBLIC_ENVIRONMENT
+
+# Ensure errors are only sent in production
+# Development errors are filtered out by default
+```
+
+**10. PWA Not Installing**
+- Check browser console for manifest errors
+- Verify all required icons exist in `public/icons/`
+- Ensure HTTPS is enabled (required for PWA in production)
+- Check service worker registration in DevTools → Application
+- Verify manifest at `/manifest.webmanifest` is accessible
+
+**11. Push Notifications Not Working**
+```bash
+# Verify VAPID public key is set
+echo $NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
+# Check browser permissions
+# DevTools → Application → Storage → Permissions
+
+# Verify service worker is registered
+# DevTools → Application → Service Workers
+
+# Test notification permission
+navigator.permissions.query({name: 'notifications'})
+```
+
+**12. Offline Mode Not Working**
+- Check service worker is active (DevTools → Application → Service Workers)
+- Verify cache storage has entries (DevTools → Application → Cache Storage)
+- Enable offline mode in DevTools → Network tab to test
+- Check background sync status in DevTools → Application → Background Sync
 
 ## Performance Optimization
 

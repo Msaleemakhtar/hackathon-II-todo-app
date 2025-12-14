@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   # PostgreSQL Database - Primary data store for both auth and application data
   db:
@@ -23,6 +21,25 @@ services:
     networks:
       - todo_network
 
+  # Redis - Caching layer for performance optimization
+  redis:
+    image: redis:7-alpine
+    container_name: todo_app_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - todo_network
+
   # FastAPI Backend - REST API with JWT validation
   backend:
     build:
@@ -37,6 +54,9 @@ services:
     environment:
       # Database Configuration
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-todouser}:${DB_PASSWORD:-todopass}@db:5432/${DB_NAME:-todo_dev}
+
+      # Redis Configuration
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
 
       # JWT Configuration (must match frontend BETTER_AUTH_SECRET)
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-to-a-random-secret-key-min-64-chars}
@@ -53,6 +73,8 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -96,6 +118,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

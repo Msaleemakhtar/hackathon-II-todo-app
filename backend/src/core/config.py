@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # Monitoring & Analytics (FR-034, FR-035)
+    SENTRY_DSN: str | None = Field(
+        default=None, description="Sentry DSN for error tracking"
+    )
+
 
 settings = Settings()
 

@@ -12,15 +12,19 @@ connect_args = {}
 if "sqlite" in DATABASE_URL_TO_USE:
     connect_args["check_same_thread"] = False
 
-# Pooling parameters (only for non-SQLite, e.g., PostgreSQL)
-pooling_args = {}
+# PostgreSQL specific connect arguments
 if "postgresql" in DATABASE_URL_TO_USE:
+    connect_args["server_settings"] = {"timezone": "UTC"}
+    # Set pooling parameters for PostgreSQL
     pooling_args = {
         "pool_size": settings.DB_POOL_MIN,
         "max_overflow": settings.DB_POOL_MAX - settings.DB_POOL_MIN,
         "pool_pre_ping": True,
         "pool_recycle": settings.DB_POOL_RECYCLE,
     }
+else:
+    # For SQLite and other databases
+    pooling_args = {}
 
 # Create async engine
 engine = create_async_engine(

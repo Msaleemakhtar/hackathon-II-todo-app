@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 class CategoryBase(BaseModel):
@@ -32,6 +32,14 @@ class CategoryResponse(CategoryBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_datetime(self, value: datetime) -> str:
+        """Serialize datetime as ISO format with Z suffix to indicate UTC time."""
+        if value is not None:
+            # For naive datetimes (which we store in UTC), treat them as UTC and append 'Z'
+            return value.isoformat() + "Z"
+        return value
 
 
 class CategoryListResponse(BaseModel):

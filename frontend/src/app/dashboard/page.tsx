@@ -1,19 +1,25 @@
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useTasks } from '@/hooks/useTasks';
 import { useTags } from '@/hooks/useTags';
 import { useAuth } from '@/hooks/useAuth';
 import TaskCard from '@/components/tasks/TaskCard';
+import { DraggableTaskList } from '@/components/tasks/DraggableTaskList';
 import TaskStatusChart from '@/components/dashboard/TaskStatusChart';
 import CompletedTaskList from '@/components/tasks/CompletedTaskList';
 import { TaskListSkeleton } from '@/components/tasks/TaskSkeleton';
 import withAuth from '@/components/withAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
+import { Plus, UserPlus, Keyboard } from 'lucide-react';
 import { Task } from '@/types';
+import { useKeyboardShortcuts, getTaskManagementShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { KeyboardShortcutsHelp } from '@/components/KeyboardShortcutsHelp';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { useOffline } from '@/hooks/useOffline';
 
 // Code-split modals for better initial page load performance
 const CreateTaskModal = dynamic(() => import('@/components/tasks/CreateTaskModal'), {
@@ -25,11 +31,36 @@ const EditTaskModal = dynamic(() => import('@/components/tasks/EditTaskModal'), 
 });
 
 function DashboardPage() {
-  const { tasks, isLoadingTasks, updateTaskStatus, updateTask, createTask, deleteTask, refetch } = useTasks();
+  const {
+    tasks,
+    isLoadingTasks,
+    isCreatingTask,
+    isUpdatingTask,
+    isDeletingTask,
+    updateTaskStatus,
+    updateTask,
+    createTask,
+    deleteTask,
+    reorderTasks,
+    refetch,
+    isTaskUpdating,
+    isTaskDeleting,
+  } = useTasks();
   const { associateTagWithTask, dissociateTagFromTask } = useTags();
   const { user } = useAuth();
+  const { isOnline, cacheTaskList } = useOffline();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number>(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Cache tasks for offline access whenever they change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      cacheTaskList(tasks).catch(console.error);
+    }
+  }, [tasks, cacheTaskList]);
 
   // Extract first name from user name or use email
   const getFirstName = (name: string | null, email: string) => {
@@ -51,8 +82,14 @@ function DashboardPage() {
   ];
 
   const handleCreateTask = useCallback(async (taskData: { title: string; description: string; priority: string; status: string; dueDate: string }) => {
-    await createTask(taskData);
-    setIsCreateModalOpen(false);
+    try {
+      await createTask(taskData);
+      setIsCreateModalOpen(false);
+    } catch (error) {
+      // Error is already handled by the mutation's onError
+      // Just keep the modal open so user can retry
+      console.error('Failed to create task:', error);
+    }
   }, [createTask]);
 
   const handleEditTask = useCallback((task: Task) => {
@@ -61,50 +98,69 @@ function DashboardPage() {
 
   const handleUpdateTask = useCallback(async (taskData: { title: string; description: string; priority: string; dueDate: string; tagIds: number[] }) => {
     if (editingTask) {
-      // Update task properties
-      await updateTask(editingTask.id, {
-        title: taskData.title,
-        description: taskData.description,
-        priority: taskData.priority,
-        due_date: taskData.dueDate || null,
-      });
+      try {
+        // Update task properties
+        await updateTask(editingTask.id, {
+          title: taskData.title,
+          description: taskData.description,
+          priority: taskData.priority,
+          due_date: taskData.dueDate || null,
+        });
 
-      // Handle tag changes
-      const currentTagIds = editingTask.tags?.map(tag => tag.id) || [];
-      const newTagIds = taskData.tagIds;
+        // Close modal immediately after the main update completes
+        setEditingTask(null);
 
-      // Find tags to add and remove
-      const tagsToAdd = newTagIds.filter(id => !currentTagIds.includes(id));
-      const tagsToRemove = currentTagIds.filter(id => !newTagIds.includes(id));
+        // Handle tag changes in the background after closing the modal
+        const currentTagIds = editingTask.tags?.map(tag => tag.id) || [];
+        const newTagIds = taskData.tagIds;
 
-      // Associate new tags
-      for (const tagId of tagsToAdd) {
-        try {
-          await associateTagWithTask(editingTask.id, tagId);
-        } catch (err) {
-          console.error('Failed to associate tag:', err);
+        // Find tags to add and remove
+        const tagsToAdd = newTagIds.filter(id => !currentTagIds.includes(id));
+        const tagsToRemove = currentTagIds.filter(id => !newTagIds.includes(id));
+
+        // Process tag operations in the background without waiting for them
+        if (tagsToAdd.length > 0 || tagsToRemove.length > 0) {
+          // Create a separate promise that runs in the background
+          const processTagChanges = async () => {
+            // Batch tag operations - run all API calls in parallel for much better performance
+            const tagOperations = [
+              ...tagsToAdd.map(tagId =>
+                associateTagWithTask(editingTask.id, tagId).catch(err => {
+                  console.error('Failed to associate tag:', err);
+                })
+              ),
+              ...tagsToRemove.map(tagId =>
+                dissociateTagFromTask(editingTask.id, tagId).catch(err => {
+                  console.error('Failed to dissociate tag:', err);
+                })
+              ),
+            ];
+
+            // Wait for all tag operations to complete in parallel
+            await Promise.all(tagOperations);
+
+            // Refetch tasks to get updated tag associations
+            await refetch();
+          };
+
+          // Execute the tag operations in the background without awaiting
+          processTagChanges().catch(console.error);
         }
+      } catch (error) {
+        // Error is already handled by the mutation's onError
+        // Just keep the modal open so user can retry
+        console.error('Failed to update task:', error);
       }
-
-      // Dissociate removed tags
-      for (const tagId of tagsToRemove) {
-        try {
-          await dissociateTagFromTask(editingTask.id, tagId);
-        } catch (err) {
-          console.error('Failed to dissociate tag:', err);
-        }
-      }
-
-      // Refetch tasks to get updated tag associations
-      await refetch();
-
-      setEditingTask(null);
     }
   }, [editingTask, updateTask, associateTagWithTask, dissociateTagFromTask, refetch]);
 
   const handleDeleteTask = useCallback(async (taskId: number) => {
-    if (confirm('Are you sure you want to delete this task?')) {
+    try {
       await deleteTask(taskId);
+      toast.success('Task deleted');
+    } catch (error) {
+      // Error toast is already shown by the mutation
+      console.error('Delete failed:', error);
     }
   }, [deleteTask]);
 
@@ -119,6 +175,60 @@ function DashboardPage() {
     month: 'long',
     day: 'numeric'
   }), []);
+
+  // Keyboard shortcuts handlers
+  const handleSearch = useCallback(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
+  const handleNewTask = useCallback(() => {
+    setIsCreateModalOpen(true);
+  }, []);
+
+  const handleCompleteTask = useCallback(() => {
+    if (pendingTasks.length > 0 && selectedTaskIndex < pendingTasks.length) {
+      const task = pendingTasks[selectedTaskIndex];
+      const newStatus = task.status === 'completed' ? 'not_started' : 'completed';
+      updateTaskStatus(task.id, newStatus);
+    }
+  }, [pendingTasks, selectedTaskIndex, updateTaskStatus]);
+
+  const handleDeleteSelectedTask = useCallback(() => {
+    if (pendingTasks.length > 0 && selectedTaskIndex < pendingTasks.length) {
+      const task = pendingTasks[selectedTaskIndex];
+      handleDeleteTask(task.id);
+    }
+  }, [pendingTasks, selectedTaskIndex, handleDeleteTask]);
+
+  const handleCloseModal = useCallback(() => {
+    if (isCreateModalOpen) {
+      setIsCreateModalOpen(false);
+    } else if (editingTask) {
+      setEditingTask(null);
+    } else if (isShortcutsHelpOpen) {
+      setIsShortcutsHelpOpen(false);
+    }
+  }, [isCreateModalOpen, editingTask, isShortcutsHelpOpen]);
+
+  const handleShowHelp = useCallback(() => {
+    setIsShortcutsHelpOpen(!isShortcutsHelpOpen);
+  }, [isShortcutsHelpOpen]);
+
+  // Register keyboard shortcuts
+  const shortcuts = useMemo(
+    () =>
+      getTaskManagementShortcuts({
+        onSearch: handleSearch,
+        onNewTask: handleNewTask,
+        onComplete: handleCompleteTask,
+        onClose: handleCloseModal,
+        onDelete: handleDeleteSelectedTask,
+        onHelp: handleShowHelp,
+      }),
+    [handleSearch, handleNewTask, handleCompleteTask, handleCloseModal, handleDeleteSelectedTask, handleShowHelp]
+  );
+
+  useKeyboardShortcuts(shortcuts);
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -145,6 +255,16 @@ function DashboardPage() {
             <UserPlus className="h-3 w-3 md:h-4 md:w-4" />
             <span className="hidden sm:inline">Invite</span>
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsShortcutsHelpOpen(true)}
+            className="gap-2 text-xs md:text-sm"
+            aria-label="Show keyboard shortcuts"
+          >
+            <Keyboard className="h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden sm:inline">Shortcuts</span>
+          </Button>
         </div>
       </div>
 
@@ -161,6 +281,7 @@ function DashboardPage() {
               <Button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="gap-2 bg-coral hover:bg-coral-600 w-full sm:w-auto text-sm"
+                aria-label="Create new task (Ctrl+N or Cmd+N)"
               >
                 <Plus className="h-4 w-4" />
                 Add Task
@@ -177,15 +298,17 @@ function DashboardPage() {
                   <p className="text-sm">Click &quot;Add Task&quot; to create your first task</p>
                 </div>
               ) : (
-                pendingTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onToggleComplete={updateTaskStatus}
-                    onEdit={handleEditTask}
-                    onDelete={handleDeleteTask}
-                  />
-                ))
+                <DraggableTaskList
+                  tasks={pendingTasks}
+                  onToggleComplete={updateTaskStatus}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteTask}
+                  onReorder={reorderTasks}
+                  isUpdating={isUpdatingTask}
+                  isDeleting={isDeletingTask}
+                  isTaskUpdating={isTaskUpdating}
+                  isTaskDeleting={isTaskDeleting}
+                />
               )}
             </div>
           </div>
@@ -206,6 +329,10 @@ function DashboardPage() {
               tasks={tasks}
               onRestore={handleRestoreTask}
               onDelete={handleDeleteTask}
+              isUpdating={isUpdatingTask}
+              isDeleting={isDeletingTask}
+              isTaskUpdating={isTaskUpdating}
+              isTaskDeleting={isTaskDeleting}
             />
           </div>
         </div>
@@ -216,6 +343,7 @@ function DashboardPage() {
         isOpen={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         onSubmit={handleCreateTask}
+        isLoading={isCreatingTask}
       />
 
       {/* Edit Task Modal */}
@@ -224,7 +352,18 @@ function DashboardPage() {
         isOpen={!!editingTask}
         onOpenChange={(open) => !open && setEditingTask(null)}
         onSubmit={handleUpdateTask}
+        isLoading={isUpdatingTask}
       />
+
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        isOpen={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        shortcuts={shortcuts}
+      />
+
+      {/* Offline Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

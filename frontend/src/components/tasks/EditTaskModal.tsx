@@ -14,13 +14,21 @@ interface EditTaskModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (taskData: { title: string; description: string; priority: string; dueDate: string; tagIds: number[] }) => void;
+  isLoading?: boolean;
 }
 
-const EditTaskModal = ({ task, isOpen, onOpenChange, onSubmit }: EditTaskModalProps) => {
+const EditTaskModal = ({ task, isOpen, onOpenChange, onSubmit, isLoading }: EditTaskModalProps) => {
   if (!task) return null;
 
+  // Prevent closing modal while loading
+  const handleOpenChange = (open: boolean) => {
+    if (!isLoading) {
+      onOpenChange(open);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden p-0 flex flex-col">
         <div className="bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 p-4">
           <DialogHeader className="space-y-2">
@@ -36,7 +44,7 @@ const EditTaskModal = ({ task, isOpen, onOpenChange, onSubmit }: EditTaskModalPr
           </DialogHeader>
         </div>
         <div className="p-4 pt-0 -mt-2 bg-white rounded-t-2xl overflow-y-auto flex-1">
-          <EditTaskForm task={task} onSubmit={onSubmit} />
+          <EditTaskForm task={task} onSubmit={onSubmit} isLoading={isLoading} />
         </div>
       </DialogContent>
     </Dialog>

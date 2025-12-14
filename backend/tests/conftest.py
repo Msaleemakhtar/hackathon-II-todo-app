@@ -74,6 +74,20 @@ from src.main import app
 from src.core.config import settings, validate_settings
 from src.core.database import get_db, init_db
 
+# Import all models to ensure they're registered with SQLModel.metadata
+from src.models import (
+    User,
+    Task,
+    Tag,
+    Category,
+    TaskTagLink,
+    Reminder,
+    WebVital,
+    AnalyticsEvent,
+    TaskOrder,
+    UserSubscription,
+)
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -93,8 +107,9 @@ async def setup_test_database():
     # Create engine with test database
     engine = create_async_engine(settings.TEST_DATABASE_URL)
 
-    # Create all tables
+    # Drop all existing tables and recreate them
     async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
 
     yield

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
 
 
 class UserBase(BaseModel):
@@ -24,3 +24,11 @@ class UserResponse(UserBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at")
+    def serialize_datetime(self, value: datetime) -> str:
+        """Serialize datetime as ISO format with Z suffix to indicate UTC time."""
+        if value is not None:
+            # For naive datetimes (which we store in UTC), treat them as UTC and append 'Z'
+            return value.isoformat() + "Z"
+        return value

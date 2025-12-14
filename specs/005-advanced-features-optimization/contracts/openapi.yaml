@@ -1,0 +1,575 @@
+openapi: 3.0.3
+info:
+  title: Todo App - Advanced Features API
+  description: API for advanced features including reminders, performance optimization, UX enhancements, and monitoring
+  version: 1.0.0
+  contact:
+    name: Todo App Development Team
+    email: support@todoapp.com
+
+servers:
+  - url: https://api.todoapp.com
+    description: Production server
+  - url: https://staging-api.todoapp.com
+    description: Staging server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: reminders
+    description: Task reminder management
+  - name: analytics
+    description: Performance and user event analytics
+  - name: tasks
+    description: Task management with advanced features
+
+paths:
+  /api/{user_id}/reminders:
+    get:
+      tags:
+        - reminders
+      summary: Get user's reminders
+      description: Retrieve all reminders for a specific user, optionally filtered to show only upcoming reminders
+      operationId: get_user_reminders
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+        - name: upcoming_only
+          in: query
+          required: false
+          description: Only return upcoming reminders
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: List of user's reminders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reminder'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+      security:
+        - bearerAuth: []
+
+    post:
+      tags:
+        - reminders
+      summary: Create a new reminder
+      description: Create a new reminder for a task
+      operationId: create_reminder
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReminderCreate'
+      responses:
+        '201':
+          description: Reminder created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+        '400':
+          $ref: '#/components/responses/InvalidInputError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      security:
+        - bearerAuth: []
+
+  /api/{user_id}/reminders/{reminder_id}:
+    get:
+      tags:
+        - reminders
+      summary: Get a specific reminder
+      description: Retrieve details of a specific reminder
+      operationId: get_reminder
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+        - name: reminder_id
+          in: path
+          required: true
+          description: ID of the reminder
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Reminder details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      security:
+        - bearerAuth: []
+
+    put:
+      tags:
+        - reminders
+      summary: Update a reminder
+      description: Update an existing reminder
+      operationId: update_reminder
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+        - name: reminder_id
+          in: path
+          required: true
+          description: ID of the reminder
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReminderUpdate'
+      responses:
+        '200':
+          description: Reminder updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+        '400':
+          $ref: '#/components/responses/InvalidInputError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags:
+        - reminders
+      summary: Delete a reminder
+      description: Cancel/delete a reminder
+      operationId: delete_reminder
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+        - name: reminder_id
+          in: path
+          required: true
+          description: ID of the reminder
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Reminder deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      security:
+        - bearerAuth: []
+
+  /api/{user_id}/reminders/{reminder_id}/snooze:
+    post:
+      tags:
+        - reminders
+      summary: Snooze a reminder
+      description: Snooze a reminder for a specified number of minutes
+      operationId: snooze_reminder
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+        - name: reminder_id
+          in: path
+          required: true
+          description: ID of the reminder
+          schema:
+            type: integer
+            format: int64
+        - name: minutes
+          in: query
+          required: false
+          description: Number of minutes to snooze
+          schema:
+            type: integer
+            default: 15
+      responses:
+        '200':
+          description: Reminder snoozed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reminder'
+        '400':
+          $ref: '#/components/responses/InvalidInputError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      security:
+        - bearerAuth: []
+
+  /api/{user_id}/tasks/reorder:
+    post:
+      tags:
+        - tasks
+      summary: Reorder tasks
+      description: Update the order of tasks for drag-and-drop functionality
+      operationId: reorder_tasks
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int64
+              description: Ordered list of task IDs
+      responses:
+        '200':
+          description: Tasks reordered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tasks reordered successfully"
+        '400':
+          $ref: '#/components/responses/InvalidInputError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+      security:
+        - bearerAuth: []
+
+  /api/analytics/vitals:
+    post:
+      tags:
+        - analytics
+      summary: Record Core Web Vitals
+      description: Record performance metrics (Core Web Vitals) from the frontend
+      operationId: record_web_vitals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebVital'
+      responses:
+        '200':
+          description: Web vital recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "recorded"
+        '400':
+          $ref: '#/components/responses/InvalidInputError'
+      security:
+        - bearerAuth: []
+
+  /api/analytics/events:
+    post:
+      tags:
+        - analytics
+      summary: Record user analytics event
+      description: Record custom user event for analytics
+      operationId: record_analytics_event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyticsEvent'
+      responses:
+        '200':
+          description: Event recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "recorded"
+        '400':
+          $ref: '#/components/responses/InvalidInputError'
+      security:
+        - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Reminder:
+      type: object
+      required:
+        - id
+        - task_id
+        - user_id
+        - remind_at
+        - channel
+        - is_sent
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier for the reminder
+        task_id:
+          type: integer
+          format: int64
+          description: ID of the associated task
+        user_id:
+          type: string
+          description: ID of the user who owns the reminder
+        remind_at:
+          type: string
+          format: date-time
+          description: When to send the reminder
+        channel:
+          type: string
+          enum: [browser, email, both]
+          description: Notification channel to use
+        is_sent:
+          type: boolean
+          description: Whether the reminder has been sent
+        sent_at:
+          type: string
+          format: date-time
+          description: When the reminder was sent (if sent)
+          nullable: true
+        message:
+          type: string
+          description: Custom message for the reminder
+          nullable: true
+        snoozed_until:
+          type: string
+          format: date-time
+          description: When the reminder is snoozed until
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: When the reminder was created
+        updated_at:
+          type: string
+          format: date-time
+          description: When the reminder was last updated
+
+    ReminderCreate:
+      type: object
+      required:
+        - task_id
+        - remind_at
+      properties:
+        task_id:
+          type: integer
+          format: int64
+          description: ID of the task to remind about
+        remind_at:
+          type: string
+          format: date-time
+          description: When to send the reminder
+        channel:
+          type: string
+          enum: [browser, email, both]
+          description: Notification channel to use
+          default: browser
+        message:
+          type: string
+          description: Custom message for the reminder
+          maxLength: 500
+
+    ReminderUpdate:
+      type: object
+      properties:
+        remind_at:
+          type: string
+          format: date-time
+          description: New time for the reminder
+        channel:
+          type: string
+          enum: [browser, email, both]
+          description: New notification channel to use
+        message:
+          type: string
+          description: New custom message for the reminder
+          maxLength: 500
+        snoozed_until:
+          type: string
+          format: date-time
+          description: When to snooze the reminder until
+
+    WebVital:
+      type: object
+      required:
+        - name
+        - value
+        - rating
+      properties:
+        name:
+          type: string
+          enum: [CLS, FID, FCP, LCP, TTFB]
+          description: Name of the Core Web Vital metric
+        value:
+          type: number
+          format: float
+          description: Value of the metric
+        rating:
+          type: string
+          enum: [good, needs-improvement, poor]
+          description: Rating of the metric value
+        user_id:
+          type: string
+          description: ID of the user (optional)
+        timestamp:
+          type: string
+          format: date-time
+          description: When the metric was recorded
+
+    AnalyticsEvent:
+      type: object
+      required:
+        - event
+      properties:
+        event:
+          type: string
+          description: Name of the event
+        properties:
+          type: object
+          description: Additional properties for the event
+          additionalProperties: true
+        user_id:
+          type: string
+          description: ID of the user (optional)
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - Invalid or missing authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Not authenticated"
+            code: "UNAUTHORIZED"
+
+    ForbiddenError:
+      description: Forbidden - Access to resource is forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Access denied"
+            code: "FORBIDDEN"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Resource not found"
+            code: "NOT_FOUND"
+
+    InvalidInputError:
+      description: Invalid input provided
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Invalid input data"
+            code: "INVALID_INPUT"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+        field:
+          type: string
+          description: Field name related to the error (if applicable)
+
+security:
+  - bearerAuth: []

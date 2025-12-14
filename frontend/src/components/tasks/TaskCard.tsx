@@ -16,9 +16,15 @@ interface TaskCardProps {
   onToggleComplete: (taskId: number, status: string) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: number) => void;
+  className?: string;
+  tabIndex?: number;
+  role?: string;
+  'aria-selected'?: boolean;
+  isUpdating?: boolean;
+  isDeleting?: boolean;
 }
 
-const TaskCard = memo(({ task, onToggleComplete, onEdit, onDelete }: TaskCardProps) => {
+const TaskCard = memo(({ task, onToggleComplete, onEdit, onDelete, className = '', tabIndex, role, 'aria-selected': ariaSelected, isUpdating = false, isDeleting = false }: TaskCardProps) => {
   const priorityVariant = task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low';
 
   // Use actual status field
@@ -37,7 +43,12 @@ const TaskCard = memo(({ task, onToggleComplete, onEdit, onDelete }: TaskCardPro
     : 'Recently';
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4 mb-3 hover:shadow-md transition-shadow">
+    <div
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4 mb-3 hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 ${className}`}
+      tabIndex={tabIndex}
+      role={role}
+      aria-selected={ariaSelected}
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <h3 className="text-sm md:text-base font-semibold text-gray-900 mb-1 truncate">{task.title}</h3>
@@ -49,24 +60,44 @@ const TaskCard = memo(({ task, onToggleComplete, onEdit, onDelete }: TaskCardPro
         {/* Three-dot menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 w-7 md:h-8 md:w-8 p-0 flex-shrink-0 ml-2">
-              <MoreVertical className="h-3 w-3 md:h-4 md:w-4 text-gray-500" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 md:h-8 md:w-8 p-0 flex-shrink-0 ml-2" disabled={isUpdating || isDeleting}>
+              {isUpdating || isDeleting ? (
+                <div className="h-3 w-3 md:h-4 md:w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+              ) : (
+                <MoreVertical className="h-3 w-3 md:h-4 md:w-4 text-gray-500" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit?.(task)}>
+            <DropdownMenuItem onClick={() => onEdit?.(task)} disabled={isUpdating || isDeleting}>
               Edit
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onToggleComplete(task.id, task.status === 'completed' ? 'not_started' : 'completed')}
+              disabled={isUpdating || isDeleting}
             >
-              {task.status === 'completed' ? 'Mark as Not Started' : 'Mark as Complete'}
+              {isUpdating ? (
+                <>
+                  <div className="h-3 w-3 mr-2 animate-spin rounded-full border-2 border-gray-600 border-t-transparent" />
+                  Updating...
+                </>
+              ) : (
+                task.status === 'completed' ? 'Mark as Not Started' : 'Mark as Complete'
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onDelete?.(task.id)}
               className="text-error"
+              disabled={isUpdating || isDeleting}
             >
-              Delete
+              {isDeleting ? (
+                <>
+                  <div className="h-3 w-3 mr-2 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
