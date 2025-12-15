@@ -24,7 +24,7 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT != "development":
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=settings.ENVIRONMENT,
-        traces_sample_rate=0.1,  # Sample 10% of transactions for performance monitoring
+        traces_sample_rate=1.0,  # Capture 100% of transactions for debugging
         profiles_sample_rate=0.1,  # Sample 10% for profiling
         send_default_pii=False,  # Don't send personally identifiable information
         attach_stacktrace=True,
@@ -102,6 +102,16 @@ app.add_middleware(
 async def health_check():
     """Provide a health check endpoint for container orchestration."""
     return {"status": "healthy"}
+
+
+@app.get("/test-sentry")
+async def test_sentry():
+    """Test endpoint to verify Sentry is capturing errors."""
+    try:
+        raise Exception("🧪 Test error from Sentry endpoint")
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        return {"message": "Error captured by Sentry", "error": str(e)}
 
 app.include_router(tasks.router, prefix="/api/v1", tags=["Tasks"])
 app.include_router(tags.router, prefix="/api/v1", tags=["Tags"])

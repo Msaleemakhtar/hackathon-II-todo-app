@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // Enable Turbopack for faster builds
@@ -11,4 +12,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Sentry options
+  silent: false,
+  org: "salim-vz",
+  project: "todo-frontend",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+});

@@ -28,7 +28,7 @@ A feature-rich command-line todo application built with Python 3.13 following Te
 ```bash
 # Clone repository
 git clone https://github.com/Msaleemakhtar/Phase-I-Hackathon-Todo-App.git
-cd Phase-I-Hackathon-Todo-App
+cd Phase-I
 
 # Install dependencies
 uv sync

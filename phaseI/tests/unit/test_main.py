@@ -1,6 +1,6 @@
 """Unit tests for main application menu."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.main import handle_add_task, main
 
