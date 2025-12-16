@@ -53,5 +53,4 @@ logs/
 tests/
 
 # Alembic
-alembic/versions/*.py
 !alembic/versions/

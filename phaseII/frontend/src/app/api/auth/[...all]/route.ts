@@ -1,5 +1,5 @@
 import { toNextJsHandler } from "better-auth/next-js";
-import { auth } from "@/lib/auth-server";
+import { getAuth } from "@/lib/auth-server";
 
 /**
  * Better Auth API Route Handler
@@ -11,9 +11,33 @@ import { auth } from "@/lib/auth-server";
  * - GET /api/auth/get-session - Get current session
  * - And other Better Auth endpoints
  *
- * The auth instance is imported from a centralized configuration
- * to avoid duplicate database connections.
+ * The auth instance is retrieved via getAuth() which defers database initialization
+ * until runtime to allow successful Docker builds.
  */
 
-// Export HTTP method handlers for Next.js App Router
-export const { GET, POST } = toNextJsHandler(auth);
+// Create a wrapper to initialize auth at runtime
+const createAuthHandler = () => {
+  let initialized = false;
+  let handlers: { GET: any; POST: any } | null = null;
+
+  return {
+    GET: async (request: Request) => {
+      if (!initialized) {
+        const auth = getAuth();
+        handlers = toNextJsHandler(auth);
+        initialized = true;
+      }
+      return handlers!.GET(request);
+    },
+    POST: async (request: Request) => {
+      if (!initialized) {
+        const auth = getAuth();
+        handlers = toNextJsHandler(auth);
+        initialized = true;
+      }
+      return handlers!.POST(request);
+    }
+  };
+};
+
+export const { GET, POST } = createAuthHandler();

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth-server';
+import { getAuth } from '@/lib/auth-server';
 import * as jose from 'jose';
 
 /**
@@ -12,6 +12,9 @@ import * as jose from 'jose';
  */
 export async function GET(request: NextRequest) {
   try {
+    // Get the auth instance (this will initialize it at runtime if not already done)
+    const auth = getAuth();
+
     // Get the session from Better Auth
     const session = await auth.api.getSession({
       headers: request.headers,
