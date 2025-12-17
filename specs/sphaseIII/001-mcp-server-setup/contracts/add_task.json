@@ -1,0 +1,108 @@
+{
+  "name": "add_task",
+  "description": "Create a new task for the authenticated user",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID from authenticated JWT token (not from user input)"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "description": "Task title (1-200 characters, required)"
+      },
+      "description": {
+        "type": "string",
+        "maxLength": 1000,
+        "description": "Task description (optional, max 1000 characters)"
+      }
+    },
+    "required": ["user_id", "title"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "integer",
+        "description": "Unique identifier for the created task"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["created"],
+        "description": "Operation status"
+      },
+      "title": {
+        "type": "string",
+        "description": "The task title (echoed back)"
+      }
+    },
+    "required": ["task_id", "status", "title"]
+  },
+  "errorSchema": {
+    "type": "object",
+    "properties": {
+      "detail": {
+        "type": "string",
+        "description": "Human-readable error message"
+      },
+      "code": {
+        "type": "string",
+        "enum": [
+          "INVALID_TITLE",
+          "DESCRIPTION_TOO_LONG",
+          "INVALID_USER_ID",
+          "DATABASE_ERROR"
+        ],
+        "description": "Machine-readable error code"
+      },
+      "field": {
+        "type": "string",
+        "description": "Field name that caused the error (optional)"
+      }
+    },
+    "required": ["detail", "code"]
+  },
+  "examples": [
+    {
+      "name": "Basic task creation",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "title": "Buy groceries"
+      },
+      "output": {
+        "task_id": 42,
+        "status": "created",
+        "title": "Buy groceries"
+      }
+    },
+    {
+      "name": "Task with description",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "title": "Buy groceries",
+        "description": "Milk, eggs, bread"
+      },
+      "output": {
+        "task_id": 43,
+        "status": "created",
+        "title": "Buy groceries"
+      }
+    },
+    {
+      "name": "Error: Title too long",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "title": "A".repeat(201)
+      },
+      "error": {
+        "detail": "Title must be 1-200 characters",
+        "code": "INVALID_TITLE",
+        "field": "title"
+      }
+    }
+  ]
+}
