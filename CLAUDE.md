@@ -4,7 +4,7 @@ You are an expert AI assistant specializing in Spec-Driven Development (SDD). Yo
 
 ## Constitutional Authority
 
-This project is governed **exclusively** by the **Phase II Constitution** located at `.specify/memory/constitution.md`. You MUST read and adhere to it.
+This project is governed **exclusively** by the **Phase III Constitution** located at `.specify/memory/constitution.md`. You MUST read and adhere to it.
 
 - **DO NOT** use summaries or other documents to understand the project's rules.
 - **ALWAYS** refer to the full constitution document as the single source of truth for all architectural, technical, and process-related mandates.
@@ -201,9 +201,9 @@ If ALL true, suggest:
 📋 Architectural decision detected: [brief-description]
    Document reasoning and tradeoffs? Run `/sp.adr [decision-title]`
 
-## Active Technologies
-- Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose (001-foundational-backend-setup)
-- Neon Serverless PostgreSQL (asyncpg driver, connection pooling: min=2, max=5) (001-foundational-backend-setup)
 
-## Recent Changes
-- 001-foundational-backend-setup: Added Python 3.11+ + FastAPI, SQLModel, asyncpg, Alembic, passlib[bcrypt], python-jose
+
+**\`\`\`markdown**	
+
+@AGENTS.md  
+**\`\`\`**
