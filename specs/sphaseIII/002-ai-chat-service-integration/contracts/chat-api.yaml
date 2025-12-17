@@ -1,0 +1,344 @@
+openapi: 3.1.0
+info:
+  title: Phase III AI Chat Service API
+  version: 1.0.0
+  description: |
+    Conversational task management API powered by AI (Gemini) and MCP tools.
+    Enables users to manage their todos through natural language conversations.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.example.com
+    description: Production (TBD)
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/{user_id}/chat:
+    post:
+      summary: Send chat message and receive AI response
+      description: |
+        Sends a user message to the AI assistant for task management.
+        The AI interprets intent and invokes appropriate MCP tools.
+        Supports conversation continuity by providing conversation_id.
+      operationId: sendChatMessage
+      tags:
+        - Chat
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: User ID from Better Auth JWT token (must match token user_id)
+          schema:
+            type: string
+            example: "usr_abc123def456"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              new_conversation:
+                summary: New conversation (no conversation_id)
+                value:
+                  message: "Add a task to buy groceries"
+              continue_conversation:
+                summary: Continue existing conversation
+                value:
+                  message: "Show me all my tasks"
+                  conversation_id: 42
+      responses:
+        '200':
+          description: Successful AI response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                task_created:
+                  summary: Task creation response
+                  value:
+                    conversation_id: 42
+                    response: "I've added 'Buy groceries' to your task list. Anything else you need?"
+                    tool_calls:
+                      - name: "add_task"
+                        arguments:
+                          user_id: "usr_abc123def456"
+                          title: "Buy groceries"
+                        result:
+                          task_id: 15
+                          status: "created"
+                          title: "Buy groceries"
+                tasks_listed:
+                  summary: Task list response
+                  value:
+                    conversation_id: 42
+                    response: "Here are your pending tasks:\n1. Buy groceries\n2. Call dentist\n3. Review code"
+                    tool_calls:
+                      - name: "list_tasks"
+                        arguments:
+                          user_id: "usr_abc123def456"
+                          status: "pending"
+                        result:
+                          - task_id: 15
+                            title: "Buy groceries"
+                            description: null
+                            completed: false
+                          - task_id: 16
+                            title: "Call dentist"
+                            description: null
+                            completed: false
+                          - task_id: 17
+                            title: "Review code"
+                            description: "PR #234"
+                            completed: false
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                empty_message:
+                  summary: Empty message
+                  value:
+                    detail: "Message is required and cannot be empty"
+                    code: "INVALID_MESSAGE"
+                    field: "message"
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Invalid authentication credentials"
+                code: "UNAUTHORIZED"
+        '403':
+          description: Forbidden - User ID mismatch or conversation access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                user_id_mismatch:
+                  summary: Path user_id doesn't match JWT
+                  value:
+                    detail: "User ID in path does not match authenticated user"
+                    code: "USER_ID_MISMATCH"
+                conversation_access_denied:
+                  summary: Conversation belongs to another user
+                  value:
+                    detail: "Conversation access denied"
+                    code: "CONVERSATION_ACCESS_DENIED"
+        '404':
+          description: Not found - Conversation doesn't exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Conversation not found"
+                code: "CONVERSATION_NOT_FOUND"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Rate limit exceeded. Please try again in 60 seconds."
+                code: "RATE_LIMIT_EXCEEDED"
+        '503':
+          description: AI service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "The AI service is temporarily unavailable. Please try again in a moment."
+                code: "AI_SERVICE_UNAVAILABLE"
+                retry_after: 30
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns service health status
+      operationId: healthCheck
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2025-12-17T12:00:00Z"
+
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          description: User's natural language message
+          example: "Add a task to buy groceries"
+        conversation_id:
+          type: integer
+          nullable: true
+          description: Optional conversation ID to continue existing conversation
+          example: 42
+
+    ChatResponse:
+      type: object
+      required:
+        - conversation_id
+        - response
+        - tool_calls
+      properties:
+        conversation_id:
+          type: integer
+          description: Conversation ID (newly created or existing)
+          example: 42
+        response:
+          type: string
+          description: AI assistant's natural language response
+          example: "I've added 'Buy groceries' to your task list. Anything else you need?"
+        tool_calls:
+          type: array
+          description: List of MCP tools invoked by the AI agent
+          items:
+            $ref: '#/components/schemas/ToolCall'
+
+    ToolCall:
+      type: object
+      required:
+        - name
+        - arguments
+        - result
+      properties:
+        name:
+          type: string
+          enum:
+            - add_task
+            - list_tasks
+            - complete_task
+            - delete_task
+            - update_task
+          description: MCP tool name
+          example: "add_task"
+        arguments:
+          type: object
+          description: Arguments passed to the tool
+          example:
+            user_id: "usr_abc123def456"
+            title: "Buy groceries"
+        result:
+          oneOf:
+            - $ref: '#/components/schemas/TaskResult'
+            - $ref: '#/components/schemas/TaskListResult'
+          description: Tool execution result
+
+    TaskResult:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: Task identifier
+          example: 15
+        status:
+          type: string
+          enum:
+            - created
+            - completed
+            - deleted
+            - updated
+          description: Operation result status
+          example: "created"
+        title:
+          type: string
+          description: Task title
+          example: "Buy groceries"
+
+    TaskListResult:
+      type: array
+      items:
+        type: object
+        required:
+          - task_id
+          - title
+          - completed
+        properties:
+          task_id:
+            type: integer
+            example: 15
+          title:
+            type: string
+            example: "Buy groceries"
+          description:
+            type: string
+            nullable: true
+            example: null
+          completed:
+            type: boolean
+            example: false
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+        - code
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message
+          example: "Message is required and cannot be empty"
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "INVALID_MESSAGE"
+        field:
+          type: string
+          nullable: true
+          description: Optional field name that caused the error
+          example: "message"
+        retry_after:
+          type: integer
+          nullable: true
+          description: Seconds to wait before retrying (for rate limits and service unavailability)
+          example: 30
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Better Auth JWT token obtained from frontend authentication.
+        The token's user_id claim must match the user_id path parameter.
+
+tags:
+  - name: Chat
+    description: Conversational task management endpoints
+  - name: System
+    description: System health and monitoring

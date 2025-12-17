@@ -1,109 +1,138 @@
-"""FastAPI application entry point for Phase III MCP Server."""
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
-# Import tools to register them
-import app.mcp.tools  # noqa: F401
 from app.config import settings
-from app.mcp.server import mcp_server_manager
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+
+# Custom rate limit exception handler with logging (T113)
+async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
+    """
+    Custom rate limit exceeded handler with event logging.
+
+    Logs rate limit events for monitoring and security analysis.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    path = request.url.path
+    logger.warning(
+        f"Rate limit exceeded: ip={client_ip}, path={path}, limit={exc.detail}",
+        extra={"ip": client_ip, "path": path, "limit": exc.detail},
+    )
+
+    return Response(
+        content=f"Rate limit exceeded: {exc.detail}",
+        status_code=429,
+        headers={"Retry-After": "60"},
+    )
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # type: ignore[misc]
-    """
-    Manage application lifespan events.
+async def lifespan(app: FastAPI):
+    """Application lifespan handler."""
+    # Startup
+    print("Starting Phase III Backend...")
+    # Note: Database tables will be created via Alembic migrations
+    # await create_db_and_tables()  # Uncomment if not using Alembic
 
-    This handles startup and shutdown logic for the MCP server.
-    """
-    # Startup: Register MCP tools
-    # Tools will be registered when their modules are imported
+    # Import tools to register them with FastMCP
+    print("FastMCP tools registered")
+
     yield
-    # Shutdown: Clean up resources if needed
-    pass
+
+    # Shutdown
+    print("Shutting down Phase III Backend...")
 
 
 # Create FastAPI application
 app = FastAPI(
-    title="Phase III MCP Server Backend",
-    description="AI-powered todo chatbot backend with MCP tool server",
+    title="Phase III AI Chat Service",
+    description="""
+    **Conversational Task Management API**
+
+    An AI-powered chat service that allows users to manage their tasks through natural language conversations.
+
+    ## Features
+    - 🤖 Natural language task management using Google Gemini
+    - 💬 Persistent conversation history
+    - 🔒 Secure authentication with Better Auth
+    - ⚡ Rate limiting and input sanitization
+    - 📊 Real-time task operations via MCP tools
+
+    ## Authentication
+    All endpoints (except `/health`, `/`, and `/docs`) require a valid JWT token in the `Authorization` header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limits
+    - Chat endpoint: 10 requests per minute per user
+    """,
     version="0.1.0",
-    debug=settings.DEBUG,
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    contact={
+        "name": "Phase III Development Team",
+        "url": "https://github.com/yourusername/todo-app",
+    },
+    license_info={
+        "name": "MIT",
+    },
 )
 
-# Add CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """
-    Global exception handler for unhandled errors.
-
-    Returns standardized error format: {detail, code, field?}
-    """
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "An internal server error occurred",
-            "code": "INTERNAL_ERROR"
-        }
-    )
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
 
 
 @app.get("/health")
-async def health_check() -> dict[str, str | int]:
-    """
-    Health check endpoint.
-
-    Returns:
-        dict: Status information
-    """
+async def health_check():
+    """Health check endpoint."""
     return {
-        "status": "ok",
-        "service": "todo-mcp-server",
+        "status": "healthy",
+        "service": "phaseiii-backend",
         "version": "0.1.0",
-        "mcp_tools_registered": len(mcp_server_manager.get_registered_tools()),
+        "environment": settings.environment,
     }
 
 
 @app.get("/")
-async def root() -> dict[str, str]:
-    """Root endpoint with API information."""
+async def root():
+    """Root endpoint."""
     return {
-        "message": "Phase III MCP Server Backend",
-        "version": "0.1.0",
-        "health_check": "/health",
+        "message": "Phase III AI Chat Service API",
         "docs": "/docs",
+        "health": "/health",
     }
 
 
-if __name__ == "__main__":
-    import uvicorn
+# Import and include routers
+from app.routers import chat
 
-    uvicorn.run(
-        "app.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower(),
-    )
+app.include_router(chat.router)
+
+# Mount FastMCP app
+from app.mcp.server import get_mcp_app
+
+mcp_app = get_mcp_app()
+app.mount("/mcp", mcp_app)
