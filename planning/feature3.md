@@ -1,21 +1,19 @@
-# Specification: Frontend Setup & Chat Interface
+# Specification: Frontend Setup with Openai Chatkit & Better_Auth Integration
 
 ## Feature Overview
-Implement the frontend components for the AI-powered chat interface, including OpenAI ChatKit setup, chat interface components, API client implementation, Better Auth integration, and conversation display and management. This feature will provide users with a conversational interface to manage their todos using natural language.
+Implement the frontend AI-powered chat interface with OpenAI ChatKit setup, and Better Auth integration for user authentication. This feature will provide users with a conversational interface to manage their todos using natural language.
 
 ## Requirements
 
 ### Functional Requirements
 1. **OpenAI ChatKit Setup**
-   - Integrate OpenAI ChatKit into the Phase III frontend
-   - Configure with the required domain key from OpenAI
-   - Set up according to the Managed ChatKit Starter template
-   - Ensure compatibility with Next.js App Router
-   - Handle domain allowlist configuration requirements for production deployment
+   -  Must follow the official documentaion of Openai ChatKit and Better-Auth using context7 mcp
+   - Advanced integrations with ChatKit (https://platform.openai.com/docs/guides/custom-chatkit) into the Phase III frontend
+   - Configure with the required domain key from OpenAI if necessary 
+   - Set up according to the Managed ChatKit Starter template as a example (https://github.com/openai/openai-chatkit-advanced-samples) it contain both frontend and backend setup with fast api
+   - Handle domain allowlist configuration requirements for production deployment if necssary because we using custom chatkit
 
 2. **Chat Interface Components**
-   - Implement ChatInterface.tsx as the main chat container component
-   - Implement ChatMessage.tsx for displaying individual messages
    - Create components that can render both user and AI messages
    - Include visual differentiation for user vs assistant messages
    - Show tool call information when AI invokes MCP tools
@@ -27,7 +25,9 @@ Implement the frontend components for the AI-powered chat interface, including O
    - Create API client for communication with the backend chat endpoint
    - Implement proper request/response handling for the `/api/{user_id}/chat` endpoint
    - Include error handling for various types of API failures (network, server, validation)
-   - Ensure integration with Better Auth for authentication token attachment
+   - Ensure integration with Better Auth for authentication token attachment strictly follow the official documentation:
+      -   Better_Auth official documentation (https://www.better-auth.com/)
+      -   Better_Auth Github Reference (https://github.com/better-auth/better-auth)
    - Handle the conversation_id flow (create new or continue existing)
    - Implement retry mechanisms for failed requests
 
@@ -115,12 +115,11 @@ Implement the frontend components for the AI-powered chat interface, including O
 7. **Error Handling Service**: Component/service to handle and display different error types
 
 ### Frontend Technology Stack
-- Next.js 16 App Router with TypeScript
 - OpenAI ChatKit components and hooks
 - Better Auth for authentication
 - Bun as the package manager
 - Tailwind CSS for styling (consistent with existing codebase)
-- React Query or SWR for server state management if needed
+
 
 ### Environment Variables
 - `NEXT_PUBLIC_OPENAI_DOMAIN_KEY`: Domain key for OpenAI ChatKit authentication
@@ -153,19 +152,12 @@ Headers: Authorization: Bearer <jwt_token>
 }
 ```
 
-### Component Structure
+### Chat Structure
 
-#### ChatInterface.tsx
-- Main container for the chat experience
-- Manages conversation state
-- Integrates with Better Auth session
-- Handles API communication
 - Displays message history
 - Contains input field for user messages
 - Manages loading states and error displays
 - Handles conversation context and history
-
-#### ChatMessage.tsx
 - Renders a single message in the conversation
 - Distinguishes between user and AI messages
 - Formats tool calls when present in AI responses
@@ -177,8 +169,8 @@ Headers: Authorization: Bearer <jwt_token>
 
 ### Domain Configuration for OpenAI ChatKit
 - Configure domain in OpenAI's dashboard for production deployment
-- Add frontend domain to OpenAI's domain allowlist
-- Obtain domain key and configure in environment variables
+- Add frontend domain to OpenAI's domain allowlist if necessary
+- Obtain domain key and configure in environment variables if necessary
 - Note: localhost typically works without domain allowlist for development
 
 ### Input Validation
@@ -199,12 +191,10 @@ Headers: Authorization: Bearer <jwt_token>
 2. Must follow the Managed ChatKit Starter template structure
 3. Must integrate with Better Auth using JWT plugin
 4. Must use `/api/{user_id}/chat` endpoint format
-5. Must be built with Next.js App Router
-6. Must use Bun for package management
-7. Must follow the existing codebase styling and architecture patterns
-8. Must ensure Phase III frontend is completely separate from Phase II
-9. Must properly configure domain allowlist for ChatKit production deployment
-10. Must implement proper error boundaries to prevent app crashes
+5. Must use Bun for package management
+6. Must ensure Phase III frontend is completely separate from Phase II
+7. Must properly configure domain allowlist for ChatKit production deployment if necessary
+8. Must implement proper error boundaries to prevent app crashes
 
 ## Security Considerations
 - JWT tokens must be securely managed by Better Auth
@@ -215,7 +205,7 @@ Headers: Authorization: Bearer <jwt_token>
 - Secure transmission of data over HTTPS
 
 ## Testing Requirements
-- Unit tests for individual components (ChatInterface, ChatMessage)
+- Unit tests for individual components 
 - Integration tests for API client functionality
 - Authentication flow tests with Better Auth
 - Error handling tests for various failure scenarios
@@ -226,18 +216,11 @@ Headers: Authorization: Bearer <jwt_token>
 ## Dependencies and Tools
 - OpenAI ChatKit
 - Better Auth
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- Vitest or Jest for testing
-- React Testing Library for component testing
 - MSW for API mocking in tests
 
 ## Success Criteria
 - [ ] OpenAI ChatKit is properly integrated and configured
-- [ ] ChatInterface.tsx component renders and functions correctly
-- [ ] ChatMessage.tsx component displays messages with appropriate styling
+- [ ] Component renders and functions correctly , displays messages with appropriate styling
 - [ ] API client successfully communicates with the backend chat endpoint
 - [ ] Better Auth integration works for user authentication
 - [ ] User can send messages and receive AI responses
@@ -246,10 +229,9 @@ Headers: Authorization: Bearer <jwt_token>
 - [ ] Loading states are implemented during AI processing
 - [ ] Error handling works for API failures
 - [ ] Interface is responsive and accessible
-- [ ] All components follow the existing codebase patterns
 - [ ] Security measures prevent unauthorized access
 - [ ] Performance meets the 3-second load time requirement
-- [ ] Domain allowlist is properly configured for production
+- [ ] Domain allowlist is properly configured for production if necessary
 - [ ] Input validation prevents invalid messages from being sent
 - [ ] All error states are handled gracefully with user feedback
 - [ ] Unit and integration tests cover critical functionality
