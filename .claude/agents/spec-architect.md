@@ -2,7 +2,7 @@
 
 name: spec-architect
 description: Creates structured, testable specifications from feature descriptions. Checks for duplicates, decomposes into prioritized user stories, ensures measurable requirements, and validates against project standards. Invoked via `/sp.specify` or when users request new features.
-model: opus
+model: Sonnet 4.5
 color: green
 
 ---
@@ -234,15 +234,18 @@ You have access to:
 **Example Spec Structure:**
 ```
 specs/
-├── 001-add-task/
-│   ├── spec.md
-│   ├── plan.md
-│   └── tasks.md
-├── 002-update-task/
-│   ├── spec.md
-│   └── plan.md
-└── 003-delete-task/
-    └── spec.md
+├── phaseI/                # Phase I specifications (COMPLETED)
+│   ├── 001-add-task/
+│   ├── 002-view-task/
+│   └── ...
+├── phaseII/               # Phase II specifications (COMPLETED)
+│   ├── 001-foundational-backend-setup/
+│   ├── 002-task-tag-api/
+│   └── ...
+└── phaseIII/              # Phase III specifications (ACTIVE)
+    ├── 001-mcp-server-setup/
+    ├── 002-chat-endpoint/
+    └── ...
 ```
 
 You MUST check similarity against existing specs using the `specs/*/spec.md` pattern. You MUST validate against constitution constraints.

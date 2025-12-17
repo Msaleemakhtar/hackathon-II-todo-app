@@ -62,6 +62,8 @@ Add these to make the app feel polished and practical:
 1. Recurring Tasks – Auto-reschedule repeating tasks (e.g., "weekly meeting")  
 2. Due Dates & Time Reminders – Set deadlines with date/time pickers; browser notifications
 
+Use Agentic Dev Stack for building this hackathon project.
+
 # **Hackathon Phases Overview**
 
 | Phase | Description | Technology Stack | Points | Due Date |
@@ -108,7 +110,7 @@ Note: All submissions will be evaluated. Live presentation is by invitation only
 
 Once you have completed the project you will submit your project here at each phase:
 
-[https://forms.gle/CQsSEGM3GeCrL43c8](https://forms.gle/CQsSEGM3GeCrL43c8) 
+[https://forms.gle/KMKEKaFUD6ZX4UtY8](https://forms.gle/KMKEKaFUD6ZX4UtY8) 
 
 **Submit the following via the form for each phase (You can submit a phase before the due date):**
 
@@ -153,6 +155,8 @@ This project simulates the real-world evolution of software. You will start with
 
 **Objective:** Build a command-line todo application that stores tasks in memory using Claude Code and Spec-Kit Plus.
 
+💡**Development Approach:** Use the [Agentic Dev Stack workflow](#the-agentic-dev-stack:-agents.md-+-spec-kitplus-+-claude-code): Write spec → Generate plan → Break into tasks → Implement via Claude Code. No manual coding allowed. We will review the process, prompts, and iterations to judge each phase and project.
+
 ## **Requirements**
 
 * Implement all 5 Basic Level features (Add, Delete, Update, View, Mark Complete)  
@@ -164,7 +168,7 @@ This project simulates the real-world evolution of software. You will start with
 * UV  
 * Python 3.13+  
 * Claude Code  
-* GitHub Spec-Kit
+* Spec-Kit Plus
 
 ## **Deliverables**
 
@@ -200,6 +204,8 @@ wsl \--install \-d Ubuntu-22.04
 *Basic Level Functionality*
 
 **Objective:** Using Claude Code and Spec-Kit Plus transform the console app into a modern multi-user web application with persistent storage.
+
+💡**Development Approach:** Use the [Agentic Dev Stack workflow](#the-agentic-dev-stack:-agents.md-+-spec-kitplus-+-claude-code): Write spec → Generate plan → Break into tasks → Implement via Claude Code. No manual coding allowed. We will review the process, prompts, and iterations to judge each phase and project.
 
 ## **Requirements**
 
@@ -557,7 +563,7 @@ Response: Created Task object
 \- tasks.user\_id (for filtering by user)  
 \- tasks.completed (for status filtering)
 
-# **Workflow with Spec-Kit \+ Claude Code**
+# **Workflow with Spec-KitPlus \+ Claude Code**
 
 * Write/Update Spec → @specs/features/new-feature.md  
 * Ask Claude Code to Implement → "Implement @specs/features/new-feature.md"  
@@ -584,17 +590,13 @@ You: @specs/features/authentication.md implement Better Auth login
 | Component | Purpose |
 | :---- | :---- |
 | **/.spec-kit/config.yaml** | Spec-Kit configuration |
-| **/specs/overview.md** | Project overview and status |
-| **/specs/features/** | What to build (user stories, acceptance criteria) |
-| **/specs/api/** | How APIs should work |
-| **/specs/database/** | Data models and schema |
-| **/specs/ui/** | UI components and pages |
+| **/specs/\<features\>/\*\*** | What to build |
 | **/CLAUDE.md** | How to navigate and use specs |
 | **/frontend/CLAUDE.md** | Frontend-specific patterns |
 | **/backend/CLAUDE.md** | Backend-specific patterns |
 
 **Key Point:**   
-Spec-Kit provides organized, structured specs that Claude Code can reference. The CLAUDE.md files tell Claude Code how to use those specs and project-specific conventions.
+Spec-Kit Plus provides organized, structured specs that Claude Code can reference. The CLAUDE.md files tell Claude Code how to use those specs and project-specific conventions.
 
 # **Summary: Monorepo vs Separate Repos**
 
@@ -620,6 +622,8 @@ Use monorepo for the hackathon – simpler for Claude Code to navigate and edit 
 *Basic Level Functionality*
 
 **Objective:** Create an AI-powered chatbot interface for managing todos through natural language using MCP (Model Context Protocol) server architecture and using Claude Code and Spec-Kit Plus.
+
+💡**Development Approach:** Use the [Agentic Dev Stack workflow](#the-agentic-dev-stack:-agents.md-+-spec-kitplus-+-claude-code): Write spec → Generate plan → Break into tasks → Implement via Claude Code. No manual coding allowed. We will review the process, prompts, and iterations to judge each phase and project.
 
 # **Requirements**
 
@@ -798,6 +802,33 @@ The chatbot should understand and respond to:
 * Handle errors gracefully  
 * Resume conversations after server restart
 
+# **OpenAI ChatKit Setup & Deployment**
+
+## **Domain Allowlist Configuration (Required for Hosted ChatKit)**
+
+Before deploying your chatbot frontend, you must configure OpenAI's domain allowlist for security:
+
+1. **Deploy your frontend first to get a production URL:**  
+-  Vercel: \`https://your-app.vercel.app\`  
+-  GitHub Pages: \`https://username.github.io/repo-name\`  
+-  Custom domain: \`https://yourdomain.com\`
+
+2. **Add your domain to OpenAI's allowlist:**  
+- Navigate to: [https://platform.openai.com/settings/organization/security/domain-allowlist](https://platform.openai.com/settings/organization/security/domain-allowlist)  
+- Click "Add domain"  
+- Enter your frontend URL (without trailing slash)  
+- Save changes
+
+3. **Get your ChatKit domain key:**  
+- After adding the domain, OpenAI will provide a domain key  
+- Pass this key to your ChatKit configuration
+
+## **Environment Variables**
+
+NEXT\_PUBLIC\_OPENAI\_DOMAIN\_KEY=your-domain-key-here
+
+*Note: The hosted ChatKit option only works after adding the correct domains under Security → Domain Allowlist. Local development (\`localhost\`) typically works without this configuration.*
+
 # **Key Architecture Benefits**
 
 | Aspect | Benefit |
@@ -819,6 +850,8 @@ The chatbot should understand and respond to:
 *Cloud Native Todo Chatbot with Basic Level Functionality*
 
 **Objective:** Deploy the Todo Chatbot on a local Kubernetes cluster using Minikube, Helm Charts.
+
+💡**Development Approach:** Use the [Agentic Dev Stack workflow](#the-agentic-dev-stack:-agents.md-+-spec-kitplus-+-claude-code): Write spec → Generate plan → Break into tasks → Implement via Claude Code. No manual coding allowed. We will review the process, prompts, and iterations to judge each phase and project.
 
 ## **Requirements**
 
@@ -874,9 +907,11 @@ Can Spec-Driven Development be used for infrastructure automation, and how we ma
 
 # **Phase V: Advanced Cloud Deployment**
 
-*Advanced Level Functionality on DigitalOcean Kubernetes*
+*Advanced Level Functionality on Azure (AKS) or Google Cloud (GKE) or Azure (AKS)*
 
-**Objective:** Implement advanced features and deploy first on Minikube locally and then to production-grade Kubernetes on DigitalOcean and Kafka on Redpanda Cloud.
+**Objective:** Implement advanced features and deploy first on Minikube locally and then to production-grade Kubernetes on Azure/Google Cloud/Oracle and Kafka within Kubernetes Cluster or with a managed service like Redpanda Cloud.
+
+💡**Development Approach:** Use the [Agentic Dev Stack workflow](#the-agentic-dev-stack:-agents.md-+-spec-kitplus-+-claude-code): Write spec → Generate plan → Break into tasks → Implement via Claude Code. No manual coding allowed. We will review the process, prompts, and iterations to judge each phase and project.
 
 ## **Part A: Advanced Features**
 
@@ -892,20 +927,36 @@ Can Spec-Driven Development be used for infrastructure automation, and how we ma
 
 ## **Part C: Cloud Deployment**
 
-* Deploy to DigitalOcean Kubernetes (DOKS)  
-* Deploy Dapr on DOKS use Full Dapr: Pub/Sub, State, Bindings (cron), Secrets, Service Invocation  
-* Use Kafka on Redpanda Cloud  
+* Deploy to Azure (AKS)/Google Cloud (GKE)  
+* Deploy Dapr on GKE/AKS use Full Dapr: Pub/Sub, State, Bindings (cron), Secrets, Service Invocation  
+* Use Kafka on Confluent/Redpanda Cloud. If you have any trouble with kafka access you can add any other PubSub Component with Dapr.  
 * Set up CI/CD pipeline using Github Actions  
 * Configure monitoring and logging
 
-## **DigitalOcean Setup**
+## **Microsoft Azure Setup (AKS)**
 
-**New DigitalOcean accounts receive $200 credit for 60 days:**
+**US$200 credits for 30 days, plus 12 months of selected free services:**
 
-1. Sign up at digitalocean.com  
-2. Create a Kubernetes cluster (DOKS)  
-3. Configure kubectl to connect to DOKS  
-4. Deploy using Helm charts from Phase IV
+Sign up at [https://azure.microsoft.com/en-us/free/.%22](https://azure.microsoft.com/en-us/free/.%22)? 
+
+1. Create a Kubernetes cluster  
+2. Configure kubectl to connect with Cluster  
+3. Deploy using Helm charts from Phase IV
+
+## **Oracle Cloud Setup (Recommended \- Always Free)**
+
+ Sign up at https://www.oracle.com/cloud/free/  
+  \- Create OKE cluster (4 OCPUs, 24GB RAM \- always free)  
+  \- No credit card charge after trial  
+  \- Best for learning without time pressure
+
+## **Google Cloud Setup (GKE)**
+
+**US$300 credits, usable for 90 days for new customers:**
+
+Sign up at [https://cloud.google.com/free?hl=en](https://cloud.google.com/free?hl=en) 
+
+# 
 
 # **Kafka Use Cases in Phase** 
 
@@ -1041,39 +1092,17 @@ Kafka enables decoupled, scalable microservices architecture where the Chat API 
 | Bitnami Kafka Helm | Medium | Kubernetes-native, Helm chart |
 | Strimzi Operator | Medium-Hard | Production-grade K8s operator |
 
-# **Primary Recommendation: Redpanda Cloud (Serverless)**
+# **Primary Recommendation: Self-Hosted Kafka in Kubernetes**
 
-Best for hackathon because:
+  You can deploy Kafka directly within your K8s cluster using the Strimzi operator. Best for hackathon because:
 
-* Free serverless tier (no credit card for basic usage)  
-* Kafka-compatible \- same APIs, clients work unchanged  
+* Free cost  
+* Dapr PubSub makes Kafka-swappable \- same APIs, clients work unchanged  
 * No Zookeeper \- simpler architecture  
 * Fast setup \- under 5 minutes  
 * REST API \+ Native protocols
 
-**Sign up:** https://redpanda.com/cloud
-
-# **For Local/Minikube: Redpanda Docker**
-
-Single container, Kafka-compatible:
-
-\# docker-compose.redpanda.yml  
-services:  
-  redpanda:  
-    image: redpandadata/redpanda:latest  
-    command:  
-      \- redpanda start  
-      \- \--smp 1  
-      \- \--memory 512M  
-      \- \--overprovisioned  
-      \- \--kafka-addr PLAINTEXT://0.0.0.0:9092  
-      \- \--advertise-kafka-addr PLAINTEXT://localhost:9092  
-    ports:  
-      \- "9092:9092"  
-      \- "8081:8081"  \# Schema Registry  
-      \- "8082:8082"  \# REST Proxy
-
-# **Alternative: Self-Hosted on Kubernetes (Strimzi)**
+# **Self-Hosted on Kubernetes (Strimzi)**
 
 Good learning experience for students:
 
@@ -1081,6 +1110,26 @@ Good learning experience for students:
 kubectl create namespace kafka  
 kubectl apply \-f https://strimzi.io/install/latest?namespace=kafka  
    
+\# kafka-cluster.yaml  
+  apiVersion: kafka.strimzi.io/v1beta2  
+  kind: Kafka  
+  metadata:  
+    name: taskflow-kafka  
+    namespace: kafka  
+  spec:  
+    kafka:  
+      replicas: 1  
+      listeners:  
+        \- name: plain  
+          port: 9092  
+          type: internal  
+      storage:  
+        type: ephemeral  
+    zookeeper:  
+      replicas: 1  
+      storage:  
+        type: ephemeral
+
 \# Create Kafka cluster  
 kubectl apply \-f kafka-cluster.yaml
 
@@ -1249,32 +1298,58 @@ fetch("http://backend-service:8000/api/chat", {...})
 // Frontend calls via Dapr sidecar – automatic discovery  
 fetch("http://localhost:3500/v1.0/invoke/backend-service/method/api/chat", {...})
 
-# **Use Case 4: Input Bindings (Scheduled Reminders)**
+# **Use Case 4: Dapr Jobs API (Scheduled Reminders)**
 
-Trigger reminder checks on a schedule:
+Why Jobs API over Cron Bindings?
 
-**Dapr Cron Binding:**  
-apiVersion: dapr.io/v1alpha1  
-kind: Component  
-metadata:  
-  name: reminder-cron  
-spec:  
-  type: bindings.cron  
-  version: v1  
-  metadata:  
-    \- name: schedule  
-      value: "\*/5 \* \* \* \*"  \# Every 5 minutes
+- Cron Bindings | Poll every X minutes, check DB  
+- Dapr Jobs API | Schedule exact time, callback fires 
 
-**Backend Handler:**  
-@app.post("/reminder-cron")  
-async def check\_reminders():  
-    \# Dapr calls this every 5 minutes  
-    \# Check for due tasks and send notifications  
-    pass
+Schedule a reminder at exact time:  
+\`\`\`python  
+  import httpx
+
+  async def schedule\_reminder(task\_id: int, remind\_at: datetime, user\_id: str):  
+      """Schedule reminder using Dapr Jobs API (not cron polling)."""  
+      await httpx.post(  
+          f"http://localhost:3500/v1.0-alpha1/jobs/reminder-task-{task\_id}",  
+          json={  
+              "dueTime": remind\_at.strftime("%Y-%m-%dT%H:%M:%SZ"),  
+              "data": {  
+                  "task\_id": task\_id,  
+                  "user\_id": user\_id,  
+                  "type": "reminder"  
+              }  
+          }  
+      )
+
+  Handle callback when job fires:  
+  @app.post("/api/jobs/trigger")  
+  async def handle\_job\_trigger(request: Request):  
+      """Dapr calls this endpoint at the exact scheduled time."""  
+      job\_data \= await request.json()
+
+      if job\_data\["data"\]\["type"\] \== "reminder":  
+          \# Publish to notification service via Dapr PubSub  
+          await publish\_event("reminders", "reminder.due", job\_data\["data"\])
+
+      return {"status": "SUCCESS"}
+
+Benefits:
+
+- No polling overhead  
+- Exact timing (not "within 5 minutes")  
+- Scales better (no DB scans every minute)  
+- Same pattern works for recurring task spawns
 
 # **Use Case 5: Secrets Management**
 
-Securely store and access credentials:
+Securely store and access credentials (Optionally you can use Kubernetes Secrets):
+
+- K8s Secrets directly: Simple, already on K8s, fewer moving parts  
+- Dapr Secrets API: Multi-cloud portability, unified API across providers
+
+Dapr Secrets becomes valuable when targeting multipleplatforms (K8s \+ Azure \+ AWS).
 
 **Dapr Component (Kubernetes Secrets):**  
 apiVersion: dapr.io/v1alpha1  
@@ -1311,11 +1386,11 @@ api\_key \= response.json()\["openai-api-key"\]
 │                          ┌────────────▼────────────┐                                 │  
 │                          │    DAPR COMPONENTS      │                                 │  
 │                          │  ┌──────────────────┐   │                                 │  
-│                          │  │ pubsub.kafka     │───┼────▶ Redpanda/Kafka             │  
+│                          │  │ pubsub.kafka     │───┼────▶ Cluster Kafka             │  
 │                          │  ├──────────────────┤   │                                 │  
 │                          │  │ state.postgresql │───┼────▶ Neon DB                    │  
 │                          │  ├──────────────────┤   │                                 │  
-│                          │  │ bindings.cron    │   │  (Scheduled triggers)           │  
+│                          │  │ scheduler        │   │  (Scheduled triggers)           │  
 │                          │  ├──────────────────┤   │                                 │  
 │                          │  │ secretstores.k8s │   │  (API keys, credentials)        │  
 │                          │  └──────────────────┘   │                                 │  
@@ -1328,7 +1403,7 @@ api\_key \= response.json()\["openai-api-key"\]
 | :---- | :---- | :---- |
 | **kafka-pubsub** | pubsub.kafka | Event streaming (task-events, reminders) |
 | **statestore** | state.postgresql | Conversation state, task cache |
-| **reminder-cron** | bindings.cron | Trigger reminder checks |
+| **dapr-jobs** | Jobs API | Trigger reminder checks |
 | **kubernetes-secrets** | secretstores.kubernetes | API keys, DB credentials |
 
 # **Why Use Dapr?**
@@ -1428,6 +1503,296 @@ A: This is an individual hackathon. Each participant submits separately.
 
 **Q: What if I don't complete all the phases?**  
 A: Submit what you complete. Partial submissions are evaluated proportionally.
+
+# **The Agentic Dev Stack: AGENTS.md \+ Spec-KitPlus \+ Claude Code** {#the-agentic-dev-stack:-agents.md-+-spec-kitplus-+-claude-code}
+
+This is a powerful integration. By combining the **declarative** nature of AGENTS.md, the **structured workflow** of Panaversity Spec-KitPlus, and the **agentic execution** of Claude Code, you move from "vibe-coding" to a professional, spec-driven engineering pipeline.
+
+This section outlines a workflow where AGENTS.md acts as the **Constitution**, Spec-KitPlus acts as the **Architect**, and Claude Code acts as the **Builder**.
+
+## **1\. The Mental Model: Who Does What?**
+
+| Component | Role | Responsibility |
+| :---- | :---- | :---- |
+| **AGENTS.md** | **The Brain** | Cross-agent truth. Defines *how* agents should behave, what tools to use, and coding standards. |
+| **Spec-KitPlus** | **The Architect** | Manages spec artifacts (.specify, .plan, .tasks). Ensures technical rigor before coding starts. |
+| **Claude Code** | **The Executor** | The agentic environment. Reads the project memory and executes Spec-Kit tools via MCP. |
+
+**Key Idea:** Claude reads AGENTS.md via a tiny CLAUDE.md shim and interacts with Spec-KitPlus. For development setup an MCP Server and upgrade specifyplus commands to be available as Prompts in MCP. SpecKitPlus MCP server ensures every line of code maps back to a validated task.
+
+## ---
+
+**2\. Step 1: Initialize Spec-KitPlus**
+
+First, scaffold the spec-driven structure in your project root. This ensures the agent has the necessary templates to create structured plans.
+
+uv specifyplus init \<project\_name\>
+
+**This enables the core pipeline:**
+
+* /specify \-\> Captures requirements in speckit.specify.  
+* /plan \-\> Generates the technical approach in speckit.plan.  
+* /tasks \-\> Breaks the plan into actionable speckit.tasks.  
+* /implement \-\> Executes the code changes.
+
+## ---
+
+**3\. Step 2: Create a Spec-Aware AGENTS.md**
+
+Create AGENTS.md in your root. This file teaches all AI agents (Claude, Copilot, Gemini) how to use your specific Spec-Kit workflow.
+
+\`\`\`markdown
+
+\# AGENTS.md  
+Here is a \*\*significantly improved, clearer, more actionable, more valuable\*\* version of your \*\*AGENTS.md\*\*.  
+I kept the spirit but made it \*practical\*, \*strict\*, and \*agent-compatible\*, so Claude/Gemini/Copilot can actually follow it in real workflows.
+
+\---
+
+\# \*\*AGENTS.md\*\*
+
+\#\# \*\*Purpose\*\*
+
+This project uses \*\*Spec-Driven Development (SDD)\*\* — a workflow where \*\*no agent is allowed to write code until the specification is complete and approved\*\*.  
+All AI agents (Claude, Copilot, Gemini, local LLMs, etc.) must follow the \*\*Spec-Kit lifecycle\*\*:
+
+\> \*\*Specify → Plan → Tasks → Implement\*\*
+
+This prevents “vibe coding,” ensures alignment across agents, and guarantees that every implementation step maps back to an explicit requirement.
+
+\---
+
+\#\# \*\*How Agents Must Work\*\*
+
+Every agent in this project MUST obey these rules:
+
+1\. \*\*Never generate code without a referenced Task ID.\*\*  
+2\. \*\*Never modify architecture without updating \`speckit.plan\`.\*\*  
+3\. \*\*Never propose features without updating \`speckit.specify\` (WHAT).\*\*  
+4\. \*\*Never change approach without updating \`speckit.constitution\` (Principles).\*\*  
+5\. \*\*Every code file must contain a comment linking it to the Task and Spec sections.\*\*
+
+If an agent cannot find the required spec, it must \*\*stop and request it\*\*, not improvise.
+
+\---
+
+\#\# \*\*Spec-Kit Workflow (Source of Truth)\*\*
+
+\#\#\# \*\*1. Constitution (WHY — Principles & Constraints)\*\*
+
+File: \`speckit.constitution\`  
+Defines the project’s non-negotiables: architecture values, security rules, tech stack constraints, performance expectations, and patterns allowed.
+
+Agents must check this before proposing solutions.
+
+\---
+
+\#\#\# \*\*2. Specify (WHAT — Requirements, Journeys & Acceptance Criteria)\*\*
+
+File: \`speckit.specify\`
+
+Contains:
+
+\* User journeys  
+\* Requirements  
+\* Acceptance criteria  
+\* Domain rules  
+\* Business constraints
+
+Agents must not infer missing requirements — they must request clarification or propose specification updates.
+
+\---
+
+\#\#\# \*\*3. Plan (HOW — Architecture, Components, Interfaces)\*\*
+
+File: \`speckit.plan\`
+
+Includes:
+
+\* Component breakdown  
+\* APIs & schema diagrams  
+\* Service boundaries  
+\* System responsibilities  
+\* High-level sequencing
+
+All architectural output MUST be generated from the Specify file.
+
+\---
+
+\#\#\# \*\*4. Tasks (BREAKDOWN — Atomic, Testable Work Units)\*\*
+
+File: \`speckit.tasks\`
+
+Each Task must contain:
+
+\* Task ID  
+\* Clear description  
+\* Preconditions  
+\* Expected outputs  
+\* Artifacts to modify  
+\* Links back to Specify \+ Plan sections
+
+Agents \*\*implement only what these tasks define\*\*.
+
+\---
+
+\#\#\# \*\*5. Implement (CODE — Write Only What the Tasks Authorize)\*\*
+
+Agents now write code, but must:
+
+\* Reference Task IDs  
+\* Follow the Plan exactly  
+\* Not invent new features or flows  
+\* Stop and request clarification if anything is underspecified
+
+\> The golden rule: \*\*No task \= No code.\*\*
+
+\---
+
+\#\# \*\*Agent Behavior in This Project\*\*
+
+\#\#\# \*\*When generating code:\*\*
+
+Agents must reference:
+
+\`\`\`  
+\[Task\]: T-001  
+\[From\]: speckit.specify §2.1, speckit.plan §3.4  
+\`\`\`
+
+\#\#\# \*\*When proposing architecture:\*\*
+
+Agents must reference:
+
+\`\`\`  
+Update required in speckit.plan → add component X  
+\`\`\`
+
+\#\#\# \*\*When proposing new behavior or a new feature:\*\*
+
+Agents must reference:
+
+\`\`\`  
+Requires update in speckit.specify (WHAT)  
+\`\`\`
+
+\#\#\# \*\*When changing principles:\*\*
+
+Agents must reference:
+
+\`\`\`  
+Modify constitution.md → Principle \#X  
+\`\`\`
+
+\---
+
+\#\# \*\*Agent Failure Modes (What Agents MUST Avoid)\*\*
+
+Agents are NOT allowed to:
+
+\* Freestyle code or architecture  
+\* Generate missing requirements  
+\* Create tasks on their own  
+\* Alter stack choices without justification  
+\* Add endpoints, fields, or flows that aren’t in the spec  
+\* Ignore acceptance criteria  
+\* Produce “creative” implementations that violate the plan
+
+If a conflict arises between spec files, the \*\*Constitution \> Specify \> Plan \> Tasks\*\* hierarchy applies.
+
+\---
+
+\#\# \*\*Developer–Agent Alignment\*\*
+
+Humans and agents collaborate, but the \*\*spec is the single source of truth\*\*.  
+Before every session, agents should re-read:
+
+1\. \`.memory/constitution.md\`
+
+This ensures predictable, deterministic development.  
+\`\`\`
+
+## **4\. Step 3: Wire Spec-KitPlus into Claude via MCP**
+
+To let Claude Code actually *run* Spec-KitPlus commands, you will set up an MCP server with prompts present in .claude/commands. Each command here will become a prompt in the MCP server.
+
+### **4.1 Install SpecKitPlus, Create an MCP Server**
+
+1. uv init specifyplus \<project\_name\>  
+2. Create your Consitution  
+3. Add Anthropic's official MCP Builder Skill   
+4. Using SDD Loop (Specify, Plan, Tasks, Implement) you will  set up an MCP server with prompts present in .claude/commands  
+5. Use these as part of your prompt instructions in specify: \`We have specifyplus commands on @.claude/commands/\*\* Each command takes user input and updates its prompt variable before sending it to the agent. Now you will use your mcp builder skill and create an mcp server where these commands are available as prompts. Goal: Now we can run this MCP server and connect with any agent and IDE.  
+6. Test the MCP server
+
+### **4.2 Register with Claude Code**
+
+Add the server to your Claude Code config (usually .mcp.json at your project root):
+
+{  
+  "mcpServers": {  
+    "spec-kit": {  
+      "command": "spec-kitplus-mcp",  
+      "args": \[\],  
+      "env": {}  
+    }  
+  }  
+}
+
+**Success:**
+
+- After running MCP Server and connecting it with Claude Code now you can have the same commands available as MCP prompts.
+
+## 
+
+## ---
+
+**5\. Step 4: Connect Claude Code via the "Shim"**
+
+Copy the default [CLAUDE.md](http://CLAUDE.md) file and integrate the content within AGENTS.md . Claude Code automatically looks for CLAUDE.md. To keep a single source of truth, use a redirection pattern.
+
+**Create CLAUDE.md in your root:**
+
+**\`\`\`markdown**	
+
+@AGENTS.md  
+**\`\`\`**
+
+*This "forwarding" ensures Claude Code loads your comprehensive agent instructions into its context window immediately upon startup.*
+
+## ---
+
+## **6\. Step 5: The Day-to-Day Workflow**
+
+Once configured, your interaction with Claude Code looks like this:
+
+* **Context Loading:** You start Claude Code. It reads CLAUDE.md \-\> AGENTS.md and realizes it must use Spec-Kit.  
+* **Spec Generation:**  
+  * *User:* "I need a project dashboard."  
+  * *Claude:* Calls speckit\_specify and speckit\_plan using the MCP.  
+* **Task Breakdown:**  
+  * *Claude:* Calls speckit\_tasks to create a checklist in speckit.tasks.  
+* **Implementation:**  
+  * *User:* "Execute the first two tasks."  
+  * *Claude:* Calls speckit\_implement, writes the code, and checks it against the speckit.constitution.
+
+## ---
+
+**7\. Constitution vs. AGENTS.md: The Difference**
+
+It is important not to duplicate information.
+
+* **AGENTS.md (The "How"):** Focuses on the **interaction**. "Use these tools, follow this order, use these CLI commands."  
+* **speckit.constitution (The "What"):** Focuses on **standards**. "We prioritize performance over brevity, we use async/await, we require 90% test coverage."
+
+## ---
+
+**Summary of Integration**
+
+3. **Initialize:** specify init creates the structure.  
+4. **Instruct:** AGENTS.md defines the rules.  
+5. **Bridge:** CLAUDE.md (@AGENTS.md) connects the agent.  
+6. **Empower:** MCP gives the agent the tools to execute.
 
 **Good luck, and may your specs be clear and your code be clean\! 🚀**
 

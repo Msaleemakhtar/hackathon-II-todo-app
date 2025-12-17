@@ -1,0 +1,222 @@
+// lib/api-client.ts
+// API Client with Better Auth JWT Token Integration
+// Handles automatic token attachment and refresh
+
+import axios, { AxiosInstance, AxiosError } from 'axios';
+import { getSession, signOut } from './auth'; // Better Auth client
+
+// ============================================
+// TOKEN CACHE
+// ============================================
+
+interface CachedToken {
+  token: string;
+  expiresAt: number;
+}
+
+class TokenCache {
+  private cache: CachedToken | null = null;
+  private fetchPromise: Promise<string> | null = null;
+
+  async getToken(sessionCheck: () => Promise<boolean>): Promise<string | null> {
+    // Return cached token if still valid
+    if (this.cache && this.isTokenValid(this.cache.expiresAt)) {
+      return this.cache.token;
+    }
+
+    // Prevent duplicate fetch requests
+    if (this.fetchPromise) {
+      return this.fetchPromise;
+    }
+
+    // Verify session exists
+    const hasSession = await sessionCheck();
+    if (!hasSession) {
+      this.clear();
+      return null;
+    }
+
+    // Fetch new token
+    this.fetchPromise = this.fetchNewToken();
+
+    try {
+      const token = await this.fetchPromise;
+      return token;
+    } finally {
+      this.fetchPromise = null;
+    }
+  }
+
+  private async fetchNewToken(): Promise<string> {
+    const response = await fetch('/api/auth/token', {
+      credentials: 'include', // Include session cookies
+    });
+
+    if (!response.ok) {
+      throw new Error(`Token fetch failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Cache token with 3-minute buffer before expiry
+    this.cache = {
+      token: data.token,
+      expiresAt: data.expiresAt,
+    };
+
+    return data.token;
+  }
+
+  private isTokenValid(expiresAt: number): boolean {
+    const bufferMs = 3 * 60 * 1000; // 3 minutes
+    return Date.now() + bufferMs < expiresAt;
+  }
+
+  clear() {
+    this.cache = null;
+    this.fetchPromise = null;
+  }
+}
+
+const tokenCache = new TokenCache();
+
+// ============================================
+// SESSION CACHE
+// ============================================
+
+interface SessionCache {
+  hasSession: boolean;
+  timestamp: number;
+}
+
+class SessionCacheManager {
+  private cache: SessionCache | null = null;
+  private readonly TTL = 60 * 1000; // 60 seconds
+
+  async hasSession(): Promise<boolean> {
+    // Return cached result if fresh
+    if (this.cache && Date.now() - this.cache.timestamp < this.TTL) {
+      return this.cache.hasSession;
+    }
+
+    // Check session with Better Auth
+    try {
+      const session = await getSession();
+      const hasSession = !!session?.user;
+
+      this.cache = {
+        hasSession,
+        timestamp: Date.now(),
+      };
+
+      return hasSession;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  clear() {
+    this.cache = null;
+  }
+}
+
+const sessionCache = new SessionCacheManager();
+
+// ============================================
+// API CLIENT
+// ============================================
+
+/**
+ * Axios instance configured for Better Auth
+ * Automatically attaches JWT tokens to requests
+ * Handles token refresh on 401 errors
+ */
+const apiClient: AxiosInstance = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true, // Include cookies for Better Auth
+});
+
+/**
+ * Request Interceptor
+ * Attaches JWT token to all requests
+ */
+apiClient.interceptors.request.use(
+  async (config) => {
+    try {
+      // Check if session exists
+      const hasSession = await sessionCache.hasSession();
+
+      if (!hasSession) {
+        console.warn('[API Client] No active session found');
+        return config;
+      }
+
+      // Get JWT token (cached or fresh)
+      const token = await tokenCache.getToken(() => sessionCache.hasSession());
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('[API Client] Failed to attach token:', error);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+/**
+ * Response Interceptor
+ * Handles authentication errors and token refresh
+ */
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      console.warn('[API Client] 401 Unauthorized - attempting token refresh');
+
+      // Clear cached token
+      tokenCache.clear();
+      sessionCache.clear();
+
+      // Try to refresh token
+      try {
+        const hasSession = await sessionCache.hasSession();
+
+        if (hasSession) {
+          const newToken = await tokenCache.getToken(() => sessionCache.hasSession());
+
+          if (newToken && error.config) {
+            // Retry original request with new token
+            error.config.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(error.config);
+          }
+        }
+      } catch (refreshError) {
+        console.error('[API Client] Token refresh failed:', refreshError);
+      }
+
+      // Sign out and redirect to login
+      console.warn('[API Client] Authentication failed - signing out');
+      await signOut();
+      window.location.href = '/login?session_expired=true';
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
+
+/**
+ * Clear all caches (call on sign out)
+ */
+export function clearAuthCache() {
+  tokenCache.clear();
+  sessionCache.clear();
+}

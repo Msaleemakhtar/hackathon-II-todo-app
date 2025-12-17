@@ -1,75 +1,78 @@
 <!--
 SYNC IMPACT REPORT:
-Version Change: 2.2.0 -> 2.3.0
-Amendment Date: 2025-12-10
+Version Change: 2.3.0 -> 2.4.0
+Amendment Date: 2025-12-16
 
-Modified Principles:
-  - IV. User Authentication & JWT Security:
-    * CHANGED: "Authentication Flow" updated to reflect Better Auth JWT plugin integration
-      where Better Auth handles token issuance and validation against shared secret
-    * CHANGED: "Data Scoping" clarified that JWT user_id is authoritative source, not path parameter
-    * CHANGED: "Security Standards" updated to specify HS256 with Better Auth shared secret
-    * RATIONALE: Aligns implementation with Better Auth's architecture and security model
+Modified Sections:
 
-  - III. Persistent & Relational State:
-    * CHANGED: "Data Isolation" enhanced to specify JWT user_id as authoritative source
-    * ADDED: "Multi-User Isolation Testing" requirement for verifying cross-user access prevention
-    * RATIONALE: Ensures data security when path parameters are validated but not used for queries
+  - Mission Statement:
+    * CHANGED: Extended to acknowledge Phase I (CLI), Phase II (web app) as COMPLETE
+    * ADDED: Phase III AI chatbot development as NEW, SEPARATE implementation
+    * RATIONALE: Provides clear phase separation and project evolution context
 
-  - VI. Frontend Architecture Standards:
-    * ADDED: "Authentication Integration" section requiring Better Auth implementation
-    * ADDED: "API Client Implementation" section requiring client at `@/lib/api-client`
-    * RATIONALE: Specifies frontend requirements for Better Auth integration
+  - Core Principles:
+    * ADDED: Principle XI - MCP Server Architecture (stateless tools, database state management)
+    * ADDED: Principle XII - OpenAI Agents SDK Integration
+    * ADDED: Principle XIII - Conversational AI Standards
+    * RATIONALE: Governs Phase III AI chatbot architecture and behavior
+
+  - Repository Structure (Principle II):
+    * ADDED: phaseIII/ directory structure showing complete separation from phaseI/ and phaseII/
+    * ADDED: Phase III-specific directory layout (backend, frontend, mcp, tests)
+    * RATIONALE: Enforces complete separation between phases as required
+
+  - Specs Organization:
+    * ADDED: `/specs/sphaseIII/` directory for Phase III specifications
+    * RATIONALE: Maintains spec organization pattern for new phase
+
+  - Data Model Specification:
+    * ADDED: Phase III Data Models section with Conversation and Message entities
+    * ADDED: Task entity clarification for Phase III (tasks_phaseiii table)
+    * RATIONALE: Phase III requires separate data models for chat functionality
 
   - API Design Standards:
-    * CHANGED: "Endpoint Patterns" updated from `/api/v1/{resources}` to `/api/{user_id}/{resources}`
-    * ADDED: "Path Parameter Validation Requirements" section for user ID validation
-    * RATIONALE: Implements required user isolation pattern with validation
+    * ADDED: Phase III Chat API Endpoint specification (POST /api/{user_id}/chat)
+    * ADDED: MCP Tools Specification section documenting 5 required tools
+    * RATIONALE: Defines chat endpoint and MCP tool contracts
 
-Modified Success Criteria:
-  - Functional Requirements:
-    * CHANGED: User Auth requirement updated to reflect Better Auth with JWT plugin
-    * ADDED: API Migration requirement for endpoint pattern changes
-    * RATIONALE: Reflects new authentication and endpoint patterns
-  - Technical Requirements:
-    * ADDED: Better Auth JWT validation requirement
-    * ADDED: Path validation requirement
-    * ADDED: API Client requirement
-    * ADDED: Multi-User Isolation testing requirement
-    * RATIONALE: Ensures proper implementation of new architecture
-
-Modified Constraints:
   - Technology Constraints:
-    * ADDED: Better Auth authentication requirement
-    * ADDED: New API endpoint format requirement
-    * ADDED: API Client location requirement
-    * RATIONALE: Enforces new architectural patterns
-  - Security Constraints:
-    * CHANGED: Token management to use Better Auth
-    * CHANGED: Data access scoping to use JWT user_id as authoritative source
-    * ADDED: Token validation with shared secret requirement
-    * ADDED: Data isolation clarification about path parameter authority
-    * RATIONALE: Aligns security requirements with Better Auth implementation
-  - Added Migration Constraints section:
-    * ADDED: Endpoint migration requirements
-    * ADDED: API client creation requirement
-    * ADDED: Validation requirement for migrated endpoints
-    * RATIONALE: Provides clear migration path for existing endpoints
+    * ADDED: Phase III-specific technology stack requirements
+    * ADDED: OpenAI ChatKit, OpenAI Agents SDK, MCP SDK requirements
+    * ADDED: UV for backend, Bun for frontend package management
+    * RATIONALE: Enforces mandatory technology stack for Phase III
+
+  - Success Criteria:
+    * ADDED: Phase III-specific functional requirements (chatbot, MCP tools, NLU)
+    * ADDED: Phase III-specific technical requirements
+    * RATIONALE: Defines completion criteria for Phase III
+
+  - Requirement-to-Rule Mapping:
+    * ADDED: Phase III requirements (FR-P3-001 through FR-P3-008)
+    * ADDED: Phase III structural requirements (SR-P3-001, SR-P3-002)
+    * ADDED: Phase III interface requirements (IR-P3-001, IR-P3-002)
+    * RATIONALE: Maintains traceability for Phase III governance
 
 Templates Requiring Updates:
-  - ✅ plan-template.md - checked, no specific updates needed
-  - ✅ spec-template.md - checked, no specific updates needed
-  - ✅ tasks-template.md - checked, no specific updates needed
+  - None - existing templates remain compatible
 
 Follow-up TODOs:
-  - None identified
+  - Create initial specs in /specs/sphaseIII/ directory
+  - Set up phaseIII directory structure
 -->
 
-# Todo App - Phase II Constitution
+# Todo App - Multi-Phase Constitution
 
 ## Mission Statement
 
-Evolve the CLI application into a feature-rich, multi-user, full-stack web application with persistent storage. Establish a scalable, secure, modern architecture for a cloud-native, distributed system while strictly adhering to Spec-Driven Development principles.
+This project implements a todo application across three distinct phases, each with complete separation:
+
+**Phase I (COMPLETED)**: Command-line interface (CLI) todo application with in-memory storage and rich terminal UI.
+
+**Phase II (COMPLETED)**: Full-stack web application with persistent storage, multi-user authentication via Better Auth, Next.js frontend, and FastAPI backend.
+
+**Phase III (ACTIVE)**: AI-powered chatbot interface for managing todos through natural language using MCP (Model Context Protocol) server architecture and OpenAI Agents SDK.
+
+Each phase is a **completely independent implementation** with no code sharing between phases. The constitution governs all phases while providing phase-specific guidance.
 
 ---
 
@@ -89,7 +92,11 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
   4. Accompanied by the specification that was attempted
 - Development follows the cycle: **Spec --> AI Generate --> Test --> Refine Spec --> Regenerate**.
 - Specifications MUST be managed via GitHub Spec-Kit Plus in the `/specs` directory.
-- Spec organization MUST follow the default Specify Plus Kit structure: `/specs/NNN-feature-name/` where each feature directory contains `spec.md`, `plan.md`, `tasks.md`, and related artifacts.
+- Spec organization MUST follow the default Specify Plus Kit structure:
+  - Phase I: `/specs/sphaseI/NNN-feature-name/`
+  - Phase II: `/specs/sphaseII/NNN-feature-name/`
+  - Phase III: `/specs/sphaseIII/NNN-feature-name/`
+  - Each feature directory contains `spec.md`, `plan.md`, `tasks.md`, and related artifacts.
 
 **Verification**:
 - Commit history shows specification files created/modified before implementation files.
@@ -100,38 +107,83 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
 
 ---
 
-### II. Full-Stack Monorepo Architecture
+### II. Repository Structure
 
-**Philosophy**: Unified codebase with clear separation of concerns.
+**Philosophy**: Complete phase separation with unified governance.
 
 **Requirements**:
-- **Repository Structure**: Monorepo with distinct directories:
-  - `/frontend` - Next.js 16 (App Router) application
-  - `/backend` - Python FastAPI server
-  - `/packages` - Shared code (TypeScript types, SDKs, utilities)
-  - `/specs` - All specifications (features, api, database, ui)
-- **Frontend Technology**:
-  - Next.js 16 with App Router (NOT Pages Router)
-  - TypeScript with strict mode enabled
-  - shadcn/ui component library
-  - Tailwind CSS for styling
-  - Zustand for global state management
-  - axios for HTTP client with interceptors
-- **Backend Technology**:
-  - Python 3.11+ with FastAPI framework
-  - SQLModel for ORM and data validation
-  - Pydantic for input/output schemas
-  - asyncpg driver for async PostgreSQL access
-  - Alembic for database migrations
-- **Package Management**:
-  - `bun` for frontend dependencies AND workspace management
-  - `uv` for backend Python dependencies
-  - NO npm or yarn for frontend
-  - NO pip or poetry for backend
+- **Repository Structure**: Monorepo with distinct directories per phase:
+  - `/phaseI` - CLI application (Python, Rich UI) - COMPLETED
+  - `/phaseII` - Full-stack web application (Next.js + FastAPI) - COMPLETED
+  - `/phaseIII` - AI Chatbot (OpenAI ChatKit + FastAPI + MCP) - ACTIVE
+  - `/specs` - All specifications organized by phase
+  - `/.specify` - Spec-Kit Plus configuration and templates
 
-**Directory Standards**:
+**Phase Separation Requirements**:
+- **NO IMPORTS** between phases (e.g., phaseIII MUST NOT import from phaseII)
+- **NO SHARED CODE** or modules between phases
+- **INDEPENDENT IMPLEMENTATIONS** - each phase reimplements required functionality
+- **SEPARATE DATABASE TABLES** - Phase III uses `tasks_phaseiii` table, not Phase II tables
+
+**Phase III Directory Structure**:
 ```
-/
+phaseIII/
+├── backend/                    # Python FastAPI backend
+│   ├── pyproject.toml         # UV package manager
+│   ├── .env.example
+│   ├── alembic/               # Database migrations (independent)
+│   │   ├── env.py
+│   │   └── versions/
+│   ├── app/
+│   │   ├── main.py            # FastAPI app entry point
+│   │   ├── config.py          # Configuration
+│   │   ├── database.py        # Database connection
+│   │   ├── models/            # SQLModel models
+│   │   │   ├── __init__.py
+│   │   │   ├── task.py        # Task model (independent from Phase II)
+│   │   │   ├── conversation.py # Conversation model
+│   │   │   └── message.py     # Message model
+│   │   ├── services/          # Business logic
+│   │   │   ├── __init__.py
+│   │   │   ├── task_service.py  # Task CRUD (independent implementation)
+│   │   │   └── chat_service.py  # Chat service with OpenAI
+│   │   ├── mcp/               # MCP Server
+│   │   │   ├── __init__.py
+│   │   │   ├── server.py      # MCP server manager
+│   │   │   └── tools.py       # MCP tool implementations
+│   │   ├── routers/           # API routes
+│   │   │   ├── __init__.py
+│   │   │   └── chat.py        # Chat endpoint
+│   │   └── schemas/           # Pydantic schemas
+│   │       ├── __init__.py
+│   │       ├── task.py
+│   │       └── chat.py
+│   └── tests/                 # Pytest tests
+│       ├── conftest.py
+│       ├── test_mcp_tools.py
+│       └── test_chat.py
+├── frontend/                   # OpenAI ChatKit UI
+│   ├── package.json           # Bun package manager
+│   ├── bun.lockb
+│   ├── .env.example
+│   ├── next.config.js
+│   ├── app/
+│   │   └── chat/
+│   │       └── page.tsx
+│   ├── components/
+│   │   └── chat/
+│   │       ├── ChatInterface.tsx
+│   │       └── ChatMessage.tsx
+│   └── lib/
+│       ├── api/
+│       │   └── chat.ts
+│       └── auth.ts            # Better Auth integration
+└── README.md
+```
+
+**Phase II Directory Structure** (Reference - COMPLETED):
+```
+phaseII/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/           # Next.js App Router pages
@@ -150,19 +202,27 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
 │   ├── tests/
 │   ├── alembic/
 │   └── pyproject.toml
-├── packages/
-│   └── auth-sdk/      # Shared TypeScript definitions, SDKs, etc.
-├── specs/
-│   ├── 001-feature-name/  # Feature-specific directory
-│   │   ├── spec.md        # Feature specification
-│   │   ├── plan.md        # Implementation plan
-│   │   ├── tasks.md       # Task breakdown
-│   │   └── ...            # Additional artifacts (ADRs, PHRs, etc.)
-│   └── 002-another-feature/
 └── docker-compose.yml
 ```
 
-**Rationale**: Monorepo enables atomic changes across frontend and backend, shared type definitions, unified CI/CD, and simplified dependency management while maintaining clear architectural boundaries.
+**Specs Directory Structure**:
+```
+specs/
+├── sphaseI/               # Phase I specifications (COMPLETED)
+│   ├── 001-add-task/
+│   ├── 002-view-task/
+│   └── ...
+├── sphaseII/              # Phase II specifications (COMPLETED)
+│   ├── 001-foundational-backend-setup/
+│   ├── 002-task-tag-api/
+│   └── ...
+└── sphaseIII/             # Phase III specifications (ACTIVE)
+    ├── 001-mcp-server-setup/
+    ├── 002-chat-endpoint/
+    └── ...
+```
+
+**Rationale**: Complete phase separation ensures each implementation is independent and can evolve without affecting other phases. This also demonstrates the ability to implement the same functionality using different architectural approaches.
 
 ---
 
@@ -181,6 +241,7 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
 - **Connection Pooling**: Production deployments MUST use connection pooling.
 - **Data Isolation**: ALL database queries MUST scope to the authenticated user's ID from the JWT token, NOT from the path parameter. The JWT user_id is the authoritative source for determining data access rights.
 - **Multi-User Isolation Testing**: All data access functions MUST include tests that verify User A cannot access User B's data, even with valid authentication.
+- **Phase Table Separation**: Phase III MUST use separate tables (e.g., `tasks_phaseiii`) to avoid conflicts with Phase II data.
 
 **Verification**:
 - No raw SQL queries outside of migrations
@@ -231,12 +292,12 @@ Evolve the CLI application into a feature-rich, multi-user, full-stack web appli
 - Rate limiting on auth endpoints: 5 attempts per minute per IP
 - All API endpoints that accept user_id in path MUST validate that the JWT user_id matches the path user_id
 
-**Phase II Scope Boundaries**:
-The following security features are explicitly OUT OF SCOPE for Phase II and targeted for future implementation:
-- **Refresh token rotation**: Rotating refresh tokens on each use (Phase III target)
-- **Token blacklisting**: Server-side token revocation for logout (Phase III target)
+**Future Scope**:
+The following security features are explicitly OUT OF SCOPE for current phases and targeted for future implementation:
+- **Refresh token rotation**: Rotating refresh tokens on each use
+- **Token blacklisting**: Server-side token revocation for logout
 
-**Rationale**: These features add complexity that exceeds Phase II scope. The current implementation provides adequate security for the MVP while clearly identifying enhancement paths.
+**Rationale**: These features add complexity that exceeds current scope. The current implementation provides adequate security for the MVP while clearly identifying enhancement paths.
 
 **Verification**:
 - All protected routes return 401 without valid token
@@ -256,12 +317,12 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 **Requirements**:
 
 **Router Organization**:
-- Endpoints organized in `/backend/src/routers/` using FastAPI APIRouter
-- One router file per resource domain (e.g., `tasks.py`, `auth.py`, `tags.py`)
+- Endpoints organized in `/backend/src/routers/` (Phase II) or `/backend/app/routers/` (Phase III) using FastAPI APIRouter
+- One router file per resource domain (e.g., `tasks.py`, `auth.py`, `chat.py`)
 - Routers registered in `main.py` with version prefix
 
 **API Versioning**:
-- ALL routes prefixed with `/api/v1/`
+- ALL routes prefixed with `/api/v1/` or `/api/{user_id}/`
 - Version changes require new router files (e.g., `/api/v2/tasks`)
 - Breaking changes MUST increment API version
 
@@ -314,7 +375,7 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 **Philosophy**: Fast, accessible, and delightful user experience.
 
-**Requirements**:
+**Phase II Frontend Requirements**:
 
 **Component Structure**:
 - Feature-based or type-based organization (choose one, be consistent)
@@ -339,6 +400,23 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - Client MUST construct URLs using the pattern `/api/{user_id}/{resources}` using the user ID from session
 - Client MUST handle 403 Forbidden responses by redirecting to appropriate error states
 - Client MUST handle 401 Unauthorized responses by allowing Better Auth to manage token refresh
+
+**Phase III Frontend Requirements**:
+
+**OpenAI ChatKit Integration**:
+- MUST use OpenAI ChatKit for the chat interface
+- MUST use Managed ChatKit Starter template: https://github.com/openai/openai-chatkit-starter-app/tree/main/managed-chatkit
+- Domain allowlist MUST be configured in OpenAI platform settings
+- ChatKit domain key MUST be obtained and configured
+
+**Chat Interface Requirements**:
+- Message display with user/assistant role differentiation
+- Loading states during AI processing
+- Tool call visualization (show which MCP tools were invoked)
+- Conversation history display
+- Error handling with graceful recovery
+
+**Common Requirements (All Phases)**:
 
 **Environment Variables**:
 - `NEXT_PUBLIC_` prefix for browser-exposed variables
@@ -391,6 +469,11 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **Coverage**: Minimum 70% code coverage on components
 - **Execution**: `cd frontend && bun test`
 
+**Phase III Specific Testing**:
+- **MCP Tool Tests**: All 5 MCP tools MUST have unit tests
+- **Chat Service Tests**: Conversation flow, tool invocation, error handling
+- **Integration Tests**: End-to-end chat interactions with mocked OpenAI responses
+
 **End-to-End Testing (Optional)**:
 - Playwright for critical user journeys
 - Run in CI on staging deployments
@@ -415,9 +498,9 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 **Requirements**:
 
 **Docker Configuration**:
-- `Dockerfile` in `/frontend` for Next.js production build
-- `Dockerfile` in `/backend` for FastAPI production build
-- `docker-compose.yml` at root for local development environment
+- `Dockerfile` in each phase's `/frontend` for production build
+- `Dockerfile` in each phase's `/backend` for production build
+- `docker-compose.yml` at phase root for local development environment
 - Multi-stage builds to minimize image size
 
 **Local Development**:
@@ -491,7 +574,7 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 ---
 
-### X. Feature Scope (Phase II)
+### X. Feature Scope (Phase II - COMPLETED)
 
 **Philosophy**: Expand core functionality with user-centric features.
 
@@ -526,9 +609,132 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 ---
 
+### XI. MCP Server Architecture (Phase III)
+
+**Philosophy**: Standardized interface for AI to interact with the application through stateless, database-backed tools.
+
+**Requirements**:
+
+**MCP Server Setup**:
+- MUST use the official MCP SDK: https://github.com/modelcontextprotocol/python-sdk
+- Server MUST expose exactly 5 tools for task operations
+- All tools MUST be stateless - no in-memory state between requests
+- All state MUST be persisted to the database
+
+**Tool Specifications**:
+
+| Tool | Purpose | Required Parameters | Optional Parameters |
+|------|---------|---------------------|---------------------|
+| `add_task` | Create a new task | `user_id`, `title` | `description` |
+| `list_tasks` | Retrieve user's tasks | `user_id` | `status` (all/pending/completed) |
+| `complete_task` | Mark task as complete | `user_id`, `task_id` | - |
+| `delete_task` | Remove a task | `user_id`, `task_id` | - |
+| `update_task` | Modify task | `user_id`, `task_id` | `title`, `description` |
+
+**Tool Response Format**:
+```json
+{
+  "task_id": <integer>,
+  "status": "<created|completed|deleted|updated>",
+  "title": "<task_title>"
+}
+```
+
+**Error Handling**:
+- Tool errors MUST return descriptive error messages
+- Invalid task_id MUST return "Task not found" error
+- All errors MUST be gracefully handled without crashing the server
+
+**Rationale**: MCP provides a standardized interface for AI agents to interact with the application, enabling tool composition and clear separation between AI logic and application logic.
+
+---
+
+### XII. OpenAI Agents SDK Integration (Phase III)
+
+**Philosophy**: Leverage OpenAI's agent framework for natural language task management.
+
+**Requirements**:
+
+**SDK Integration**:
+- MUST use OpenAI Agents SDK: https://github.com/openai/openai-agents-python
+- Agent MUST be configured with MCP tools for task operations
+- Agent MUST understand natural language intent and invoke appropriate tools
+
+**Agent Behavior Specification**:
+
+| User Intent | Agent Action |
+|-------------|--------------|
+| Adding/creating/remembering something | Invoke `add_task` |
+| Viewing/showing/listing tasks | Invoke `list_tasks` with appropriate filter |
+| Done/complete/finished with task | Invoke `complete_task` |
+| Delete/remove/cancel task | Invoke `delete_task` |
+| Change/update/rename task | Invoke `update_task` |
+
+**Conversation Context**:
+- Agent MUST receive last 20 messages for context
+- Conversation history MUST be loaded from database
+- New messages MUST be stored before agent invocation
+
+**Response Requirements**:
+- Agent MUST confirm actions with friendly responses
+- Agent MUST explain what tools were invoked
+- Agent MUST handle errors gracefully with helpful messages
+
+**Rationale**: OpenAI Agents SDK provides robust AI capabilities for natural language understanding and tool invocation, enabling intuitive conversational task management.
+
+---
+
+### XIII. Conversational AI Standards (Phase III)
+
+**Philosophy**: Stateless server architecture with database-persisted conversation state.
+
+**Requirements**:
+
+**Stateless Architecture**:
+- Server MUST NOT hold conversation state in memory
+- Each request MUST be independent and self-contained
+- Server MUST be horizontally scalable
+- Server restart MUST NOT lose conversation data
+
+**Conversation Flow (Request Cycle)**:
+1. Receive user message via API
+2. Fetch conversation history from database (if conversation_id provided)
+3. Build message array for agent (history + new message)
+4. Store user message in database
+5. Run agent with MCP tools
+6. Agent invokes appropriate MCP tool(s)
+7. Store assistant response in database
+8. Return response to client
+9. Server holds NO state (ready for next request)
+
+**Conversation Persistence**:
+- Conversations MUST be stored in `conversations` table
+- Messages MUST be stored in `messages` table with conversation_id reference
+- Messages MUST include role (user/assistant) and content
+- Messages MUST be ordered by created_at timestamp
+
+**Natural Language Commands**:
+The chatbot MUST understand and respond to:
+| User Says | Agent Should |
+|-----------|--------------|
+| "Add a task to buy groceries" | Call `add_task` with title "Buy groceries" |
+| "Show me all my tasks" | Call `list_tasks` with status "all" |
+| "What's pending?" | Call `list_tasks` with status "pending" |
+| "Mark task 3 as complete" | Call `complete_task` with task_id 3 |
+| "Delete the meeting task" | Call `list_tasks` first, then `delete_task` |
+| "Change task 1 to 'Call mom tonight'" | Call `update_task` with new title |
+| "I need to remember to pay bills" | Call `add_task` with title "Pay bills" |
+| "What have I completed?" | Call `list_tasks` with status "completed" |
+
+**Rationale**: Stateless architecture enables scalability and resilience while database persistence ensures conversation continuity across requests and server restarts.
+
+---
+
 ## Data Model Specification
 
-### User Entity (SQLModel)
+### Phase II Data Models
+
+#### User Entity (SQLModel)
 
 | Field      | Type   | Constraints                          | Description                         |
 |------------|--------|--------------------------------------|-------------------------------------|
@@ -537,7 +743,7 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 | name       | str    | NULLABLE                             | User's display name                 |
 | created_at | datetime | NOT NULL, DEFAULT now()            | Account creation timestamp          |
 
-### Tag Entity (SQLModel)
+#### Tag Entity (SQLModel)
 
 | Field    | Type   | Constraints                          | Description                         |
 |----------|--------|--------------------------------------|-------------------------------------|
@@ -548,7 +754,7 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 **Constraint**: UNIQUE(name, user_id) - No duplicate tag names per user
 
-### Task Entity (SQLModel)
+#### Task Entity (SQLModel) - Phase II
 
 | Field           | Type         | Constraints                          | Description                         |
 |-----------------|--------------|--------------------------------------|-------------------------------------|
@@ -564,7 +770,7 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 | updated_at      | datetime     | NOT NULL, DEFAULT now(), ON UPDATE   | Last modification timestamp         |
 | tags            | List[Tag]    | Many-to-Many via TaskTagLink         | Associated tags                     |
 
-### TaskTagLink Entity (Junction Table)
+#### TaskTagLink Entity (Junction Table)
 
 | Field   | Type | Constraints                          | Description                         |
 |---------|------|--------------------------------------|-------------------------------------|
@@ -573,8 +779,51 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 **Constraint**: Composite PRIMARY KEY(task_id, tag_id)
 
+### Phase III Data Models
+
+**IMPORTANT**: Phase III uses SEPARATE tables from Phase II to maintain complete separation.
+
+#### Task Entity (SQLModel) - Phase III
+
+**Table Name**: `tasks_phaseiii` (NOT the Phase II `tasks` table)
+
+| Field       | Type     | Constraints                          | Description                         |
+|-------------|----------|--------------------------------------|-------------------------------------|
+| id          | int      | PRIMARY KEY, AUTOINCREMENT           | Unique task identifier              |
+| user_id     | str      | INDEX, NOT NULL                      | Owner user ID from Better Auth      |
+| title       | str      | NOT NULL, max 200 chars              | Task title                          |
+| description | str      | NULLABLE                             | Task description                    |
+| completed   | bool     | NOT NULL, DEFAULT False              | Completion status                   |
+| created_at  | datetime | NOT NULL, DEFAULT now()              | Creation timestamp                  |
+| updated_at  | datetime | NOT NULL, DEFAULT now(), ON UPDATE   | Last modification timestamp         |
+
+#### Conversation Entity (SQLModel)
+
+**Table Name**: `conversations`
+
+| Field      | Type     | Constraints                          | Description                         |
+|------------|----------|--------------------------------------|-------------------------------------|
+| id         | int      | PRIMARY KEY, AUTOINCREMENT           | Unique conversation identifier      |
+| user_id    | str      | INDEX, NOT NULL                      | Owner user ID from Better Auth      |
+| created_at | datetime | NOT NULL, DEFAULT now()              | Conversation start timestamp        |
+| updated_at | datetime | NOT NULL, DEFAULT now(), ON UPDATE   | Last activity timestamp             |
+
+#### Message Entity (SQLModel)
+
+**Table Name**: `messages`
+
+| Field           | Type     | Constraints                          | Description                         |
+|-----------------|----------|--------------------------------------|-------------------------------------|
+| id              | int      | PRIMARY KEY, AUTOINCREMENT           | Unique message identifier           |
+| conversation_id | int      | FOREIGN KEY -> Conversation.id, INDEX| Parent conversation                 |
+| user_id         | str      | INDEX, NOT NULL                      | Owner user ID                       |
+| role            | str      | NOT NULL                             | 'user' or 'assistant'               |
+| content         | text     | NOT NULL                             | Message content                     |
+| created_at      | datetime | NOT NULL, DEFAULT now()              | Message timestamp                   |
+
 ### Database Indexes
 
+**Phase II Indexes**:
 - `idx_tasks_user_id` on tasks(user_id) - User task lookup
 - `idx_tasks_user_completed` on tasks(user_id, completed) - Filtered task lists
 - `idx_tasks_user_priority` on tasks(user_id, priority) - Priority sorting
@@ -582,6 +831,12 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - `idx_tags_user_id` on tags(user_id) - User tag lookup
 - `idx_task_tag_link_task` on task_tag_link(task_id) - Tag lookup by task
 - `idx_task_tag_link_tag` on task_tag_link(tag_id) - Task lookup by tag
+
+**Phase III Indexes**:
+- `idx_tasks_phaseiii_user_id` on tasks_phaseiii(user_id) - User task lookup
+- `idx_conversations_user_id` on conversations(user_id) - User conversation lookup
+- `idx_messages_conversation_id` on messages(conversation_id) - Message lookup by conversation
+- `idx_messages_user_id` on messages(user_id) - User message lookup
 
 ---
 
@@ -597,18 +852,18 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **Length**: Maximum 1000 characters
 - **Error**: `{"detail": "Description cannot exceed 1000 characters", "code": "DESCRIPTION_TOO_LONG"}`
 
-### Task Priority
+### Task Priority (Phase II only)
 - **Required**: Must be one of: 'low', 'medium', 'high'
 - **Default**: 'medium'
 - **Error**: `{"detail": "Priority must be low, medium, or high", "code": "INVALID_PRIORITY"}`
 
-### Due Date
+### Due Date (Phase II only)
 - **Optional**: Can be null
 - **Format**: ISO 8601 datetime string
 - **Constraint**: Cannot be in the past when creating (warning only on update)
 - **Error**: `{"detail": "Due date must be a valid ISO 8601 datetime", "code": "INVALID_DUE_DATE"}`
 
-### Recurrence Rule
+### Recurrence Rule (Phase II only)
 - **Optional**: Can be null
 - **Format**: Valid iCal RRULE string
 - **Error**: `{"detail": "Recurrence rule must be a valid iCal RRULE", "code": "INVALID_RRULE"}`
@@ -624,11 +879,20 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **Existence**: Must correspond to an existing task owned by the user
 - **Error**: `{"detail": "Task not found", "code": "TASK_NOT_FOUND"}`
 
+### Chat Message
+- **Required**: Cannot be empty or whitespace-only
+- **Error**: `{"detail": "Message is required", "code": "INVALID_MESSAGE"}`
+
+### Conversation ID
+- **Optional**: Can be null (creates new conversation)
+- **Existence**: If provided, must correspond to an existing conversation owned by the user
+- **Error**: `{"detail": "Conversation not found", "code": "CONVERSATION_NOT_FOUND"}`
+
 ---
 
 ## API Design Standards
 
-### Endpoint Patterns
+### Phase II Endpoint Patterns
 
 | Operation       | Method | Path                          | Success Code |
 |-----------------|--------|-------------------------------|--------------|
@@ -648,6 +912,35 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 | Refresh token   | POST   | /api/v1/auth/refresh          | 200          |
 | Logout          | POST   | /api/v1/auth/logout           | 200          |
 | Current user    | GET    | /api/v1/auth/me               | 200          |
+
+### Phase III Chat Endpoint
+
+| Operation       | Method | Path                          | Success Code |
+|-----------------|--------|-------------------------------|--------------|
+| Send message    | POST   | /api/{user_id}/chat           | 200          |
+
+**Request Schema**:
+```json
+{
+  "message": "<string, required>",
+  "conversation_id": "<integer, optional>"
+}
+```
+
+**Response Schema**:
+```json
+{
+  "conversation_id": "<integer>",
+  "response": "<string>",
+  "tool_calls": [
+    {
+      "name": "<tool_name>",
+      "arguments": {},
+      "result": {}
+    }
+  ]
+}
+```
 
 ### Query Parameters
 
@@ -680,38 +973,65 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 
 ---
 
-## Success Criteria (Phase II Completion)
+## Success Criteria
 
-### Functional Requirements
-- [ ] **User Auth**: Better Auth integration works with JWT plugin for user registration, login, logout, and token refresh
-- [ ] **Task CRUD**: All basic task operations work correctly with new API pattern
-- [ ] **Data Isolation**: Users only see their own tasks and tags; path parameter validation prevents cross-user access
-- [ ] **Priorities**: Tasks can be assigned and filtered by priority
-- [ ] **Tags**: Users can create, edit, delete, and assign tags
-- [ ] **Search**: Full-text search returns relevant results
-- [ ] **Filter/Sort**: All filter and sort combinations work
-- [ ] **Due Dates**: Tasks display due date indicators correctly
-- [ ] **Notifications**: Browser notifications trigger for due tasks (P3)
-- [ ] **Recurring Tasks**: RRULE parsing and next occurrence calculation (P3)
-- [ ] **API Migration**: All user-specific endpoints migrated to `/api/{user_id}/{resources}` pattern with proper validation
+### Phase II Completion (COMPLETED)
 
-### Technical Requirements
-- [ ] **AI-Generated Code**: All code generated from specs with exceptions documented
-- [ ] **Backend Tests**: pytest coverage >= 80% on core logic (verified in nightly pipeline)
-- [ ] **Frontend Tests**: Component test coverage >= 70% (verified in nightly pipeline)
-- [ ] **CI Pipeline**: All PR checks pass (lint, test, build) on every PR
-- [ ] **Docker**: Both services run via `docker-compose up`
-- [ ] **API Docs**: OpenAPI documentation accurate and complete
-- [ ] **JWT Security**: Better Auth JWT validation works correctly with shared secret
-- [ ] **Path Validation**: All endpoints with user_id in path validate against JWT user_id
-- [ ] **API Client**: API client implemented at `@/lib/api-client` with Better Auth integration
-- [ ] **Multi-User Isolation**: Tests verify that users can't access other users' resources
-- [ ] **Performance**: Lighthouse score >= 90 (verified in nightly pipeline)
+#### Functional Requirements
+- [x] **User Auth**: Better Auth integration works with JWT plugin for user registration, login, logout, and token refresh
+- [x] **Task CRUD**: All basic task operations work correctly with new API pattern
+- [x] **Data Isolation**: Users only see their own tasks and tags; path parameter validation prevents cross-user access
+- [x] **Priorities**: Tasks can be assigned and filtered by priority
+- [x] **Tags**: Users can create, edit, delete, and assign tags
+- [x] **Search**: Full-text search returns relevant results
+- [x] **Filter/Sort**: All filter and sort combinations work
+- [x] **Due Dates**: Tasks display due date indicators correctly
+- [x] **Notifications**: Browser notifications trigger for due tasks (P3)
+- [x] **Recurring Tasks**: RRULE parsing and next occurrence calculation (P3)
+- [x] **API Migration**: All user-specific endpoints migrated to `/api/{user_id}/{resources}` pattern with proper validation
+
+#### Technical Requirements
+- [x] **AI-Generated Code**: All code generated from specs with exceptions documented
+- [x] **Backend Tests**: pytest coverage >= 80% on core logic (verified in nightly pipeline)
+- [x] **Frontend Tests**: Component test coverage >= 70% (verified in nightly pipeline)
+- [x] **CI Pipeline**: All PR checks pass (lint, test, build) on every PR
+- [x] **Docker**: Both services run via `docker-compose up`
+- [x] **API Docs**: OpenAPI documentation accurate and complete
+- [x] **JWT Security**: Better Auth JWT validation works correctly with shared secret
+- [x] **Path Validation**: All endpoints with user_id in path validate against JWT user_id
+- [x] **API Client**: API client implemented at `@/lib/api-client` with Better Auth integration
+- [x] **Multi-User Isolation**: Tests verify that users can't access other users' resources
+- [x] **Performance**: Lighthouse score >= 90 (verified in nightly pipeline)
+
+### Phase III Completion (ACTIVE)
+
+#### Functional Requirements
+- [ ] **Chat Interface**: OpenAI ChatKit-based UI allows sending messages and receiving AI responses
+- [ ] **Conversation Persistence**: Conversations and messages are stored in database
+- [ ] **MCP Tools**: All 5 MCP tools (add_task, list_tasks, complete_task, delete_task, update_task) work correctly
+- [ ] **Natural Language**: AI understands natural language commands for task management
+- [ ] **Tool Invocation**: Agent correctly invokes appropriate MCP tools based on user intent
+- [ ] **Conversation Resume**: Users can continue previous conversations
+- [ ] **Stateless Server**: Server holds no in-memory state; all state in database
+- [ ] **Better Auth Integration**: User authentication works with Phase III frontend
+
+#### Technical Requirements
+- [ ] **Phase Separation**: Zero imports from Phase II codebase
+- [ ] **MCP SDK**: Official MCP SDK used correctly
+- [ ] **OpenAI Agents SDK**: Agent configured with proper system prompt and tools
+- [ ] **Separate Tables**: Phase III uses `tasks_phaseiii`, `conversations`, `messages` tables
+- [ ] **Backend Tests**: pytest coverage >= 80% on MCP tools and chat service
+- [ ] **Frontend Tests**: Component tests for chat interface
+- [ ] **UV Package Manager**: Backend uses UV for dependency management
+- [ ] **Bun Package Manager**: Frontend uses Bun for dependency management
+- [ ] **OpenAI ChatKit**: Frontend built with ChatKit starter template
+- [ ] **API Docs**: Chat endpoint documented in OpenAPI
 
 ### Documentation Requirements
-- [ ] Specs exist for all features in `/specs/NNN-feature-name/spec.md`
-- [ ] Implementation plans exist in `/specs/NNN-feature-name/plan.md`
-- [ ] Task breakdowns exist in `/specs/NNN-feature-name/tasks.md`
+
+- [ ] Specs exist for all features in `/specs/sphaseIII/NNN-feature-name/spec.md`
+- [ ] Implementation plans exist in `/specs/sphaseIII/NNN-feature-name/plan.md`
+- [ ] Task breakdowns exist in `/specs/sphaseIII/NNN-feature-name/tasks.md`
 - [ ] README.md includes setup, development, and deployment instructions
 - [ ] DEVIATIONS.md documents any manual code (if any)
 
@@ -725,6 +1045,8 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **Version Control**: All changes via pull requests to main
 
 ### Technology Constraints
+
+**Phase II**:
 - **Frontend**: Next.js 16 App Router, TypeScript, bun only
 - **Backend**: Python 3.11+, FastAPI, uv only
 - **Database**: PostgreSQL (Neon Serverless) only
@@ -732,6 +1054,18 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **Authentication**: Better Auth with JWT plugin for frontend authentication
 - **API Endpoint Format**: All user-specific endpoints MUST follow the `/api/{user_id}/{resources}` pattern
 - **API Client Location**: MUST be implemented at `@/lib/api-client` with Better Auth integration
+
+**Phase III** (MANDATORY per hackathon requirements):
+- **Frontend**: OpenAI ChatKit (https://platform.openai.com/docs/guides/chatkit)
+- **Frontend Template**: Managed ChatKit Starter (https://github.com/openai/openai-chatkit-starter-app/tree/main/managed-chatkit)
+- **Backend**: Python FastAPI
+- **AI Framework**: OpenAI Agents SDK (https://github.com/openai/openai-agents-python)
+- **MCP Server**: Official MCP SDK (https://github.com/modelcontextprotocol/python-sdk)
+- **ORM**: SQLModel
+- **Database**: Neon Serverless PostgreSQL (same instance, different tables)
+- **Authentication**: Better Auth
+- **Backend Package Manager**: UV (`uv add <package>`)
+- **Frontend Package Manager**: Bun (`bun add <package>`)
 
 ### Security Constraints
 - **No Secrets in Code**: All secrets via environment variables
@@ -745,18 +1079,20 @@ The following security features are explicitly OUT OF SCOPE for Phase II and tar
 - **API Response Time**: p95 < 200ms for CRUD operations
 - **Frontend TTI**: Time to Interactive < 3 seconds
 - **Database Queries**: No N+1 queries (use eager loading)
+- **Chat Response Time**: p95 < 5s for AI responses (includes OpenAI API latency)
 
-### Migration Constraints
-- **Endpoint Migration**: All existing `/api/v1/{resources}` endpoints MUST be migrated to `/api/{user_id}/{resources}` pattern
-- **API Client Creation**: API client at `@/lib/api-client` must be created before endpoint migration
-- **Validation Requirements**: All migrated endpoints MUST implement path parameter validation
+### Phase Separation Constraints
+- **No Imports Between Phases**: Phase III MUST NOT import from phaseII or phaseI
+- **Independent Implementations**: Each phase reimplements required functionality
+- **Separate Database Tables**: Phase III uses `tasks_phaseiii` table, not Phase II `tasks` table
+- **Independent Migrations**: Phase III has its own Alembic migration history
 
 ---
 
 ## Governance & Enforcement
 
 ### Authority
-This constitution is the **single source of truth** for Phase II development. All decisions, specifications, implementations, and reviews MUST align with these principles.
+This constitution is the **single source of truth** for all phases of development. All decisions, specifications, implementations, and reviews MUST align with these principles.
 
 ### Amendment Process
 Amendments require:
@@ -787,7 +1123,7 @@ Any deviation from this constitution MUST be:
 > "The engineer is no longer a syntax writer but a system architect. The specification is the blueprint; AI is the builder."
 
 **Evolution Mindset**:
-> "Phase II builds on Phase I's foundation. We add persistence, authentication, and web interfaces while maintaining the discipline of specification-first development."
+> "Each phase builds on lessons learned. We evolve from CLI to web to AI while maintaining the discipline of specification-first development."
 
 **Security-First Thinking**:
 > "Security is not an afterthought. Every feature considers authentication, authorization, and data isolation from the specification phase."
@@ -795,9 +1131,14 @@ Any deviation from this constitution MUST be:
 **Quality Over Speed**:
 > "Take time to write precise specifications. The better your spec, the better the AI's implementation. Iteration on specs is encouraged; manual coding is forbidden."
 
+**Phase Independence**:
+> "Each phase stands alone. Complete separation ensures clean architecture and demonstrates multiple approaches to the same problem domain."
+
 ---
 
 ## Requirement-to-Rule Mapping
+
+### Phase II Requirements
 
 | Req ID | Requirement Description                            | Constitutional Rule(s)                     | Section      |
 |--------|---------------------------------------------------|--------------------------------------------|--------------|
@@ -825,42 +1166,68 @@ Any deviation from this constitution MUST be:
 | SEC-003| CORS policy                                        | Backend Architecture Standards             | V            |
 | SEC-004| Path parameter user ID validation                  | JWT Security - Path Parameter Matching     | IV           |
 
+### Phase III Requirements
+
+| Req ID      | Requirement Description                       | Constitutional Rule(s)                     | Section      |
+|-------------|----------------------------------------------|--------------------------------------------|--------------|
+| FR-P3-001   | Conversational chat interface                 | OpenAI ChatKit Integration                 | VI           |
+| FR-P3-002   | Natural language task management              | Agent Behavior Specification               | XII          |
+| FR-P3-003   | MCP tools for task operations                 | MCP Server Architecture                    | XI           |
+| FR-P3-004   | Stateless chat endpoint                       | Conversational AI Standards                | XIII         |
+| FR-P3-005   | Conversation persistence                      | Data Model - Conversation, Message         | Data Model   |
+| FR-P3-006   | Tool invocation by AI agent                   | OpenAI Agents SDK Integration              | XII          |
+| FR-P3-007   | Chat history context                          | Conversation Flow specification            | XIII         |
+| FR-P3-008   | Error handling in conversations               | Agent Behavior - Error Handling            | XII          |
+| QR-P3-001   | Chat response time < 5s p95                   | Performance Constraints                    | Constraints  |
+| SR-P3-001   | Phase III directory structure                 | Repository Structure                       | II           |
+| SR-P3-002   | Complete phase separation                     | Phase Separation Constraints               | Constraints  |
+| IR-P3-001   | Chat API endpoint                             | API Design Standards - Phase III           | API Design   |
+| IR-P3-002   | MCP tool interface                            | MCP Tools Specification                    | XI           |
+| TC-P3-001   | OpenAI ChatKit frontend                       | Technology Constraints - Phase III         | Constraints  |
+| TC-P3-002   | OpenAI Agents SDK                             | Technology Constraints - Phase III         | Constraints  |
+| TC-P3-003   | Official MCP SDK                              | Technology Constraints - Phase III         | Constraints  |
+| TC-P3-004   | UV package manager for backend                | Technology Constraints - Phase III         | Constraints  |
+| TC-P3-005   | Bun package manager for frontend              | Technology Constraints - Phase III         | Constraints  |
+
 ---
 
 ## Constitutional Self-Checks
 
 ### 1. Alignment Check
 **Status**: PASS
-- All 23+ rules map to documented requirements
+- All 40+ rules map to documented requirements
 - No orphan rules without requirement backing
-- Requirement-to-Rule mapping table complete
-- New SEC-004 requirement added for path parameter validation
+- Requirement-to-Rule mapping table complete for both Phase II and Phase III
+- New Phase III requirements (FR-P3-001 through FR-P3-008) added
 
 ### 2. Coverage Check
 **Status**: PASS
-- Functional Requirements: Covered (FR-001 through FR-008)
-- Quality Requirements: Covered (QR-001 through QR-003)
-- Structural Requirements: Covered (SR-001 through SR-003)
-- Interface Requirements: Covered (IR-001, IR-002)
+- Functional Requirements: Covered (FR-001 through FR-008, FR-P3-001 through FR-P3-008)
+- Quality Requirements: Covered (QR-001 through QR-003, QR-P3-001)
+- Structural Requirements: Covered (SR-001 through SR-003, SR-P3-001, SR-P3-002)
+- Interface Requirements: Covered (IR-001, IR-002, IR-P3-001, IR-P3-002)
 - Process Requirements: Covered (PR-001 through PR-003)
 - Security Requirements: Covered (SEC-001 through SEC-004)
+- Technology Constraints: Covered (TC-P3-001 through TC-P3-005)
 
 ### 3. Conflict Check
 **Status**: PASS
 - No contradictory rules identified
-- Token storage rules consistent (memory for access, HttpOnly for refresh)
-- Package manager rules consistent (bun for frontend, uv for backend)
-- CI/CD rules updated consistently (PR checks vs nightly pipeline)
+- Phase II and Phase III rules are complementary, not conflicting
+- Phase separation rules prevent cross-phase conflicts
+- Package manager rules consistent (bun for frontend, uv for backend in both phases)
 
 ### 4. Completeness Check
 **Status**: PASS
-- All Phase II features have governance rules
-- Authentication flow fully specified with clear frontend/backend responsibilities
-- Data model covers all entities
+- All Phase II features have governance rules (COMPLETED)
+- All Phase III features have governance rules (ACTIVE)
+- MCP Server Architecture fully specified
+- OpenAI Agents SDK Integration fully specified
+- Conversational AI Standards fully specified
+- Data models cover all entities for both phases
 - Validation rules comprehensive
-- API design standards complete
-- Phase II scope boundaries for security features clearly documented
+- API design standards complete for both phases
 
 ---
 
-**Version**: 2.3.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-10
+**Version**: 2.4.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-16

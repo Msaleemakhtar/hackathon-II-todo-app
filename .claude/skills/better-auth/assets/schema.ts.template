@@ -1,0 +1,196 @@
+// lib/db/schema.ts
+// Drizzle Schema for Better Auth
+// Based on Better Auth Drizzle adapter documentation
+
+import { pgTable, text, timestamp, boolean, uuid } from 'drizzle-orm/pg-core';
+
+// ============================================
+// USER TABLE
+// ============================================
+
+/**
+ * User Table
+ * Stores user profiles and account information
+ *
+ * Official Better Auth schema:
+ * https://www.better-auth.com/docs/adapters/drizzle
+ */
+export const user = pgTable('user', {
+  // Primary key - auto-generated UUID
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Profile information
+  name: text('name'), // Optional display name
+  email: text('email').notNull().unique(), // Unique email address
+  emailVerified: boolean('emailVerified').notNull().default(false),
+  image: text('image'), // Optional profile image URL
+
+  // Timestamps
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+// ============================================
+// ACCOUNT TABLE
+// ============================================
+
+/**
+ * Account Table
+ * Tracks authentication providers and credentials
+ * Supports both OAuth providers and email/password auth
+ */
+export const account = pgTable('account', {
+  // Primary key
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // User reference
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+
+  // Provider information
+  accountId: text('accountId').notNull(), // Provider-specific account ID
+  providerId: text('providerId').notNull(), // e.g., "google", "github", "email"
+
+  // OAuth tokens (for OAuth providers)
+  accessToken: text('accessToken'),
+  refreshToken: text('refreshToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt'),
+  refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt'),
+  scope: text('scope'),
+  idToken: text('idToken'),
+
+  // Password (for email/password auth)
+  password: text('password'), // Hashed with scrypt
+
+  // Timestamps
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+// ============================================
+// SESSION TABLE
+// ============================================
+
+/**
+ * Session Table
+ * Manages active user sessions
+ * Sessions are stored server-side for security
+ */
+export const session = pgTable('session', {
+  // Primary key
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // User reference
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+
+  // Session token (unique)
+  token: text('token').notNull().unique(),
+
+  // Expiration
+  expiresAt: timestamp('expiresAt').notNull(),
+
+  // Optional tracking information
+  ipAddress: text('ipAddress'),
+  userAgent: text('userAgent'),
+
+  // Timestamps
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+// ============================================
+// VERIFICATION TABLE
+// ============================================
+
+/**
+ * Verification Table
+ * Handles email verification and password reset requests
+ * Stores temporary verification tokens
+ */
+export const verification = pgTable('verification', {
+  // Primary key
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Verification details
+  identifier: text('identifier').notNull(), // Email or user identifier
+  value: text('value').notNull(), // Verification token/code
+  expiresAt: timestamp('expiresAt').notNull(),
+
+  // Timestamps
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+});
+
+// ============================================
+// INDEXES
+// ============================================
+
+/**
+ * Better Auth automatically creates these indexes:
+ *
+ * User table:
+ * - Unique index on email
+ * - Index on createdAt for sorting
+ *
+ * Session table:
+ * - Unique index on token
+ * - Index on userId for user session lookup
+ * - Index on expiresAt for cleanup queries
+ *
+ * Account table:
+ * - Index on userId for user account lookup
+ * - Composite index on (providerId, accountId)
+ *
+ * Verification table:
+ * - Index on identifier for lookup
+ * - Index on expiresAt for cleanup
+ */
+
+// ============================================
+// TYPE EXPORTS
+// ============================================
+
+/**
+ * Type-safe database types
+ * Use these types throughout your application
+ */
+export type User = typeof user.$inferSelect;
+export type NewUser = typeof user.$inferInsert;
+
+export type Account = typeof account.$inferSelect;
+export type NewAccount = typeof account.$inferInsert;
+
+export type Session = typeof session.$inferSelect;
+export type NewSession = typeof session.$inferInsert;
+
+export type Verification = typeof verification.$inferSelect;
+export type NewVerification = typeof verification.$inferInsert;
+
+// ============================================
+// USAGE NOTES
+// ============================================
+
+/**
+ * 1. Generate migrations:
+ *    bun x @better-auth/cli generate
+ *    drizzle-kit generate
+ *
+ * 2. Apply migrations:
+ *    drizzle-kit migrate
+ *
+ * 3. Customize tables (optional):
+ *    - Add additional user fields with `additionalFields` in Better Auth config
+ *    - Rename tables with `modelName` config
+ *    - Map field names with `fields` config
+ *
+ * 4. Production considerations:
+ *    - Enable connection pooling
+ *    - Set up regular cleanup of expired sessions/verifications
+ *    - Monitor database performance and add indexes as needed
+ *
+ * Official documentation:
+ * https://www.better-auth.com/docs/adapters/drizzle
+ */

@@ -1,0 +1,225 @@
+# core/security.py
+# FastAPI Security Module with Better Auth JWT Validation
+# Based on JWT standard practices and Better Auth token format
+
+import os
+import time
+from typing import Dict, Optional
+from jose import jwt, JWTError
+from fastapi import HTTPException, Request, status
+
+# ============================================
+# CONFIGURATION
+# ============================================
+
+# Must match frontend BETTER_AUTH_SECRET exactly
+SECRET_KEY = os.getenv("BETTER_AUTH_SECRET")
+ALGORITHM = "HS256"
+
+# Token lifetime validation
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+MIN_TOKEN_LIFETIME = 15 * 60  # 15 minutes in seconds
+MAX_TOKEN_LIFETIME = 30 * 60  # 30 minutes in seconds
+
+# Validate secret at startup
+if not SECRET_KEY:
+    raise ValueError("BETTER_AUTH_SECRET environment variable is required")
+
+if len(SECRET_KEY) < 32:
+    raise ValueError("BETTER_AUTH_SECRET must be at least 32 characters")
+
+
+# ============================================
+# JWT TOKEN VERIFICATION
+# ============================================
+
+def verify_better_auth_token(token: str) -> Dict[str, any]:
+    """
+    Verify and decode Better Auth JWT token.
+
+    Args:
+        token: JWT token from Authorization header
+
+    Returns:
+        Decoded token payload with user claims
+
+    Raises:
+        HTTPException: If token is invalid or expired
+
+    Example payload:
+        {
+            "sub": "user_id",
+            "email": "user@example.com",
+            "name": "User Name",
+            "exp": 1234567890,
+            "iat": 1234567890,
+            "type": "access"
+        }
+    """
+    try:
+        # Decode JWT with Better Auth secret
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        # Extract and validate required claims
+        user_id: str = payload.get("sub")
+        email: str = payload.get("email")
+        exp: Optional[int] = payload.get("exp")
+        iat: Optional[int] = payload.get("iat")
+
+        # Validate required claims exist
+        if not user_id or not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token: missing user claims"
+            )
+
+        # Validate expiration
+        current_time = time.time()
+        if exp and exp < current_time:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired"
+            )
+
+        # Validate token lifetime (prevents suspicious tokens)
+        if iat and exp:
+            lifetime = exp - iat
+
+            if lifetime < MIN_TOKEN_LIFETIME or lifetime > MAX_TOKEN_LIFETIME:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Invalid token lifetime: {lifetime}s (expected 15-30 minutes)"
+                )
+
+        return payload
+
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}"
+        )
+
+
+# ============================================
+# PATH VALIDATION
+# ============================================
+
+async def validate_path_user_id(request: Request, path_user_id: str) -> Dict[str, any]:
+    """
+    Validate that path user_id matches JWT token user_id.
+
+    This implements Layer 2 of the three-layer security model:
+    1. JWT Authentication (valid token)
+    2. Path Validation (user_id in path matches JWT) ← This function
+    3. Query Filtering (database queries scoped to user)
+
+    Args:
+        request: FastAPI request object
+        path_user_id: User ID from URL path parameter
+
+    Returns:
+        Decoded JWT payload
+
+    Raises:
+        HTTPException: 401 if auth fails, 403 if user_id mismatch
+
+    Example usage:
+        @router.get("/{user_id}/tasks")
+        async def get_tasks(user_id: str, request: Request):
+            payload = await validate_path_user_id(request, user_id)
+            jwt_user_id = payload["sub"]
+            # Query database with jwt_user_id, not path_user_id
+    """
+    # Extract Authorization header
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header"
+        )
+
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header format (expected: Bearer <token>)"
+        )
+
+    # Extract token
+    token = auth_header.replace("Bearer ", "")
+
+    # Verify JWT (Layer 1: Authentication)
+    payload = verify_better_auth_token(token)
+
+    # Validate path user_id matches JWT user_id (Layer 2: Authorization)
+    jwt_user_id = payload.get("sub")
+
+    if jwt_user_id != path_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID in path does not match authenticated user"
+        )
+
+    return payload
+
+
+# ============================================
+# FASTAPI DEPENDENCIES
+# ============================================
+
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Dict[str, any]:
+    """
+    FastAPI dependency to get current authenticated user.
+
+    Usage:
+        @router.get("/me/profile")
+        async def get_profile(user = Depends(get_current_user)):
+            user_id = user["sub"]
+            email = user["email"]
+            return {"id": user_id, "email": email}
+    """
+    return verify_better_auth_token(credentials.credentials)
+
+
+# ============================================
+# EXAMPLE ROUTER USAGE
+# ============================================
+
+"""
+Example protected route implementation:
+
+from fastapi import APIRouter, Request
+from core.security import validate_path_user_id
+
+router = APIRouter(prefix="/api/v1")
+
+@router.get("/{user_id}/tasks")
+async def list_tasks(
+    user_id: str,
+    request: Request,
+):
+    # Three-layer security:
+    # 1. Valid JWT token (checked in validate_path_user_id)
+    # 2. Path user_id matches JWT user_id (checked in validate_path_user_id)
+    # 3. Database query scoped to JWT user_id (done below)
+
+    payload = await validate_path_user_id(request, user_id)
+    authenticated_user_id = payload["sub"]
+
+    # IMPORTANT: Use JWT user_id for queries, NOT path parameter
+    tasks = await get_user_tasks(authenticated_user_id)
+
+    return {"tasks": tasks}
+"""

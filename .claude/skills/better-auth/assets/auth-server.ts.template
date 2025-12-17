@@ -1,0 +1,129 @@
+// lib/auth-server.ts
+// Better Auth Server Configuration Template
+// Based on official Better Auth documentation
+
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { db } from "./db"; // Your Drizzle database instance
+
+/**
+ * Better Auth server instance
+ * Handles user authentication and session management
+ *
+ * Official docs: https://www.better-auth.com/docs
+ */
+export const auth = betterAuth({
+  // ============================================
+  // DATABASE CONFIGURATION
+  // ============================================
+  database: drizzleAdapter(db, {
+    provider: "pg", // PostgreSQL
+    // For other databases: "mysql" | "sqlite"
+  }),
+
+  // ============================================
+  // EMAIL & PASSWORD AUTHENTICATION
+  // ============================================
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+
+    // Auto sign in after registration
+    autoSignIn: true,
+
+    // Email verification (optional)
+    // requireEmailVerification: true,
+    // sendVerificationEmail: async ({ user, url }) => {
+    //   await sendEmail({
+    //     to: user.email,
+    //     subject: "Verify your email",
+    //     html: `Click <a href="${url}">here</a> to verify your email`,
+    //   });
+    // },
+  },
+
+  // ============================================
+  // SESSION CONFIGURATION
+  // ============================================
+  session: {
+    // Session expires after 7 days of inactivity
+    expiresIn: 60 * 60 * 24 * 7, // 7 days in seconds
+
+    // Update session timestamp every 24 hours for active users
+    updateAge: 60 * 60 * 24, // 24 hours in seconds
+
+    // Cookie cache reduces database queries
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 60 * 24, // 24 hours
+    },
+  },
+
+  // ============================================
+  // SECURITY SETTINGS
+  // ============================================
+
+  // Secret for signing cookies and JWT tokens
+  // MUST be at least 32 characters
+  // Generate with: openssl rand -base64 32
+  secret: process.env.BETTER_AUTH_SECRET!,
+
+  // Base URL for your application
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+
+  // Trusted origins for CORS
+  trustedOrigins: [
+    "http://localhost:3000", // Development
+    process.env.BETTER_AUTH_URL!, // Production
+  ],
+
+  // ============================================
+  // RATE LIMITING
+  // ============================================
+  rateLimit: {
+    enabled: true,
+    window: 60, // 1 minute window
+    max: 10, // 10 requests per minute
+
+    // Optional: Use Redis for distributed rate limiting
+    // storage: redisStorage,
+  },
+
+  // ============================================
+  // ADVANCED SECURITY
+  // ============================================
+  advanced: {
+    // Cookie prefix for all Better Auth cookies
+    cookiePrefix: "better-auth",
+
+    // Use secure cookies in production (HTTPS only)
+    useSecureCookies: process.env.NODE_ENV === "production",
+
+    // SameSite attribute for CSRF protection
+    // "lax" allows navigation, "strict" for maximum security
+    sameSite: "lax",
+  },
+
+  // ============================================
+  // LOGGING (Optional)
+  // ============================================
+  // logger: {
+  //   disabled: false,
+  //   verboseError: process.env.NODE_ENV === "development",
+  // },
+
+  // ============================================
+  // EXPERIMENTAL FEATURES (Optional)
+  // ============================================
+  // experimental: {
+  //   // Enable database joins for better performance
+  //   joins: true,
+  // },
+});
+
+/**
+ * Type-safe auth session
+ * Use this type for session data throughout your app
+ */
+export type Session = typeof auth.$Infer.Session;
