@@ -1,0 +1,100 @@
+{
+  "name": "delete_task",
+  "description": "Permanently delete a task (non-idempotent operation)",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID from authenticated JWT token (not from user input)"
+      },
+      "task_id": {
+        "type": "integer",
+        "description": "ID of the task to delete"
+      }
+    },
+    "required": ["user_id", "task_id"],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "integer",
+        "description": "ID of the deleted task"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["deleted"],
+        "description": "Operation status"
+      },
+      "title": {
+        "type": "string",
+        "description": "The task title (echoed back)"
+      }
+    },
+    "required": ["task_id", "status", "title"]
+  },
+  "errorSchema": {
+    "type": "object",
+    "properties": {
+      "detail": {
+        "type": "string",
+        "description": "Human-readable error message"
+      },
+      "code": {
+        "type": "string",
+        "enum": [
+          "TASK_NOT_FOUND",
+          "INVALID_USER_ID",
+          "INVALID_PARAMETER",
+          "DATABASE_ERROR"
+        ],
+        "description": "Machine-readable error code"
+      },
+      "field": {
+        "type": "string",
+        "description": "Field name that caused the error (optional)"
+      }
+    },
+    "required": ["detail", "code"]
+  },
+  "examples": [
+    {
+      "name": "Delete a task",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42
+      },
+      "output": {
+        "task_id": 42,
+        "status": "deleted",
+        "title": "Buy groceries"
+      }
+    },
+    {
+      "name": "Error: Task not found (already deleted)",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42
+      },
+      "error": {
+        "detail": "Task not found",
+        "code": "TASK_NOT_FOUND",
+        "note": "Non-idempotent: deleting same task twice returns error"
+      }
+    },
+    {
+      "name": "Error: Cross-user access attempt",
+      "input": {
+        "user_id": "ba_user_xyz789",
+        "task_id": 43
+      },
+      "error": {
+        "detail": "Task not found",
+        "code": "TASK_NOT_FOUND",
+        "note": "Returns TASK_NOT_FOUND instead of revealing existence (security)"
+      }
+    }
+  ]
+}

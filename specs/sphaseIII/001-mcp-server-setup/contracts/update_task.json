@@ -1,0 +1,142 @@
+{
+  "name": "update_task",
+  "description": "Update task title and/or description (at least one field required)",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string",
+        "description": "User ID from authenticated JWT token (not from user input)"
+      },
+      "task_id": {
+        "type": "integer",
+        "description": "ID of the task to update"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "description": "New task title (optional, 1-200 characters if provided)"
+      },
+      "description": {
+        "type": "string",
+        "maxLength": 1000,
+        "description": "New task description (optional, max 1000 characters if provided)"
+      }
+    },
+    "required": ["user_id", "task_id"],
+    "additionalProperties": false,
+    "note": "At least one of 'title' or 'description' must be provided"
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "integer",
+        "description": "ID of the updated task"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["updated"],
+        "description": "Operation status"
+      },
+      "title": {
+        "type": "string",
+        "description": "The current task title after update"
+      }
+    },
+    "required": ["task_id", "status", "title"]
+  },
+  "errorSchema": {
+    "type": "object",
+    "properties": {
+      "detail": {
+        "type": "string",
+        "description": "Human-readable error message"
+      },
+      "code": {
+        "type": "string",
+        "enum": [
+          "TASK_NOT_FOUND",
+          "INVALID_TITLE",
+          "DESCRIPTION_TOO_LONG",
+          "INVALID_PARAMETER",
+          "INVALID_USER_ID",
+          "DATABASE_ERROR"
+        ],
+        "description": "Machine-readable error code"
+      },
+      "field": {
+        "type": "string",
+        "description": "Field name that caused the error (optional)"
+      }
+    },
+    "required": ["detail", "code"]
+  },
+  "examples": [
+    {
+      "name": "Update title only",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42,
+        "title": "Buy groceries and cook dinner"
+      },
+      "output": {
+        "task_id": 42,
+        "status": "updated",
+        "title": "Buy groceries and cook dinner"
+      }
+    },
+    {
+      "name": "Update description only",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42,
+        "description": "Milk, eggs, bread, and chicken"
+      },
+      "output": {
+        "task_id": 42,
+        "status": "updated",
+        "title": "Buy groceries"
+      }
+    },
+    {
+      "name": "Update both title and description",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42,
+        "title": "Weekly grocery shopping",
+        "description": "Full list: milk, eggs, bread, chicken, vegetables"
+      },
+      "output": {
+        "task_id": 42,
+        "status": "updated",
+        "title": "Weekly grocery shopping"
+      }
+    },
+    {
+      "name": "Error: No fields provided",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42
+      },
+      "error": {
+        "detail": "At least one field (title or description) must be provided",
+        "code": "INVALID_PARAMETER"
+      }
+    },
+    {
+      "name": "Error: Title too long",
+      "input": {
+        "user_id": "ba_user_abc123",
+        "task_id": 42,
+        "title": "A".repeat(201)
+      },
+      "error": {
+        "detail": "Title must be 1-200 characters",
+        "code": "INVALID_TITLE",
+        "field": "title"
+      }
+    }
+  ]
+}
