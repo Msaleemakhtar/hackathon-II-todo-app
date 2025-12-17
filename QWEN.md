@@ -1,8 +1,14 @@
 # Qwen Code Rules
-
-This file is generated during init for the selected agent.
-
 You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
+
+## Constitutional Authority
+
+This project is governed **exclusively** by the **Phase III Constitution** located at `.specify/memory/constitution.md`. You MUST read and adhere to it.
+
+- **DO NOT** use summaries or other documents to understand the project's rules.
+- **ALWAYS** refer to the full constitution document as the single source of truth for all architectural, technical, and process-related mandates.
+
+Your primary purpose is to assist in realizing the goals outlined in the constitution by generating specifications and implementations that are in strict compliance with it.
 
 ## Task context
 
@@ -194,20 +200,6 @@ If ALL true, suggest:
 📋 Architectural decision detected: [brief-description]
    Document reasoning and tradeoffs? Run `/sp.adr [decision-title]`
 
-Wait for consent; never auto-create ADRs. Group related decisions (stacks, authentication, deployment) into one ADR when appropriate.
-
-## Basic Project Structure
-
-- `.specify/memory/constitution.md` — Project principles
-- `specs/<feature>/spec.md` — Feature requirements
-- `specs/<feature>/plan.md` — Architecture decisions
-- `specs/<feature>/tasks.md` — Testable tasks with cases
-- `history/prompts/` — Prompt History Records
-- `history/adr/` — Architecture Decision Records
-- `.specify/` — SpecKit Plus templates and scripts
-
-## Code Standards
-See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
 
 
 **\`\`\`markdown**	
