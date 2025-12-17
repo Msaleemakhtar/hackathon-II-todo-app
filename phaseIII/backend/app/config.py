@@ -1,37 +1,43 @@
-"""Application configuration settings."""
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Application configuration loaded from environment variables."""
 
-    # Database configuration
-    DATABASE_URL: str
-    DB_POOL_MIN: int = 5
-    DB_POOL_MAX: int = 10
+    # Database
+    database_url: str
+    test_database_url: str | None = None
 
-    # Better Auth configuration
-    BETTER_AUTH_SECRET: str
+    # Database Connection Pool Settings
+    db_pool_min: int = 5
+    db_pool_max: int = 10
 
-    # JWT cache configuration
-    JWT_CACHE_SIZE: int = 1000
-    JWT_CACHE_TTL: int = 300  # seconds
+    # Gemini AI
+    gemini_api_key: str
 
-    # Application settings
-    DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"
+    # Better Auth
+    better_auth_secret: str
+    better_auth_url: str = "http://localhost:3000"
 
-    # Server configuration
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    # CORS
+    cors_origins: list[str] = ["http://localhost:3000"]
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore",  # Ignore extra environment variables
-    )
+    # JWT Cache Configuration
+    jwt_cache_size: int = 1000
+    jwt_cache_ttl: int = 300  # seconds
+
+    # Application Settings
+    debug: bool = False
+    log_level: str = "INFO"
+    environment: str = "development"
+
+    # Server Configuration
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
 
 
-# Global settings instance
 settings = Settings()

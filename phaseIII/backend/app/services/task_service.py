@@ -1,4 +1,6 @@
-"""Task service layer for business logic."""
+"""Task service with CRUD operations for TaskPhaseIII."""
+
+import logging
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,173 +8,121 @@ from sqlmodel import select
 
 from app.models.task import TaskPhaseIII
 
+logger = logging.getLogger(__name__)
+
 
 class TaskService:
-    """Service for task CRUD operations."""
+    """Service layer for task management operations."""
 
-    def __init__(self, session: AsyncSession):
-        """Initialize task service with database session."""
-        self.session = session
-
+    @staticmethod
     async def create_task(
-        self, user_id: str, title: str, description: str | None = None
+        db: AsyncSession,
+        user_id: str,
+        title: str,
+        description: str | None = None,
     ) -> TaskPhaseIII:
-        """
-        Create a new task.
-
-        Args:
-            user_id: User ID from JWT token
-            title: Task title (1-200 characters)
-            description: Optional task description (≤1000 characters)
-
-        Returns:
-            Created task object
-        """
+        """Create a new task."""
         task = TaskPhaseIII(
             user_id=user_id,
             title=title,
             description=description,
             completed=False,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
         )
-
-        self.session.add(task)
-        await self.session.commit()
-        await self.session.refresh(task)
-
+        db.add(task)
+        await db.commit()
+        await db.refresh(task)
+        logger.info(f"Task created: task_id={task.id}, user_id={user_id}")
         return task
 
+    @staticmethod
+    async def get_task(
+        db: AsyncSession,
+        task_id: int,
+        user_id: str,
+    ) -> TaskPhaseIII | None:
+        """Get a task by ID (with user ownership validation)."""
+        task = await db.get(TaskPhaseIII, task_id)
+        if task and task.user_id == user_id:
+            return task
+        return None
+
+    @staticmethod
     async def list_tasks(
-        self, user_id: str, status: str = "all"
+        db: AsyncSession,
+        user_id: str,
+        status: str = "all",
     ) -> list[TaskPhaseIII]:
-        """
-        List tasks for a user with optional status filter.
-
-        Args:
-            user_id: User ID from JWT token
-            status: Filter by status ("all", "pending", "completed")
-
-        Returns:
-            List of tasks
-        """
+        """List tasks with optional status filter."""
         query = select(TaskPhaseIII).where(TaskPhaseIII.user_id == user_id)
 
-        # Apply status filter
         if status == "pending":
-            query = query.where(~TaskPhaseIII.completed)
+            query = query.where(TaskPhaseIII.completed.is_(False))
         elif status == "completed":
-            query = query.where(TaskPhaseIII.completed)
+            query = query.where(TaskPhaseIII.completed.is_(True))
 
-        # Order by creation date (newest first)
         query = query.order_by(TaskPhaseIII.created_at.desc())
 
-        result = await self.session.exec(query)
-        tasks = result.all()
+        result = await db.execute(query)
+        return list(result.scalars().all())
 
-        return list(tasks)
+    @staticmethod
+    async def update_task(
+        db: AsyncSession,
+        task_id: int,
+        user_id: str,
+        title: str | None = None,
+        description: str | None = None,
+    ) -> TaskPhaseIII | None:
+        """Update a task."""
+        task = await TaskService.get_task(db, task_id, user_id)
+        if not task:
+            return None
 
-    async def get_task(self, user_id: str, task_id: int) -> TaskPhaseIII | None:
-        """
-        Get a single task by ID (with user ownership check).
+        if title is not None:
+            task.title = title
+        if description is not None:
+            task.description = description
 
-        Args:
-            user_id: User ID from JWT token
-            task_id: Task ID
-
-        Returns:
-            Task object if found and owned by user, None otherwise
-        """
-        query = select(TaskPhaseIII).where(
-            TaskPhaseIII.id == task_id, TaskPhaseIII.user_id == user_id
-        )
-
-        result = await self.session.exec(query)
-        task = result.first()
-
+        task.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(task)
+        logger.info(f"Task updated: task_id={task_id}, user_id={user_id}")
         return task
 
-    async def complete_task(self, user_id: str, task_id: int) -> TaskPhaseIII | None:
-        """
-        Mark a task as completed.
-
-        Args:
-            user_id: User ID from JWT token
-            task_id: Task ID
-
-        Returns:
-            Updated task if found, None if not found
-        """
-        task = await self.get_task(user_id, task_id)
-
+    @staticmethod
+    async def complete_task(
+        db: AsyncSession,
+        task_id: int,
+        user_id: str,
+    ) -> TaskPhaseIII | None:
+        """Mark a task as completed."""
+        task = await TaskService.get_task(db, task_id, user_id)
         if not task:
             return None
 
         task.completed = True
         task.updated_at = datetime.utcnow()
-
-        self.session.add(task)
-        await self.session.commit()
-        await self.session.refresh(task)
-
+        await db.commit()
+        await db.refresh(task)
+        logger.info(f"Task completed: task_id={task_id}, user_id={user_id}")
         return task
 
-    async def delete_task(self, user_id: str, task_id: int) -> bool:
-        """
-        Delete a task.
-
-        Args:
-            user_id: User ID from JWT token
-            task_id: Task ID
-
-        Returns:
-            True if deleted, False if not found
-        """
-        task = await self.get_task(user_id, task_id)
-
+    @staticmethod
+    async def delete_task(
+        db: AsyncSession,
+        task_id: int,
+        user_id: str,
+    ) -> bool:
+        """Delete a task."""
+        task = await TaskService.get_task(db, task_id, user_id)
         if not task:
             return False
 
-        await self.session.delete(task)
-        await self.session.commit()
-
+        await db.delete(task)
+        await db.commit()
+        logger.info(f"Task deleted: task_id={task_id}, user_id={user_id}")
         return True
 
-    async def update_task(
-        self,
-        user_id: str,
-        task_id: int,
-        title: str | None = None,
-        description: str | None = None,
-    ) -> TaskPhaseIII | None:
-        """
-        Update task fields.
 
-        Args:
-            user_id: User ID from JWT token
-            task_id: Task ID
-            title: Optional new title
-            description: Optional new description
-
-        Returns:
-            Updated task if found, None if not found
-        """
-        task = await self.get_task(user_id, task_id)
-
-        if not task:
-            return None
-
-        # Update provided fields
-        if title is not None:
-            task.title = title
-
-        if description is not None:
-            task.description = description
-
-        task.updated_at = datetime.utcnow()
-
-        self.session.add(task)
-        await self.session.commit()
-        await self.session.refresh(task)
-
-        return task
+# Global service instance
+task_service = TaskService()

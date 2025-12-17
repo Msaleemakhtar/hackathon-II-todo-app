@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: phaseiii-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@localhost:5432/todoapp_phaseiii}
+
+      # Better Auth
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+
+      # Gemini AI
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Application
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+
+      # Redis (optional - for future caching)
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+
+    depends_on:
+      - redis
+
+    volumes:
+      # Mount source code for development hot-reload
+      - ./backend/app:/app/app:ro
+      # Mount .env file
+      - ./backend/.env:/app/.env:ro
+
+    networks:
+      - phaseiii-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis Cache (optional - for rate limiting and caching)
+  redis:
+    image: redis:7-alpine
+    container_name: phaseiii-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - phaseiii-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - redis-data:/data
+
+networks:
+  phaseiii-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

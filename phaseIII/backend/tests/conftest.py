@@ -1,7 +1,8 @@
 """Pytest configuration and fixtures for Phase III backend tests."""
+
 import asyncio
 import os
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from dotenv import load_dotenv
@@ -9,18 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
-from app.database import get_session
-from app.models.task import TaskPhaseIII
-from app.models.conversation import Conversation
-from app.models.message import Message
-
 # Load environment variables
 load_dotenv()
 
 # Test database URL (use PostgreSQL test database from .env)
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://neondb_owner:npg_zTkq1ABHR8uC@ep-mute-tooth-adbf0l4h-pooler.c-2.us-east-1.aws.neon.tech/neondb"
+    "postgresql+asyncpg://neondb_owner:npg_zTkq1ABHR8uC@ep-mute-tooth-adbf0l4h-pooler.c-2.us-east-1.aws.neon.tech/neondb",
 )
 
 

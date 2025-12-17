@@ -1,36 +1,29 @@
-"""Database connection and session management."""
-from collections.abc import AsyncGenerator
-
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 from app.config import settings
 
-# Create async engine with connection pooling
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    pool_size=settings.DB_POOL_MIN,
-    max_overflow=settings.DB_POOL_MAX - settings.DB_POOL_MIN,
-    pool_pre_ping=True,  # Verify connections before using
+# Create async engine
+engine: AsyncEngine = create_async_engine(
+    settings.database_url,
+    echo=settings.environment == "development",
+    future=True,
+    pool_pre_ping=True,
 )
 
-# Create async session factory
+# Create async session maker
 async_session_maker = sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
-)  # type: ignore[call-overload]
+    autocommit=False,
+    autoflush=False,
+)
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Dependency function to get database session.
-
-    Yields:
-        AsyncSession: Database session for async operations
-    """
+async def get_session():
+    """Dependency for getting database session in FastAPI endpoints."""
     async with async_session_maker() as session:
         try:
             yield session
@@ -38,12 +31,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-async def init_db() -> None:
-    """
-    Initialize database tables.
-
-    Note: In production, use Alembic migrations instead.
-    This is only for testing/development.
-    """
+async def create_db_and_tables():
+    """Create all tables. Call this on startup."""
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)

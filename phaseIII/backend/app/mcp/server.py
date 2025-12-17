@@ -1,38 +1,22 @@
-"""MCP server manager with tool registration using FastMCP."""
-from collections.abc import Callable
-from typing import Any
+"""FastMCP Server for Phase III conversational task management."""
+
+import logging
 
 from mcp.server.fastmcp import FastMCP
 
+logger = logging.getLogger(__name__)
 
-class MCPServerManager:
-    """Manager for MCP server and tool registration."""
+# Create FastMCP instance with stateless HTTP transport
+mcp = FastMCP(name="phaseiii-task-manager", stateless_http=True)
 
-    def __init__(self) -> None:
-        """Initialize FastMCP server with stateless HTTP transport."""
-        self.server = FastMCP("todo-mcp-server", stateless_http=True)
-        self.tools_registered: list[str] = []
-
-    def register_tool(self, name: str, description: str, handler: Callable[..., Any]) -> None:
-        """
-        Register an MCP tool.
-
-        Args:
-            name: Tool name
-            description: Tool description
-            handler: Tool handler function
-        """
-        # Tool registration handled via @self.server.tool() decorator
-        self.tools_registered.append(name)
-
-    async def start(self) -> None:
-        """Start the FastMCP server with stateless HTTP transport."""
-        await self.server.run_streamable_http_async()
-
-    def get_registered_tools(self) -> list[str]:
-        """Get list of registered tool names."""
-        return self.tools_registered.copy()
+logger.info("FastMCP Server initialized: phaseiii-task-manager (stateless HTTP)")
 
 
-# Global FastMCP server instance
-mcp_server_manager = MCPServerManager()
+def get_mcp_app():
+    """Get the Starlette MCP app for mounting in FastAPI."""
+    return mcp.streamable_http_app()
+
+
+def get_mcp_instance():
+    """Get the FastMCP instance for tool registration."""
+    return mcp

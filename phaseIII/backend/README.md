@@ -4,6 +4,14 @@ AI-powered todo chatbot backend implementing the Model Context Protocol (MCP) us
 
 ## 🎯 Features
 
+### AI Chat Service ✅
+- **Conversational AI**: Natural language task management via chat interface
+- **OpenAI Agents SDK**: Integrated agent orchestration framework
+- **Gemini AI**: Powered by Google's Gemini 1.5 Flash via LiteLLM
+- **MCP Tool Integration**: AI automatically invokes MCP tools based on user intent
+- **Multi-turn Conversations**: Stateful conversation tracking with database persistence
+- **Intelligent Routing**: Context-aware tool selection and parameter extraction
+
 ### MCP Tools (All Implemented ✅)
 - **add_task**: Create new tasks with title and optional description
 - **list_tasks**: Retrieve tasks with status filtering (all/pending/completed)
@@ -23,10 +31,11 @@ AI-powered todo chatbot backend implementing the Model Context Protocol (MCP) us
 
 ## 📋 Prerequisites
 
-- **Python**: 3.11+ (3.14 recommended)
+- **Python**: 3.11-3.13 (3.13 recommended, 3.14 has SQLite compatibility issues)
 - **UV Package Manager**: Latest version
 - **PostgreSQL**: Neon Serverless or any PostgreSQL 14+
 - **Better Auth Secret**: For JWT token validation
+- **Gemini API Key**: For AI chat service (Google AI Studio)
 
 ## 🚀 Quick Start
 
@@ -50,16 +59,27 @@ cp .env.example .env
 # Required variables:
 # - DATABASE_URL: PostgreSQL connection string
 # - BETTER_AUTH_SECRET: Better Auth secret key
+# - GEMINI_API_KEY: Google Gemini API key
 ```
 
 Example `.env`:
 ```bash
+# Database
 DATABASE_URL=postgresql+asyncpg://user:password@host:5432/dbname
-BETTER_AUTH_SECRET=your-secret-key-here
 DB_POOL_MIN=5
 DB_POOL_MAX=10
+
+# Authentication
+BETTER_AUTH_SECRET=your-secret-key-here
+
+# AI Service
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# Server Configuration
 DEBUG=false
 LOG_LEVEL=INFO
+HOST=0.0.0.0
+PORT=8000
 ```
 
 ### 3. Run Database Migrations
@@ -77,47 +97,35 @@ This creates 3 tables:
 - `conversations` - Chat sessions
 - `messages` - Conversation messages with FK constraints
 
-### 4. Start MCP Server
+### 4. Start the Server
 
-The MCP server uses FastMCP with stateless HTTP transport:
+The server integrates FastAPI with MCP tools and AI chat service:
 
 ```bash
-# Start the MCP server
-uv run python -m app.mcp
+# Start the integrated server with auto-reload
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Server will start on http://127.0.0.1:8000
+# Server will start on http://0.0.0.0:8000
 ```
 
 **What happens when you start the server:**
 ```
-✓ Starting FastMCP server with stateless HTTP transport...
-✓ Registered tools: ['add_task', 'complete_task', 'delete_task', 'list_tasks', 'update_task']
-✓ StreamableHTTP session manager started
-✓ Uvicorn running on http://127.0.0.1:8000
+✓ FastMCP Server initialized: phaseiii-task-manager (stateless HTTP)
+✓ Started server process
+✓ Application startup complete
+✓ Starting Phase III Backend...
+✓ FastMCP tools registered
+✓ Agent service initialized with Gemini via LiteLLM and OpenAI Agents SDK
 ```
 
-The MCP server will be available at:
-- **MCP Endpoint**: http://127.0.0.1:8000
-- **Transport**: StreamableHTTP (stateless)
-- **Tools**: 5 task management tools registered
-
-### 5. (Optional) Start FastAPI Server
-
-If you need the REST API for testing:
-
-```bash
-# Start with auto-reload
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
-
-# Or run via Python module
-uv run python -m app.main
-```
-
-API will be available at:
-- **API**: http://localhost:8001
-- **Health Check**: http://localhost:8001/health
-- **API Docs**: http://localhost:8001/docs
-- **ReDoc**: http://localhost:8001/redoc
+The server provides:
+- **REST API**: http://localhost:8000
+- **Health Check**: http://localhost:8000/health
+- **API Docs**: http://localhost:8000/docs (Swagger UI)
+- **ReDoc**: http://localhost:8000/redoc
+- **MCP Endpoint**: http://localhost:8000/mcp
+- **Chat Endpoint**: http://localhost:8000/api/chat
+- **MCP Tools**: 5 stateless task management tools
 
 ## 🧪 Testing
 
@@ -223,6 +231,8 @@ See [contracts/](../../specs/sphaseIII/001-mcp-server-setup/contracts/) for comp
 | Component | Technology |
 |-----------|-----------|
 | Web Framework | FastAPI 0.124+ |
+| AI Framework | OpenAI Agents SDK 0.6+ |
+| AI Model | Google Gemini 1.5 Flash (via LiteLLM) |
 | MCP Framework | **FastMCP (stateless HTTP)** |
 | MCP SDK | Official MCP SDK 1.24+ |
 | ORM | SQLModel 0.0.27 |
@@ -246,25 +256,61 @@ phaseIII/backend/
 │   │   ├── conversation.py
 │   │   └── message.py
 │   ├── schemas/             # Pydantic schemas
-│   │   ├── task.py
-│   │   └── mcp.py
+│   │   ├── chat.py          # Chat request/response schemas
+│   │   └── errors.py        # Error response schemas
+│   ├── routers/             # API routes
+│   │   └── chat.py          # Chat endpoints
 │   ├── services/            # Business logic
+│   │   ├── agent_service.py      # OpenAI Agents SDK orchestrator
+│   │   ├── conversation_service.py
+│   │   ├── message_service.py
 │   │   └── task_service.py
+│   ├── dependencies/        # FastAPI dependencies
+│   │   └── auth.py          # Authentication dependencies
 │   ├── mcp/                 # MCP server
-│   │   ├── server.py        # Server manager
-│   │   ├── validators.py    # Input validation
-│   │   └── tools/           # MCP tool implementations
-│   │       ├── add_task.py
-│   │       ├── list_tasks.py
-│   │       ├── complete_task.py
-│   │       ├── delete_task.py
-│   │       └── update_task.py
-│   └── auth/
-│       └── jwt.py           # JWT validation
+│   │   ├── server.py        # FastMCP server manager
+│   │   └── tools.py         # MCP tool implementations (5 tools)
+│   └── utils/
+│       └── errors.py        # Error handling utilities
 ├── tests/                   # Test suite
 ├── alembic/                 # Database migrations
 └── pyproject.toml           # Dependencies & config
 ```
+
+### AI Service Architecture
+
+The AI chat service uses a **stateless agent** pattern with database-backed conversation history:
+
+**Flow:**
+```
+User Message → Chat API → Agent Service → OpenAI Agents SDK
+                               ↓
+                        Gemini (via LiteLLM)
+                               ↓
+                        Intent Recognition
+                               ↓
+                        MCP Tool Selection
+                               ↓
+                    MCP Server HTTP Request
+                               ↓
+                    Tool Execution (Stateless)
+                               ↓
+                        Database Query
+                               ↓
+                    Result → AI Response → User
+```
+
+**Key Components:**
+- **AgentService** (`app/services/agent_service.py`): Orchestrates AI agent with MCP tools
+- **LitellmModel**: Wraps Gemini API in OpenAI-compatible interface
+- **OpenAI Agents SDK Runner**: Handles multi-turn tool execution
+- **MCPServerStreamableHttp**: Connects to MCP tools via HTTP
+
+**Stateless Design:**
+- No in-memory session state (SDK's SQLite memory not used for persistence)
+- Conversation history stored in PostgreSQL
+- Each request rebuilds context from database
+- Horizontally scalable architecture
 
 ### FastMCP Configuration
 
@@ -274,16 +320,7 @@ This project uses **FastMCP** with stateless HTTP transport:
 - **Framework**: FastMCP from `mcp.server.fastmcp`
 - **Transport**: StreamableHTTP (stateless)
 - **Port**: 8000 (default)
-- **Initialization**: `FastMCP("todo-mcp-server", stateless_http=True)`
-
-**Transport Details:**
-```python
-# In app/mcp/server.py
-self.server = FastMCP("todo-mcp-server", stateless_http=True)
-
-# Startup uses async HTTP method
-await self.server.run_streamable_http_async()
-```
+- **MCP Endpoint**: `/mcp`
 
 **Why FastMCP + Stateless HTTP?**
 - ✅ **HTTP-based**: Easy integration with web services and testing tools
@@ -294,7 +331,7 @@ await self.server.run_streamable_http_async()
 
 **Tool Registration:**
 ```python
-@mcp_server_manager.server.tool()
+@mcp.tool()
 async def my_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """Tool implementation."""
     return {"status": "success"}
@@ -355,6 +392,7 @@ Error codes:
 |----------|-------------|---------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | - | ✅ |
 | `BETTER_AUTH_SECRET` | Better Auth secret key | - | ✅ |
+| `GEMINI_API_KEY` | Google Gemini API key | - | ✅ |
 | `DB_POOL_MIN` | Min database connections | 5 | ❌ |
 | `DB_POOL_MAX` | Max database connections | 10 | ❌ |
 | `JWT_CACHE_SIZE` | JWT cache size | 1000 | ❌ |
@@ -435,6 +473,28 @@ grep -r "import phaseII" app/ || echo "✅ Clean"
 
 ## 🐛 Troubleshooting
 
+### Python Version Issues (SQLite Compatibility)
+
+If you encounter `ModuleNotFoundError: No module named '_sqlite3'`:
+
+```bash
+# Check current Python version
+python3 --version
+
+# The OpenAI Agents SDK requires SQLite support
+# Python 3.14 may have compatibility issues
+
+# Solution 1: Switch to Python 3.13 (Recommended)
+uv python pin 3.13
+uv sync
+
+# Solution 2: Install SQLite development libraries
+sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
+# Verify SQLite support
+python3 -c "import sqlite3; print('SQLite3 OK')"
+```
+
 ### Database Connection Issues
 
 ```bash
@@ -460,22 +520,30 @@ find . -type d -name __pycache__ -exec rm -rf {} +
 find . -type f -name "*.pyc" -delete
 ```
 
-### MCP Server Issues
+### Server Startup Issues
 
 ```bash
-# Verify FastMCP instance is created
-uv run python -c "from app.mcp.server import mcp_server_manager; print('Server:', mcp_server_manager.server.name); print('Type:', type(mcp_server_manager.server).__name__)"
+# Check if server is running
+curl http://localhost:8000/health
 
-# Verify tools are registered (need to import tools first)
-uv run python -c "import app.mcp.tools; from app.mcp.server import mcp_server_manager; print('Registered tools:', mcp_server_manager.get_registered_tools())"
+# Expected response:
+# {"status":"ok","service":"phaseiii-task-manager"}
 
-# Test MCP server startup (will start on http://127.0.0.1:8000)
-uv run python -m app.mcp
+# View server logs
+# The server outputs detailed startup logs including:
+# - FastMCP server initialization
+# - Tool registration
+# - Agent service initialization
+# - Database connection status
 
-# Expected output:
-# ✓ Starting FastMCP server with stateless HTTP transport...
-# ✓ Registered tools: ['add_task', 'complete_task', 'delete_task', 'list_tasks', 'update_task']
-# ✓ Uvicorn running on http://127.0.0.1:8000
+# Test MCP endpoint
+curl http://localhost:8000/mcp
+
+# Test chat endpoint (requires authentication)
+curl -X POST http://localhost:8000/api/chat \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "List my tasks"}'
 ```
 
 ## 📄 License

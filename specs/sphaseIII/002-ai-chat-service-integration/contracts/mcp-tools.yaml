@@ -1,0 +1,452 @@
+# MCP Tools Specification
+# Phase III AI Chat Service
+# Date: 2025-12-17
+
+# This document specifies the 5 required MCP tools for task management.
+# These tools are invoked by the OpenAI Agents SDK based on user intent.
+
+tools:
+  - name: add_task
+    description: |
+      Creates a new task for the user. Use this tool when the user wants to:
+      - Add a task
+      - Create a task
+      - Remember something
+      - Make a note of something
+      - Add to their to-do list
+
+    parameters:
+      type: object
+      required:
+        - user_id
+        - title
+      properties:
+        user_id:
+          type: string
+          description: User ID from Better Auth (extracted from JWT token)
+        title:
+          type: string
+          description: Task title (1-200 characters)
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          description: Optional detailed description of the task
+          nullable: true
+
+    returns:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: Unique identifier of the created task
+        status:
+          type: string
+          enum: [created]
+          description: Always "created" for successful task creation
+        title:
+          type: string
+          description: Title of the created task
+
+    examples:
+      - input:
+          user_id: "usr_abc123"
+          title: "Buy groceries"
+        output:
+          task_id: 15
+          status: "created"
+          title: "Buy groceries"
+
+      - input:
+          user_id: "usr_abc123"
+          title: "Call dentist"
+          description: "Schedule appointment for next week"
+        output:
+          task_id: 16
+          status: "created"
+          title: "Call dentist"
+
+    errors:
+      - code: INVALID_TITLE
+        condition: Title is empty or exceeds 200 characters
+        message: "Title is required and must be 1-200 characters"
+
+  - name: list_tasks
+    description: |
+      Retrieves the user's tasks with optional status filtering. Use this tool when the user wants to:
+      - See their tasks
+      - List tasks
+      - Show pending tasks
+      - Show completed tasks
+      - Check what needs to be done
+
+    parameters:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: User ID from Better Auth (extracted from JWT token)
+        status:
+          type: string
+          enum: [all, pending, completed]
+          default: all
+          description: |
+            Filter tasks by completion status:
+            - "all": Return all tasks
+            - "pending": Return only incomplete tasks
+            - "completed": Return only completed tasks
+
+    returns:
+      type: array
+      items:
+        type: object
+        required:
+          - task_id
+          - title
+          - completed
+        properties:
+          task_id:
+            type: integer
+            description: Unique task identifier
+          title:
+            type: string
+            description: Task title
+          description:
+            type: string
+            nullable: true
+            description: Task description (null if not set)
+          completed:
+            type: boolean
+            description: Completion status
+
+    examples:
+      - input:
+          user_id: "usr_abc123"
+          status: "pending"
+        output:
+          - task_id: 15
+            title: "Buy groceries"
+            description: null
+            completed: false
+          - task_id: 16
+            title: "Call dentist"
+            description: "Schedule appointment for next week"
+            completed: false
+
+      - input:
+          user_id: "usr_abc123"
+          status: "completed"
+        output:
+          - task_id: 12
+            title: "Review PR"
+            description: null
+            completed: true
+
+      - input:
+          user_id: "usr_abc123"
+          status: "all"
+        output:
+          - task_id: 15
+            title: "Buy groceries"
+            description: null
+            completed: false
+          - task_id: 12
+            title: "Review PR"
+            description: null
+            completed: true
+
+    errors: []
+
+  - name: complete_task
+    description: |
+      Marks a task as completed. Use this tool when the user wants to:
+      - Mark a task as done
+      - Complete a task
+      - Finish a task
+      - Check off a task
+
+    parameters:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: User ID from Better Auth (extracted from JWT token)
+        task_id:
+          type: integer
+          description: ID of the task to mark as complete
+
+    returns:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of the completed task
+        status:
+          type: string
+          enum: [completed]
+          description: Always "completed" for successful completion
+        title:
+          type: string
+          description: Title of the completed task
+
+    examples:
+      - input:
+          user_id: "usr_abc123"
+          task_id: 15
+        output:
+          task_id: 15
+          status: "completed"
+          title: "Buy groceries"
+
+    errors:
+      - code: TASK_NOT_FOUND
+        condition: Task ID doesn't exist or doesn't belong to user
+        message: "Task not found"
+
+  - name: delete_task
+    description: |
+      Permanently removes a task. Use this tool when the user wants to:
+      - Delete a task
+      - Remove a task
+      - Cancel a task
+      - Get rid of a task
+
+    parameters:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: User ID from Better Auth (extracted from JWT token)
+        task_id:
+          type: integer
+          description: ID of the task to delete
+
+    returns:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of the deleted task
+        status:
+          type: string
+          enum: [deleted]
+          description: Always "deleted" for successful deletion
+        title:
+          type: string
+          description: Title of the deleted task (before deletion)
+
+    examples:
+      - input:
+          user_id: "usr_abc123"
+          task_id: 15
+        output:
+          task_id: 15
+          status: "deleted"
+          title: "Buy groceries"
+
+    errors:
+      - code: TASK_NOT_FOUND
+        condition: Task ID doesn't exist or doesn't belong to user
+        message: "Task not found"
+
+  - name: update_task
+    description: |
+      Modifies an existing task's title or description. Use this tool when the user wants to:
+      - Change a task
+      - Update a task
+      - Modify a task
+      - Edit a task
+      - Rename a task
+
+    parameters:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: User ID from Better Auth (extracted from JWT token)
+        task_id:
+          type: integer
+          description: ID of the task to update
+        title:
+          type: string
+          description: New task title (1-200 characters)
+          nullable: true
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          description: New task description
+          nullable: true
+
+    returns:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of the updated task
+        status:
+          type: string
+          enum: [updated]
+          description: Always "updated" for successful update
+        title:
+          type: string
+          description: Updated task title
+
+    examples:
+      - input:
+          user_id: "usr_abc123"
+          task_id: 15
+          title: "Buy groceries and pick up mail"
+        output:
+          task_id: 15
+          status: "updated"
+          title: "Buy groceries and pick up mail"
+
+      - input:
+          user_id: "usr_abc123"
+          task_id: 16
+          description: "Call dentist at (555) 123-4567"
+        output:
+          task_id: 16
+          status: "updated"
+          title: "Call dentist"  # Title unchanged
+
+    errors:
+      - code: TASK_NOT_FOUND
+        condition: Task ID doesn't exist or doesn't belong to user
+        message: "Task not found"
+      - code: INVALID_TITLE
+        condition: Title is provided but empty or exceeds 200 characters
+        message: "Title must be 1-200 characters when provided"
+
+# Tool Invocation Guidelines for AI Agent
+
+agent_guidelines:
+  intent_mapping:
+    - user_intent: "Add/create/remember something"
+      tool: add_task
+      example_phrases:
+        - "Add a task to buy groceries"
+        - "Create a reminder to call mom"
+        - "I need to remember to pay bills"
+
+    - user_intent: "View/list tasks"
+      tool: list_tasks
+      example_phrases:
+        - "Show me my tasks"
+        - "What do I need to do?"
+        - "List my pending tasks"
+        - "What have I completed?"
+
+    - user_intent: "Mark task as done"
+      tool: complete_task
+      example_phrases:
+        - "Mark task 3 as complete"
+        - "I finished the groceries task"
+        - "Task 5 is done"
+
+    - user_intent: "Remove a task"
+      tool: delete_task
+      example_phrases:
+        - "Delete task 3"
+        - "Remove the meeting task"
+        - "Cancel the dentist appointment"
+
+    - user_intent: "Change task details"
+      tool: update_task
+      example_phrases:
+        - "Change task 1 to 'Call mom tonight'"
+        - "Update the description for task 5"
+        - "Rename the grocery task"
+
+  ambiguity_handling:
+    - scenario: User references task by title instead of ID
+      resolution: Call list_tasks first to find matching task, then perform operation
+      example:
+        user_says: "Delete the grocery task"
+        agent_action:
+          1: Call list_tasks(user_id, status="all")
+          2: Find task with title matching "grocery"
+          3: Call delete_task(user_id, task_id=<found_id>)
+
+    - scenario: Multiple tasks match user description
+      resolution: Ask user to clarify which task they mean
+      example:
+        user_says: "Complete the grocery task"
+        agent_finds: ["Buy groceries", "Return grocery bags"]
+        agent_response: "I found 2 grocery-related tasks. Which one? (1) Buy groceries or (2) Return grocery bags?"
+
+    - scenario: User intent unclear
+      resolution: Ask clarifying question
+      example:
+        user_says: "What about that thing?"
+        agent_response: "Could you clarify what you're referring to? Would you like to see your tasks, add a new one, or something else?"
+
+  error_handling:
+    - error_type: TASK_NOT_FOUND
+      agent_response: "I couldn't find that task. Would you like to see your task list?"
+
+    - error_type: INVALID_TITLE
+      agent_response: "The task title needs to be between 1 and 200 characters. Could you rephrase it?"
+
+    - error_type: Database error
+      agent_response: "I'm having trouble accessing your tasks right now. Please try again in a moment."
+
+# MCP Server Implementation Notes
+
+implementation:
+  stateless_requirement: |
+    All tools MUST be stateless. No in-memory state between invocations.
+    Each tool call is independent and reads/writes directly to the database.
+
+  database_access: |
+    Tools receive database session via dependency injection.
+    All queries MUST be scoped to the provided user_id parameter.
+
+  data_isolation: |
+    Tools MUST validate that task_id (when provided) belongs to user_id.
+    Return TASK_NOT_FOUND if task doesn't exist or belongs to another user.
+
+  transaction_handling: |
+    Each tool invocation runs in a database transaction.
+    Commit on success, rollback on error.
+
+  performance_targets:
+    - add_task: < 50ms p95
+    - list_tasks: < 100ms p95 (with indexing)
+    - complete_task: < 50ms p95
+    - delete_task: < 50ms p95
+    - update_task: < 50ms p95
+
+  testing_requirements:
+    - Unit tests for each tool with mocked database
+    - Integration tests with test database
+    - Multi-user isolation tests
+    - Error handling tests for all error codes

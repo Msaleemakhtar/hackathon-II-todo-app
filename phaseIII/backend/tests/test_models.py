@@ -1,20 +1,19 @@
 """Tests for database models."""
-import pytest
+
 from datetime import datetime
 
-from app.models.task import TaskPhaseIII
+import pytest
+
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.models.task import TaskPhaseIII
 
 
 @pytest.mark.asyncio
 async def test_task_creation(test_session):
     """Test creating a TaskPhaseIII model."""
     task = TaskPhaseIII(
-        user_id="test_user_123",
-        title="Test Task",
-        description="Test description",
-        completed=False
+        user_id="test_user_123", title="Test Task", description="Test description", completed=False
     )
 
     test_session.add(task)
@@ -33,11 +32,7 @@ async def test_task_creation(test_session):
 @pytest.mark.asyncio
 async def test_task_without_description(test_session):
     """Test creating a task without description."""
-    task = TaskPhaseIII(
-        user_id="test_user_123",
-        title="Test Task",
-        completed=False
-    )
+    task = TaskPhaseIII(user_id="test_user_123", title="Test Task", completed=False)
 
     test_session.add(task)
     await test_session.commit()
@@ -50,9 +45,7 @@ async def test_task_without_description(test_session):
 @pytest.mark.asyncio
 async def test_conversation_creation(test_session):
     """Test creating a Conversation model."""
-    conversation = Conversation(
-        user_id="test_user_123"
-    )
+    conversation = Conversation(user_id="test_user_123")
 
     test_session.add(conversation)
     await test_session.commit()
@@ -75,10 +68,7 @@ async def test_message_creation(test_session):
 
     # Then create a message
     message = Message(
-        conversation_id=conversation.id,
-        user_id="test_user_123",
-        role="user",
-        content="Hello, AI!"
+        conversation_id=conversation.id, user_id="test_user_123", role="user", content="Hello, AI!"
     )
 
     test_session.add(message)
@@ -97,8 +87,7 @@ async def test_message_creation(test_session):
 async def test_multiple_tasks_for_user(test_session):
     """Test creating multiple tasks for the same user."""
     tasks = [
-        TaskPhaseIII(user_id="test_user_123", title=f"Task {i}", completed=False)
-        for i in range(3)
+        TaskPhaseIII(user_id="test_user_123", title=f"Task {i}", completed=False) for i in range(3)
     ]
 
     for task in tasks:

@@ -14,6 +14,12 @@ dependencies = [
     "uvicorn[standard]>=0.27.0",
     "python-multipart>=0.0.6",
     "mcp[cli]>=1.24.0",
+    "google-generativeai>=0.3.0",
+    "openai>=1.12.0",
+    "slowapi>=0.1.9",
+    "redis>=5.0.0",
+    "openai-agents>=0.6.3",
+    "litellm>=1.80.10",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +41,8 @@ packages = ["app"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -47,9 +55,10 @@ select = [
 ignore = [
     "E501", # line too long (handled by formatter)
     "B008", # do not perform function calls in argument defaults
+    "E402", # module level import not at top of file (intentional lazy loading)
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
 
 [tool.pytest.ini_options]

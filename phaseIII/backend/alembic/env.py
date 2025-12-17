@@ -1,4 +1,5 @@
 """Alembic environment configuration for async SQLModel migrations."""
+
 import asyncio
 from logging.config import fileConfig
 
@@ -14,16 +15,13 @@ from app.config import settings
 
 # Import all models to ensure they're registered with SQLModel.metadata
 # This is required for autogenerate to work properly
-from app.models.task import TaskPhaseIII
-from app.models.conversation import Conversation
-from app.models.message import Message
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Override sqlalchemy.url from environment variable
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
