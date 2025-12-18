@@ -12,11 +12,12 @@ class Settings(BaseSettings):
     db_pool_min: int = 5
     db_pool_max: int = 10
 
-    # Gemini AI
-    gemini_api_key: str
+    # AI API Keys
+    openai_api_key: str | None = None
+    gemini_api_key: str | None = None
 
-    # Better Auth
-    better_auth_secret: str
+    # Better Auth (optional - not used in Phase III)
+    better_auth_secret: str | None = None
     better_auth_url: str = "http://localhost:3000"
 
     # CORS
@@ -34,6 +35,9 @@ class Settings(BaseSettings):
     # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8000
+
+    # MCP Server Configuration
+    mcp_server_url: str = "http://localhost:8001/mcp"
 
     class Config:
         env_file = ".env"

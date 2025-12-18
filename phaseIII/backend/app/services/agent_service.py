@@ -28,14 +28,22 @@ class AgentService:
     """
 
     def __init__(self):
-        """Initialize agent service with Gemini via LiteLLM."""
-        # Configure Gemini model via LiteLLM
-        self.model = LitellmModel(
-            model="gemini/gemini-1.5-flash",  # Fast, cost-effective Gemini model
-            api_key=settings.gemini_api_key,
-        )
-
-        logger.info("Agent service initialized with Gemini via LiteLLM and OpenAI Agents SDK")
+        """Initialize agent service with LiteLLM (OpenAI or Gemini)."""
+        # Prefer OpenAI if available, fallback to Gemini
+        if settings.openai_api_key:
+            self.model = LitellmModel(
+                model="gpt-3.5-turbo",  # Most cost-effective model for testing
+                api_key=settings.openai_api_key,
+            )
+            logger.info("Agent service initialized with GPT-3.5-turbo via LiteLLM and OpenAI Agents SDK")
+        elif settings.gemini_api_key:
+            self.model = LitellmModel(
+                model="gemini/gemini-2.0-flash",  # Fast, cost-effective Gemini 2.0 model
+                api_key=settings.gemini_api_key,
+            )
+            logger.info("Agent service initialized with Gemini 2.0 via LiteLLM and OpenAI Agents SDK")
+        else:
+            raise ValueError("Either OPENAI_API_KEY or GEMINI_API_KEY must be set in environment")
 
     def _get_system_instructions(self) -> str:
         """Get system instructions for the agent."""
@@ -83,10 +91,11 @@ Guidelines:
         """
         try:
             # Create MCP server connection using async context manager
+            # Uses configurable URL (localhost for dev, Docker service name for containers)
             async with MCPServerStreamableHttp(
                 name="Task Manager MCP Server",
                 params={
-                    "url": f"http://{settings.host}:{settings.port}/mcp",
+                    "url": settings.mcp_server_url,
                     "timeout": 30,
                 },
                 cache_tools_list=True,

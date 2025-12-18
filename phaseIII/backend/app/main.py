@@ -41,11 +41,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     print("Starting Phase III Backend...")
-    # Note: Database tables will be created via Alembic migrations
-    # await create_db_and_tables()  # Uncomment if not using Alembic
+    # Import and create database tables
+    from app.database import create_db_and_tables
+    await create_db_and_tables()
+    print("Database tables created/verified")
 
-    # Import tools to register them with FastMCP
-    print("FastMCP tools registered")
+    # MCP tools are defined in app/mcp/tools.py and run in a separate MCP server service
+    print("MCP tools defined (running in separate mcp-server service)")
 
     yield
 
@@ -131,8 +133,15 @@ from app.routers import chat
 
 app.include_router(chat.router)
 
-# Mount FastMCP app
-from app.mcp.server import get_mcp_app
-
-mcp_app = get_mcp_app()
-app.mount("/mcp", mcp_app)
+# MCP Server Architecture Note:
+# The MCP server runs as a standalone Docker service (phaseiii-mcp-server)
+# on port 8001 to avoid routing conflicts with FastAPI.
+#
+# Architecture:
+# - MCP Server: http://mcp-server:8001 (Docker) or http://localhost:8001 (local)
+# - Backend API: http://backend:8000 (Docker) or http://localhost:8000 (local)
+# - Communication: Docker network (phaseiii-network)
+# - Agent service connects via settings.mcp_server_url
+#
+# See docker-compose.yml for service configuration.
+# See app/mcp/standalone.py for MCP server entry point.

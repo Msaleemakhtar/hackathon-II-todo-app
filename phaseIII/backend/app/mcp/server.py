@@ -3,13 +3,37 @@
 import logging
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 logger = logging.getLogger(__name__)
 
 # Create FastMCP instance with stateless HTTP transport
-mcp = FastMCP(name="phaseiii-task-manager", stateless_http=True)
+# Configure allowed hosts for Docker network + localhost
+mcp = FastMCP(
+    name="phaseiii-task-manager",
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[
+            "127.0.0.1:*",  # Localhost IPv4
+            "localhost:*",  # Localhost hostname
+            "[::1]:*",  # Localhost IPv6
+            "0.0.0.0:*",  # All interfaces
+            "mcp-server:*",  # Docker service name
+            "*.phaseiii-network:*",  # Docker network (wildcard)
+        ],
+        allowed_origins=[
+            "http://127.0.0.1:*",
+            "http://localhost:*",
+            "http://[::1]:*",
+            "http://mcp-server:*",
+            "http://backend:*",
+        ],
+    ),
+)
 
 logger.info("FastMCP Server initialized: phaseiii-task-manager (stateless HTTP)")
+logger.info("Allowed hosts: localhost, mcp-server, Docker network")
 
 
 def get_mcp_app():

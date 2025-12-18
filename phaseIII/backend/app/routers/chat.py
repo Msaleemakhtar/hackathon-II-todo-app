@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,102 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+
+@router.post("/api/chat-test", response_model=ChatResponse)
+@limiter.limit("10/minute")
+async def chat_test_endpoint(
+    chat_request: ChatRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Test chat endpoint WITHOUT authentication (for development/testing only).
+
+    Use this endpoint to test the AI agent without JWT tokens.
+    In production, this should be disabled.
+
+    Args:
+        request: Chat request with message, user_id, and optional conversation_id
+        db: Database session
+
+    Returns:
+        ChatResponse: AI response with conversation_id and tool calls
+    """
+    try:
+        # Use user_id from request body instead of JWT
+        user_id = chat_request.user_id or "test_user"
+
+        # Validate message content
+        message_content = validate_message_content(chat_request.message)
+
+        # Handle conversation_id
+        if chat_request.conversation_id:
+            # Continue existing conversation
+            conversation, messages = await conversation_service.get_conversation_with_messages(
+                db, chat_request.conversation_id, user_id
+            )
+
+            if not conversation:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Conversation #{chat_request.conversation_id} not found",
+                )
+
+            conversation_id = conversation.id
+            conversation_history = [
+                {"role": msg.role.value, "content": msg.content} for msg in messages
+            ]
+        else:
+            # Create new conversation
+            conversation = await conversation_service.create_conversation(db, user_id)
+            conversation_id = conversation.id
+            conversation_history = []
+
+        logger.info(f"TEST: Processing chat message: conversation_id={conversation_id}, user_id={user_id}")
+
+        # Process message with AI agent
+        agent_response = await agent_service.process_message(
+            user_message=message_content,
+            conversation_history=conversation_history,
+            user_id=user_id,
+        )
+
+        # Store user message
+        await message_service.create_user_message(db, conversation_id, user_id, message_content)
+
+        # Store assistant response
+        await message_service.create_assistant_message(
+            db, conversation_id, user_id, agent_response["content"]
+        )
+
+        # Update conversation timestamp
+        await conversation_service.update_conversation_timestamp(db, conversation_id)
+
+        # Build response
+        tool_calls = [
+            ToolCall(
+                name=call["name"],
+                arguments=call["arguments"],
+                result=call["result"],
+            )
+            for call in agent_response["tool_calls"]
+        ]
+
+        return ChatResponse(
+            conversation_id=conversation_id,
+            response=agent_response["content"],
+            tool_calls=tool_calls,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat test endpoint error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}",
+        ) from e
 
 
 @router.get("/api/{path_user_id}/conversations/{conversation_id}")
