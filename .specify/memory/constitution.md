@@ -405,7 +405,6 @@ The following security features are explicitly OUT OF SCOPE for current phases a
 
 **OpenAI ChatKit Integration**:
 - MUST use OpenAI ChatKit for the chat interface
-- MUST use Managed ChatKit Starter template: https://github.com/openai/openai-chatkit-starter-app/tree/main/managed-chatkit
 - Domain allowlist MUST be configured in OpenAI platform settings
 - ChatKit domain key MUST be obtained and configured
 
@@ -1057,7 +1056,6 @@ The chatbot MUST understand and respond to:
 
 **Phase III** (MANDATORY per hackathon requirements):
 - **Frontend**: OpenAI ChatKit (https://platform.openai.com/docs/guides/chatkit)
-- **Frontend Template**: Managed ChatKit Starter (https://github.com/openai/openai-chatkit-starter-app/tree/main/managed-chatkit)
 - **Backend**: Python FastAPI
 - **AI Framework**: OpenAI Agents SDK (https://github.com/openai/openai-agents-python)
 - **MCP Server**: Official MCP SDK (https://github.com/modelcontextprotocol/python-sdk)
