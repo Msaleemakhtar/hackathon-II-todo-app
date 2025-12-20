@@ -115,6 +115,7 @@ async def health_check():
         "service": "phaseiii-backend",
         "version": "0.1.0",
         "environment": settings.environment,
+        "adapters": ["chatkit"],
     }
 
 
@@ -129,9 +130,10 @@ async def root():
 
 
 # Import and include routers
-from app.routers import chat
+from app.routers import chat, chatkit_adapter
 
 app.include_router(chat.router)
+app.include_router(chatkit_adapter.router)
 
 # MCP Server Architecture Note:
 # The MCP server runs as a standalone Docker service (phaseiii-mcp-server)

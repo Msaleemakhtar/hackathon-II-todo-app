@@ -19,13 +19,14 @@ class ConversationService:
     async def create_conversation(
         db: AsyncSession,
         user_id: str,
+        external_id: str | None = None,
     ) -> Conversation:
         """Create a new conversation."""
-        conversation = Conversation(user_id=user_id)
+        conversation = Conversation(user_id=user_id, external_id=external_id)
         db.add(conversation)
         await db.commit()
         await db.refresh(conversation)
-        logger.info(f"Conversation created: conversation_id={conversation.id}, user_id={user_id}")
+        logger.info(f"Conversation created: conversation_id={conversation.id}, user_id={user_id}, external_id={external_id}")
         return conversation
 
     @staticmethod
@@ -39,6 +40,25 @@ class ConversationService:
         if conversation and conversation.user_id == user_id:
             return conversation
         return None
+
+    @staticmethod
+    async def get_conversation_by_external_id(
+        db: AsyncSession,
+        external_id: str,
+        user_id: str,
+    ) -> Conversation | None:
+        """
+        Get conversation by ChatKit thread ID.
+
+        This links ChatKit threads to internal conversations.
+        """
+        result = await db.execute(
+            select(Conversation).where(
+                Conversation.external_id == external_id,
+                Conversation.user_id == user_id
+            )
+        )
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def get_conversation_with_messages(
