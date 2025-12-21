@@ -2,7 +2,14 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useSession } from '@/lib/auth';
-import { UserProfile } from '@/types';
+import { BetterAuthUser } from '@/types/auth.d';
+
+// Define UserProfile interface
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+}
 
 interface AuthContextType {
   user: UserProfile | null;

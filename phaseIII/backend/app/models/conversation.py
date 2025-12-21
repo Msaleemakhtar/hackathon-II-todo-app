@@ -18,6 +18,7 @@ class Conversation(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: str = Field(index=True, nullable=False)
     external_id: str | None = Field(default=None, index=True)  # Maps to ChatKit thread_id
+    title: str | None = Field(default=None)  # Optional conversation title
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 

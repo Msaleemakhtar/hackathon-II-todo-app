@@ -1,54 +1,84 @@
-# Phase III Backend - AI-Powered Task Management
+# Phase III Backend - AI-Powered Task Management with ChatKit
 
-Conversational AI task management system built with **OpenAI Agents SDK**, **MCP Protocol**, and **Gemini 2.0**.
+Conversational AI task management system built with **OpenAI ChatKit SDK**, **OpenAI Agents SDK**, **MCP Protocol**, and **Gemini 2.0**.
 
 ## Overview
 
-Phase III implements a natural language interface for task management, allowing users to manage their tasks through conversational AI. The system uses:
+Phase III implements a natural language interface for task management using the official OpenAI ChatKit Python SDK. Users can manage tasks through conversational AI with full conversation persistence and multi-user isolation.
 
+### Key Technologies
+
+- **OpenAI ChatKit SDK** (`openai-chatkit`) - Official ChatKit backend integration
 - **OpenAI Agents SDK** for AI orchestration
 - **MCP (Model Context Protocol)** for tool discovery and execution
-- **LiteLLM** for multi-provider LLM support
-- **Gemini 2.0 Flash** as the language model
-- **FastAPI** for the REST API
+- **LiteLLM** for multi-provider LLM support (OpenAI GPT-3.5 or Gemini 2.0)
+- **FastAPI** for the REST API framework
 - **PostgreSQL** (Neon Serverless) for data persistence
+- **Better Auth** for JWT authentication
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Docker Compose Stack                         │
+│                    ChatKit SDK Architecture                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌──────────────┐  HTTP/MCP   ┌──────────────────┐             │
-│  │              │  Protocol   │   MCP Server     │             │
-│  │   Backend    │◄────────────┤   (Port 8001)    │             │
-│  │ (Port 8000)  │             │                  │             │
-│  │              │             │  - FastMCP       │             │
-│  │ OpenAI Agent │             │  - 5 Tools       │             │
-│  │ + LiteLLM    │             │  - Stateless     │             │
-│  │ + Gemini 2.0 │             │  - HTTP Transport│             │
-│  └──────┬───────┘             └─────────┬────────┘             │
-│         │                               │                      │
-│         │                               │                      │
-│  ┌──────▼───────┐                ┌──────▼────────┐             │
-│  │              │                │               │             │
-│  │    Redis     │                │  PostgreSQL   │             │
-│  │  (Port 6379) │                │  (External)   │             │
-│  │              │                │               │             │
-│  └──────────────┘                └───────────────┘             │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │         Frontend (Next.js + ChatKit.js)              │      │
+│  │         - @openai/chatkit-react                      │      │
+│  │         - Better Auth JWT                            │      │
+│  └────────────────────┬─────────────────────────────────┘      │
+│                       │ POST /chatkit                           │
+│                       │ (Bearer JWT Token)                      │
+│  ┌────────────────────▼─────────────────────────────────┐      │
+│  │         ChatKit SDK (Port 8000)                      │      │
+│  │  ┌───────────────────────────────────────────────┐   │      │
+│  │  │ extract_user_context() - Auth Middleware      │   │      │
+│  │  │ - Validates JWT                              │   │      │
+│  │  │ - Extracts user_id                           │   │      │
+│  │  └─────────────────┬─────────────────────────────┘   │      │
+│  │                    │                                  │      │
+│  │  ┌─────────────────▼─────────────────────────────┐   │      │
+│  │  │ TaskChatServer (ChatKitServer)               │   │      │
+│  │  │ - respond() method                           │   │      │
+│  │  │ - OpenAI Agents SDK integration              │   │      │
+│  │  │ - MCP tool orchestration                     │   │      │
+│  │  └─────────┬──────────────────┬─────────────────┘   │      │
+│  │            │                  │                      │      │
+│  │  ┌─────────▼────────┐  ┌──────▼──────────────┐      │      │
+│  │  │ PostgresStore    │  │  MCP Server         │      │      │
+│  │  │ (Store Interface)│  │  (Port 8001)        │      │      │
+│  │  │ - save_thread    │  │  - FastMCP          │      │      │
+│  │  │ - load_thread    │  │  - 5 Tools          │      │      │
+│  │  │ - save_item      │  │  - HTTP Transport   │      │      │
+│  │  │ - load_items     │  │                     │      │      │
+│  │  └─────────┬────────┘  └─────────────────────┘      │      │
+│  │            │                                         │      │
+│  │  ┌─────────▼────────────────────────────────┐       │      │
+│  │  │         PostgreSQL                       │       │      │
+│  │  │         - Conversations                  │       │      │
+│  │  │         - Messages                       │       │      │
+│  │  │         - Tasks                          │       │      │
+│  │  └──────────────────────────────────────────┘       │      │
+│  └──────────────────────────────────────────────────────┘      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Components
 
-#### 1. Backend Service (Port 8000)
-- **Framework**: FastAPI
-- **AI Integration**: OpenAI Agents SDK + LiteLLM
-- **Model**: Gemini 2.0 Flash via Google AI Studio API
-- **MCP Client**: MCPServerStreamableHttp (stateless HTTP)
-- **Location**: `app/`
+#### 1. ChatKit SDK Integration
+- **TaskChatServer**: Extends `ChatKitServer` from `openai-chatkit`
+  - Implements `respond()` method with OpenAI Agents SDK
+  - Connects to MCP server for tool execution
+  - Streams responses to frontend
+- **PostgresStore**: Implements ChatKit `Store` interface
+  - Maps ChatKit threads → Conversation table
+  - Maps ChatKit items → Message table
+  - Provides conversation persistence
+- **Auth Middleware**: JWT validation
+  - Extracts user_id from Bearer token
+  - Injects user context into all requests
 
 #### 2. MCP Server (Port 8001)
 - **Framework**: FastMCP (Python SDK)
@@ -57,9 +87,13 @@ Phase III implements a natural language interface for task management, allowing 
 - **Tools**: 5 task management tools
 - **Location**: `app/mcp/`
 
-#### 3. Supporting Services
-- **Redis**: Caching and session storage (Port 6379)
-- **PostgreSQL**: Neon Serverless Database (external)
+#### 3. Database
+- **PostgreSQL**: Neon Serverless Database
+- **Tables**:
+  - `conversations` - ChatKit threads with external_id mapping
+  - `messages` - User and assistant messages
+  - `tasks_phaseiii` - Task data with user_id isolation
+  - `user`, `session`, `account`, `verification` - Better Auth tables
 
 ## MCP Tools
 
@@ -95,15 +129,19 @@ The MCP server provides 5 tools for task management:
 - **Database**: PostgreSQL (Neon Serverless)
 - **Validation**: Pydantic v2
 
-### AI & MCP
+### ChatKit & AI
+- **ChatKit SDK**: `openai-chatkit==1.4.1` - Official backend integration
 - **AI Framework**: OpenAI Agents SDK (`agents`)
 - **LLM Provider**: LiteLLM (multi-provider support)
-- **Model**: Gemini 2.0 Flash (`gemini/gemini-2.0-flash`)
+- **Models**:
+  - OpenAI GPT-3.5-turbo (primary)
+  - Gemini 2.0 Flash (fallback)
 - **MCP Framework**: FastMCP (official Python SDK)
 - **MCP Transport**: HTTP (stateless)
 
 ### Authentication
-- **Better Auth**: (Future integration for user authentication)
+- **Better Auth**: JWT-based authentication
+- **Session Management**: Database-backed sessions
 
 ## Prerequisites
 
@@ -111,7 +149,9 @@ The MCP server provides 5 tools for task management:
 - **UV**: Python package manager ([Install UV](https://docs.astral.sh/uv/))
 - **Docker**: For containerized deployment
 - **PostgreSQL**: Neon Serverless or local instance
-- **Gemini API Key**: From [Google AI Studio](https://ai.google.dev/)
+- **API Keys**:
+  - OpenAI API key (primary) OR Gemini API key (fallback)
+  - Better Auth secret
 
 ## Setup
 
@@ -127,7 +167,7 @@ cd phaseIII/backend
 # Install UV if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install project dependencies
+# Install project dependencies (including openai-chatkit)
 uv sync
 ```
 
@@ -146,8 +186,12 @@ Edit `.env` with your configuration:
 # Database
 DATABASE_URL=postgresql+asyncpg://user:password@host:5432/database
 
-# Gemini AI
-GEMINI_API_KEY=your_gemini_api_key_here
+# AI Models (at least one required)
+OPENAI_API_KEY=sk-proj-...  # Primary (recommended)
+GEMINI_API_KEY=your_gemini_api_key_here  # Fallback
+
+# Better Auth
+BETTER_AUTH_SECRET=your-32-char-secret-here
 
 # Application
 ENVIRONMENT=development
@@ -160,15 +204,12 @@ CORS_ORIGINS=http://localhost:3000
 
 # MCP Server
 MCP_SERVER_URL=http://localhost:8001/mcp
-
-# Redis (optional)
-REDIS_URL=redis://localhost:6379/0
 ```
 
 ### 4. Database Setup
 
 ```bash
-# Run migrations
+# Run migrations (includes Better Auth tables)
 uv run alembic upgrade head
 ```
 
@@ -186,9 +227,9 @@ docker compose up -d --build
 ```
 
 This starts all services:
-- Backend API: http://localhost:8000
+- Backend API (ChatKit SDK): http://localhost:8000
 - MCP Server: http://localhost:8001
-- Redis: http://localhost:6379
+- ChatKit endpoint: http://localhost:8000/chatkit
 
 ### Option 2: Local Development
 
@@ -199,7 +240,7 @@ Run services separately for development:
 ./scripts/dev-mcp-server.sh
 ```
 
-#### Terminal 2 - Backend API
+#### Terminal 2 - Backend API (with ChatKit SDK)
 ```bash
 ./scripts/dev-backend.sh
 ```
@@ -212,6 +253,14 @@ Run services separately for development:
 # Backend health
 curl http://localhost:8000/health
 
+# Should return:
+# {
+#   "status": "healthy",
+#   "service": "phaseiii-backend",
+#   "version": "0.1.0",
+#   "environment": "development"
+# }
+
 # MCP server (list tools)
 curl -X POST http://localhost:8001/mcp \
   -H "Content-Type: application/json" \
@@ -219,50 +268,45 @@ curl -X POST http://localhost:8001/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-### Run Integration Tests
+### Test ChatKit Integration
 
-```bash
-# Inside backend container
-docker compose exec backend python test_agent_mcp_integration.py
+1. **Start all services** (backend + MCP server + frontend)
 
-# Or locally with UV
-uv run python test_agent_mcp_integration.py
-```
+2. **Create a user account** at `http://localhost:3000/signup`
 
-### Test Conversational AI
+3. **Login** at `http://localhost:3000/login`
 
-```bash
-# Send a message to the AI agent
-curl -X POST http://localhost:8000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Create a task to buy groceries",
-    "user_id": "user_123"
-  }'
-```
+4. **Navigate to chat** at `http://localhost:3000/chat`
+
+5. **Test conversation**:
+   - "Add a task to buy groceries"
+   - "Show me all my tasks"
+   - "Mark task #1 as complete"
 
 ## API Endpoints
 
 ### Health Check
 - `GET /health` - Service health status
 
-### Chat Endpoint
-- `POST /api/chat` - Send message to AI agent
-  ```json
-  {
-    "message": "Create a task to buy groceries",
-    "user_id": "user_123",
-    "conversation_history": []
-  }
-  ```
+### ChatKit Endpoint (Primary)
+- `POST /chatkit` - ChatKit SDK endpoint
+  - Handles all chat interactions
+  - Requires JWT Bearer token in Authorization header
+  - Streams responses as Server-Sent Events (SSE)
+  - Automatically persists conversations and messages
 
-### Task Management (REST API)
-- `GET /api/tasks` - List tasks
-- `POST /api/tasks` - Create task
-- `GET /api/tasks/{task_id}` - Get task details
-- `PUT /api/tasks/{task_id}` - Update task
-- `DELETE /api/tasks/{task_id}` - Delete task
-- `PATCH /api/tasks/{task_id}/complete` - Complete task
+**Authentication**:
+```bash
+curl -X POST http://localhost:8000/chatkit \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "thread": {"id": "thread_123"},
+    "messages": [
+      {"role": "user", "content": "Add task to buy milk"}
+    ]
+  }'
+```
 
 ## Development Workflow
 
@@ -271,12 +315,22 @@ curl -X POST http://localhost:8000/api/chat \
 ```
 backend/
 ├── app/
-│   ├── main.py              # FastAPI application
+│   ├── main.py              # FastAPI application with ChatKit mounting
 │   ├── config.py            # Configuration settings
 │   ├── models/              # SQLModel database models
-│   ├── routes/              # API route handlers
+│   │   ├── conversation.py  # Conversation model (with external_id)
+│   │   ├── message.py       # Message model
+│   │   └── task.py          # Task model
 │   ├── services/
-│   │   └── agent_service.py # OpenAI Agent orchestrator
+│   │   ├── conversation_service.py  # Conversation CRUD
+│   │   └── message_service.py       # Message CRUD
+│   ├── chatkit/             # ← ChatKit SDK Integration
+│   │   ├── __init__.py      # Package exports
+│   │   ├── postgres_store.py    # Store interface implementation
+│   │   ├── task_server.py       # ChatKitServer subclass
+│   │   └── middleware.py        # Auth middleware
+│   ├── dependencies/
+│   │   └── auth.py          # JWT validation
 │   └── mcp/
 │       ├── server.py        # FastMCP instance
 │       ├── tools.py         # MCP tool implementations
@@ -285,12 +339,31 @@ backend/
 ├── scripts/
 │   ├── dev-backend.sh       # Run backend in dev mode
 │   └── dev-mcp-server.sh    # Run MCP server in dev mode
-├── test_agent_mcp_integration.py  # Integration tests
-├── pyproject.toml           # UV project configuration
+├── pyproject.toml           # UV project configuration (with openai-chatkit)
 ├── Dockerfile               # Backend container
 ├── Dockerfile.mcp           # MCP server container
 └── README.md                # This file
 ```
+
+### Key ChatKit SDK Files
+
+#### `app/chatkit/postgres_store.py` (252 lines)
+Implements ChatKit `Store` interface:
+- `save_thread()` - Creates/updates conversations with external_id
+- `load_thread()` - Loads conversations by ID
+- `save_item()` - Saves user/assistant messages
+- `load_items()` - Loads conversation history
+
+#### `app/chatkit/task_server.py` (249 lines)
+Extends `ChatKitServer`:
+- `respond()` - Processes user messages with OpenAI Agents SDK
+- Connects to MCP server for tool execution
+- Yields `AssistantMessageItem` events for streaming
+
+#### `app/chatkit/middleware.py` (68 lines)
+Authentication middleware:
+- `extract_user_context()` - Validates JWT and extracts user_id
+- Creates context dict passed to all Store methods
 
 ### Adding New MCP Tools
 
@@ -311,7 +384,7 @@ async def my_new_tool(user_id: str, param: str) -> str:
 
 ### Modifying the AI Agent
 
-Edit `app/services/agent_service.py`:
+Edit `app/chatkit/task_server.py`:
 
 ```python
 def _get_system_instructions(self) -> str:
@@ -323,31 +396,33 @@ def _get_system_instructions(self) -> str:
 
 ### Common Issues
 
-#### 1. Gemini API Quota Exceeded (429 Error)
+#### 1. ChatKit SDK Import Error
 
-**Error**: `429 Too Many Requests - Quota exceeded`
-
-**Solutions**:
-- Check usage at https://ai.dev/usage
-- Wait for free tier quota to reset (daily)
-- Upgrade to paid tier at https://ai.google.dev/
-
-#### 2. MCP Server Connection Refused
-
-**Error**: `Connection refused to http://mcp-server:8001/mcp`
+**Error**: `ModuleNotFoundError: No module named 'chatkit'`
 
 **Solutions**:
-- Verify MCP server is running: `docker compose ps mcp-server`
+- Install ChatKit SDK: `uv pip install openai-chatkit`
+- Verify installation: `uv pip list | grep chatkit`
+
+#### 2. JWT Authentication Failed (401)
+
+**Error**: `401 Unauthorized - Missing Authorization header`
+
+**Solutions**:
+- Ensure JWT token is included: `Authorization: Bearer YOUR_TOKEN`
+- Verify Better Auth is configured correctly
+- Check token expiration
+
+#### 3. MCP Server Connection Refused
+
+**Error**: `Connection refused to http://localhost:8001/mcp`
+
+**Solutions**:
+- Verify MCP server is running: `curl http://localhost:8001/health`
 - Check MCP server logs: `docker compose logs mcp-server`
 - Restart MCP server: `docker compose restart mcp-server`
 
-#### 3. Invalid Host Header (421 Error)
-
-**Error**: `421 Misdirected Request - Invalid Host header`
-
-**Solution**: Already fixed in `app/mcp/server.py` with `TransportSecuritySettings`
-
-#### 4. Database Connection Error
+#### 4. Database Migration Error
 
 **Error**: `Could not connect to database`
 
@@ -355,6 +430,15 @@ def _get_system_instructions(self) -> str:
 - Verify DATABASE_URL is correct in `.env`
 - Check database is accessible
 - Run migrations: `uv run alembic upgrade head`
+
+#### 5. Model API Quota Exceeded
+
+**Error**: `429 Too Many Requests - Quota exceeded`
+
+**Solutions**:
+- OpenAI: Check usage at https://platform.openai.com/usage
+- Gemini: Check usage at https://ai.dev/usage
+- Switch models: Set `OPENAI_API_KEY` or `GEMINI_API_KEY`
 
 ### Viewing Logs
 
@@ -398,14 +482,15 @@ docker compose down -v
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | - | Yes |
-| `GEMINI_API_KEY` | Google Gemini API key | - | Yes |
+| `OPENAI_API_KEY` | OpenAI API key (primary) | - | One required |
+| `GEMINI_API_KEY` | Google Gemini API key (fallback) | - | One required |
+| `BETTER_AUTH_SECRET` | JWT secret key (32+ chars) | - | Yes |
 | `MCP_SERVER_URL` | MCP server endpoint | `http://localhost:8001/mcp` | Yes |
 | `ENVIRONMENT` | Environment name | `development` | No |
 | `HOST` | Server bind host | `0.0.0.0` | No |
 | `PORT` | Server port | `8000` | No |
 | `LOG_LEVEL` | Logging level | `INFO` | No |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` | No |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379/0` | No |
 
 ### MCP Server Configuration
 
@@ -420,39 +505,64 @@ docker compose down -v
 - MCP tool discovery: < 100ms
 - Agent processing (simple): 2-5 seconds
 - Agent processing (complex): 5-15 seconds
+- ChatKit SSE streaming: Real-time
 
 ### Rate Limits
+- OpenAI GPT-3.5: Based on tier (pay-as-you-go)
 - Gemini Free Tier: ~60 requests/minute
 - Gemini Paid Tier: Higher limits based on plan
 
 ### Scalability
-- Stateless HTTP MCP transport enables horizontal scaling
-- Redis for distributed caching
+- ChatKit SDK supports horizontal scaling
+- Stateless HTTP MCP transport enables load balancing
 - PostgreSQL connection pooling configured
+- Store interface handles concurrent requests
 
 ## Security
 
 ### Current Implementation
+- JWT authentication via Better Auth
 - Environment-based configuration (no hardcoded secrets)
 - CORS protection configured
 - Input validation with Pydantic
 - SQL injection protection via SQLModel/SQLAlchemy
+- User isolation via user_id in all operations
 
-### Future Enhancements
-- Better Auth integration for user authentication
-- JWT token validation
-- Rate limiting per user
-- API key rotation
+### Best Practices
+- Rotate API keys regularly
+- Use strong BETTER_AUTH_SECRET (32+ characters)
+- Enable SSL/TLS in production
+- Implement rate limiting per user
+- Monitor authentication failures
+
+## Migration from Custom Adapter
+
+If upgrading from the custom adapter approach:
+
+1. **Removed Files**:
+   - `app/routers/chatkit_adapter.py` (custom adapter)
+   - `app/routers/chat.py` (old chat endpoint)
+   - `app/services/agent_service.py` (merged into TaskChatServer)
+
+2. **New Files**:
+   - `app/chatkit/postgres_store.py`
+   - `app/chatkit/task_server.py`
+   - `app/chatkit/middleware.py`
+
+3. **Key Changes**:
+   - Endpoint: `/api/{user_id}/chat` → `/chatkit`
+   - Architecture: Custom adapter → Official ChatKit SDK
+   - Authentication: Path parameter → JWT Bearer token
 
 ## Documentation
 
-- **Integration Summary**: `OPENAI_AGENT_MCP_INTEGRATION_SUMMARY.md` - Complete integration details
-- **MCP Debug Summary**: `MCP_SERVER_DEBUG_SUMMARY.md` - Troubleshooting guide
-- **API Reference**: Coming soon
+- **OpenAI ChatKit SDK**: https://pypi.org/project/openai-chatkit/
+- **ChatKit React**: https://www.npmjs.com/package/@openai/chatkit-react
 - **OpenAI Agents SDK**: https://github.com/openai/openai-agents-python
 - **MCP Protocol**: https://modelcontextprotocol.io/
 - **FastMCP SDK**: https://github.com/modelcontextprotocol/python-sdk
 - **LiteLLM**: https://docs.litellm.ai/
+- **Better Auth**: https://better-auth.com/
 
 ## Contributing
 
@@ -467,6 +577,8 @@ See LICENSE file in project root.
 
 ---
 
-**Status**: ✅ Integration Complete - Production Ready (with valid Gemini API quota)
+**Status**: ✅ ChatKit SDK Migration Complete - Production Ready
 
-**Last Updated**: 2025-12-19
+**Architecture**: Official OpenAI ChatKit Python SDK + OpenAI Agents SDK + MCP Protocol
+
+**Last Updated**: 2025-12-20

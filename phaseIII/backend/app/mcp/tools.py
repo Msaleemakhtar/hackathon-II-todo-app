@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 # Import FastMCP instance
 from app.mcp.server import mcp
 
+# Log tool registration on module load
+logger.info("🔧 tools.py module loading - registering MCP tools...")
+
 
 @mcp.tool(name="add_task", description="Create a new task for the user")
 async def add_task(user_id: str, title: str, description: str = "") -> dict[str, Any]:
@@ -365,3 +368,8 @@ async def update_task(
             "status": "error",
             "message": f"Failed to update task: {str(e)}",
         }
+
+
+# Log tools registered
+logger.info(f"✅ MCP tools registered: add_task, list_tasks, complete_task, delete_task, update_task")
+logger.info(f"📊 Total tools in mcp instance: {len(mcp._tools) if hasattr(mcp, '_tools') else 'unknown'}")

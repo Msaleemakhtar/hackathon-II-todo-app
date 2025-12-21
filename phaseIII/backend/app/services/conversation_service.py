@@ -107,6 +107,23 @@ class ConversationService:
             await db.commit()
 
     @staticmethod
+    async def update_title(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+        title: str,
+    ) -> Conversation | None:
+        """Update conversation title with user ownership validation."""
+        conversation = await ConversationService.get_conversation(db, conversation_id, user_id)
+        if conversation:
+            conversation.title = title
+            conversation.updated_at = datetime.utcnow()
+            await db.commit()
+            await db.refresh(conversation)
+            logger.info(f"Conversation title updated: conversation_id={conversation_id}, title={title}")
+        return conversation
+
+    @staticmethod
     async def list_conversations(
         db: AsyncSession,
         user_id: str,

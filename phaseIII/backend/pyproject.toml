@@ -20,6 +20,7 @@ dependencies = [
     "redis>=5.0.0",
     "openai-agents>=0.6.3",
     "litellm>=1.80.10",
+    "openai-chatkit",
 ]
 
 [project.optional-dependencies]

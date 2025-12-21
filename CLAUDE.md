@@ -200,3 +200,9 @@ After design/architecture work, test for ADR significance:
 If ALL true, suggest:
 📋 Architectural decision detected: [brief-description]
    Document reasoning and tradeoffs? Run `/sp.adr [decision-title]`
+
+## Active Technologies
+- Neon Serverless PostgreSQL (shared database instance with Phase II) (003-fix-chatkit-auth)
+
+## Recent Changes
+- 003-fix-chatkit-auth: Added Neon Serverless PostgreSQL (shared database instance with Phase II)

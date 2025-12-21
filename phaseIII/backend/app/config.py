@@ -1,4 +1,6 @@
+import json
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -21,7 +23,19 @@ class Settings(BaseSettings):
     better_auth_url: str = "http://localhost:3000"
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] | str = ["http://localhost:3000"]
+
+    @field_validator('cors_origins', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from JSON string or return as-is if already a list."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # If not JSON, treat as comma-separated
+                return [origin.strip() for origin in v.split(',')]
+        return v
 
     # JWT Cache Configuration
     jwt_cache_size: int = 1000
