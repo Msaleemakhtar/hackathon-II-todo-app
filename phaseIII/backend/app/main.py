@@ -9,6 +9,12 @@ from slowapi.util import get_remote_address
 
 from app.config import settings
 
+# Configure logging explicitly to ensure INFO level for all app modules
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,  # Override any existing configuration
+)
 logger = logging.getLogger(__name__)
 
 # Rate limiter
@@ -129,11 +135,102 @@ async def root():
     }
 
 
-# Import and include routers
-from app.routers import chat, chatkit_adapter
+# Import ChatKit SDK components
+from fastapi.responses import StreamingResponse
+from app.chatkit import PostgresStore, TaskChatServer, extract_user_context
 
-app.include_router(chat.router)
-app.include_router(chatkit_adapter.router)
+# Initialize ChatKit SDK
+logger.info("Initializing ChatKit SDK...")
+store = PostgresStore()
+task_server = TaskChatServer(store=store)
+logger.info("ChatKit SDK initialized")
+
+
+# ChatKit endpoint handler
+@app.api_route("/chatkit", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def chatkit_handler(request: Request):
+    """
+    ChatKit SDK endpoint handler.
+
+    Routes all ChatKit protocol requests to the TaskChatServer.process() method.
+    Authenticates user via JWT and passes context to ChatKitServer.
+    """
+    logger.info(f"📨 ChatKit request: {request.method} {request.url.path}")
+
+    try:
+        # Extract user context from JWT
+        context = await extract_user_context(request)
+        user_id = context.get("user_id")
+        logger.info(f"✅ Authenticated user: {user_id}")
+
+        # Get request body
+        body = await request.body()
+        logger.info(f"📨 Request body length: {len(body)} bytes")
+        if body:
+            import json
+            try:
+                body_json = json.loads(body)
+                logger.info(f"📨 Request type: {body_json.get('type', 'unknown')}")
+                logger.info(f"📨 Request params: {body_json.get('params', {})}")
+            except:
+                pass
+
+        # Process request via ChatKitServer
+        result = await task_server.process(body, context)
+        logger.info(f"📤 Result type: {type(result).__name__}")
+
+        # Handle streaming vs non-streaming results
+        if hasattr(result, '__aiter__'):
+            # Streaming result
+            logger.info("🌊 Streaming response detected")
+            chunk_count = 0
+
+            async def stream_generator():
+                nonlocal chunk_count
+                try:
+                    async for chunk in result:
+                        chunk_count += 1
+                        # Debug logging for SSE chunks
+                        logger.info(f"📤 SSE Chunk {chunk_count}: type={type(chunk).__name__}, size={len(chunk) if isinstance(chunk, (str, bytes)) else 'N/A'}")
+                        if isinstance(chunk, bytes):
+                            try:
+                                logger.info(f"   Content preview: {chunk[:200].decode('utf-8', errors='ignore')}")
+                            except:
+                                logger.info(f"   Binary content: {chunk[:100]}")
+                        elif isinstance(chunk, str):
+                            logger.info(f"   Content preview: {chunk[:200]}")
+                        else:
+                            logger.info(f"   Object: {str(chunk)[:200]}")
+                        yield chunk
+                    logger.info(f"✅ Streaming completed: {chunk_count} chunks sent to user {user_id}")
+                except Exception as e:
+                    logger.error(f"❌ Error in stream generator: {str(e)}", exc_info=True)
+                    # Yield error event in SSE format
+                    error_msg = f'data: {{"error": "Stream error: {str(e)}"}}\n\n'
+                    yield error_msg.encode()
+
+            return StreamingResponse(
+                stream_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                }
+            )
+        else:
+            # Non-streaming result - ChatKit SDK returns a proper response object
+            # Return it directly without wrapping
+            logger.info(f"📄 Non-streaming response for user {user_id}")
+            return result
+
+    except Exception as e:
+        logger.error(f"❌ Error in chatkit_handler: {str(e)}", exc_info=True)
+        # Return error response with proper CORS headers
+        return Response(
+            content=f'{{"error": "{str(e)}"}}',
+            status_code=500,
+            media_type="application/json",
+        )
 
 # MCP Server Architecture Note:
 # The MCP server runs as a standalone Docker service (phaseiii-mcp-server)

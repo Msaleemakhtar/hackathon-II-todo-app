@@ -83,6 +83,7 @@ const RegistrationForm: React.FC = () => {
             name="name"
             value={formData.name}
             onChange={handleChange}
+            autoComplete="name"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="John Doe"
           />
@@ -99,6 +100,7 @@ const RegistrationForm: React.FC = () => {
             value={formData.email}
             onChange={handleChange}
             required
+            autoComplete="email"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="you@example.com"
           />
@@ -116,6 +118,7 @@ const RegistrationForm: React.FC = () => {
             onChange={handleChange}
             required
             minLength={8}
+            autoComplete="new-password"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="••••••••"
           />

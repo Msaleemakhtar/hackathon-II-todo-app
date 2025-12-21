@@ -3,6 +3,7 @@
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from app.models.message import Message, MessageRole
 
@@ -59,6 +60,47 @@ class MessageService:
         return await MessageService.create_message(
             db, conversation_id, user_id, MessageRole.ASSISTANT, content
         )
+
+    @staticmethod
+    async def get_messages_by_conversation(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """
+        Get messages for a conversation with user ownership validation.
+
+        Args:
+            db: Database session
+            conversation_id: Conversation ID
+            user_id: User ID for ownership validation
+            limit: Maximum number of messages to return (optional)
+
+        Returns:
+            List of messages ordered by creation time (oldest first)
+        """
+        query = (
+            select(Message)
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.user_id == user_id
+            )
+            .order_by(Message.created_at.asc())
+        )
+
+        if limit:
+            query = query.limit(limit)
+
+        result = await db.execute(query)
+        messages = list(result.scalars().all())
+
+        logger.info(
+            f"Loaded {len(messages)} messages for conversation_id={conversation_id}, "
+            f"user_id={user_id}"
+        )
+
+        return messages
 
 
 # Global service instance
