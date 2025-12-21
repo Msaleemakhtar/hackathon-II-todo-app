@@ -136,7 +136,7 @@ async def root():
 
 
 # Import ChatKit SDK components
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from app.chatkit import PostgresStore, TaskChatServer, extract_user_context
 
 # Initialize ChatKit SDK
@@ -218,9 +218,42 @@ async def chatkit_handler(request: Request):
                 }
             )
         else:
-            # Non-streaming result - ChatKit SDK returns a proper response object
-            # Return it directly without wrapping
+            # Non-streaming result - ChatKit SDK returns a response object
             logger.info(f"📄 Non-streaming response for user {user_id}")
+
+            # DEBUG: Inspect the result object structure
+            logger.info(f"🔍 Result object type: {type(result)}")
+            logger.info(f"🔍 Result object dir: {dir(result)[:20]}")  # First 20 attributes
+            logger.info(f"🔍 Has 'json' attr: {hasattr(result, 'json')}")
+
+            if hasattr(result, 'json'):
+                logger.info(f"🔍 json type: {type(result.json)}")
+                logger.info(f"🔍 json value preview: {str(result.json)[:200]}")
+
+            # CRITICAL: ChatKit SDK returns an object with a .json attribute containing
+            # JSON data (either as bytes or string). We need to parse this and return
+            # the actual JSON content, not the wrapper object, to avoid double-serialization.
+            if hasattr(result, 'json'):
+                import json as json_lib
+                try:
+                    # Handle both bytes and str
+                    json_data = result.json
+                    if isinstance(json_data, bytes):
+                        json_data = json_data.decode('utf-8')
+
+                    # Parse the JSON string
+                    parsed_data = json_lib.loads(json_data)
+                    logger.info(f"✅ Parsed ChatKit response: {str(parsed_data)[:200]}...")
+                    # Return as JSONResponse to ensure proper serialization
+                    return JSONResponse(content=parsed_data)
+                except (json_lib.JSONDecodeError, UnicodeDecodeError) as e:
+                    logger.error(f"❌ Failed to parse ChatKit JSON: {str(e)}")
+                    logger.error(f"   Raw JSON data: {str(result.json)[:500]}")
+                    # Fallback to returning result as-is
+                    return result
+
+            # If no .json attribute, return as-is
+            logger.info(f"⚠️ No .json attribute, returning result as-is")
             return result
 
     except Exception as e:

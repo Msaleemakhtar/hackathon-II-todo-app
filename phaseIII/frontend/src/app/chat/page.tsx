@@ -24,6 +24,44 @@ const ChatKit = dynamic(
 // Import useChatKit normally since it's just a hook
 import { useChatKit } from '@openai/chatkit-react';
 
+// localStorage key for persisting current thread
+const THREAD_STORAGE_KEY = 'chatkit_current_thread_id';
+
+/**
+ * Get the stored thread ID from localStorage
+ * @returns The stored thread ID or null if not found/unavailable
+ */
+const getStoredThreadId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedId = localStorage.getItem(THREAD_STORAGE_KEY);
+    console.log('[DEBUG] getStoredThreadId:', storedId);
+    return storedId;
+  } catch (error) {
+    console.error('[DEBUG] Failed to get stored thread ID:', error);
+    return null;
+  }
+};
+
+/**
+ * Store the thread ID in localStorage
+ * @param threadId - The thread ID to store, or null to clear
+ */
+const setStoredThreadId = (threadId: string | null): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (threadId) {
+      localStorage.setItem(THREAD_STORAGE_KEY, threadId);
+      console.log('[DEBUG] Stored thread ID:', threadId);
+    } else {
+      localStorage.removeItem(THREAD_STORAGE_KEY);
+      console.log('[DEBUG] Cleared thread ID from localStorage');
+    }
+  } catch (error) {
+    console.error('[DEBUG] Failed to store thread ID:', error);
+  }
+};
+
 /**
  * Chat Interface Component
  * This component is only rendered when authToken is available
@@ -32,164 +70,194 @@ import { useChatKit } from '@openai/chatkit-react';
  * https://github.com/openai/openai-chatkit-advanced-samples
  */
 function ChatInterface({ authToken, session }: { authToken: string; session: any }) {
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(() => {
+    const initialThreadId = getStoredThreadId();
+    console.log('[DEBUG] ChatInterface initialized with threadId:', initialThreadId);
+    return initialThreadId;
+  });
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Handle thread change events
   const handleThreadChange = useCallback(({ threadId: newThreadId }: { threadId?: string | null }) => {
-    console.log('[ChatKit] 🔄 Thread changed:', {
-      thread_id: newThreadId,
-      timestamp: new Date().toISOString()
-    });
-    setThreadId(newThreadId ?? null);
-  }, []);
+    const normalizedThreadId = newThreadId ?? null;
+    console.log('[DEBUG] handleThreadChange called with:', newThreadId, '-> normalized:', normalizedThreadId);
+
+    // Only update if the thread ID actually changed
+    // This prevents clearing the thread ID on errors
+    if (normalizedThreadId !== threadId) {
+      console.log('[DEBUG] Thread ID changed from', threadId, 'to', normalizedThreadId);
+      setThreadId(normalizedThreadId);
+      setStoredThreadId(normalizedThreadId);
+    } else {
+      console.log('[DEBUG] Thread ID unchanged, skipping update');
+    }
+  }, [threadId]);
 
   // Handle response completion
   const handleResponseEnd = useCallback(() => {
-    console.log('[ChatKit] ✅ Response completed:', {
-      thread_id: threadId,
-      timestamp: new Date().toISOString()
-    });
-  }, [threadId]);
+    // Response completed
+  }, []);
 
   // Handle errors
   const handleError = useCallback(({ error }: { error: Error }) => {
-    console.error('[ChatKit] ❌ Error:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    });
+    console.error('[ChatKit] Error:', error);
   }, []);
 
   // Handle ready event
   const handleReady = useCallback(() => {
-    console.log('[ChatKit] 🟢 ChatKit is ready', {
-      thread_id: threadId,
-      timestamp: new Date().toISOString()
-    });
+    console.log('[DEBUG] ChatKit ready event fired');
+  }, []);
+
+  // Handle incoming messages
+  const handleMessage = useCallback((event: any) => {
+    // Message received
+  }, []);
+
+  // Handle stream events
+  const handleStreamEvent = useCallback((event: any) => {
+    // Stream event received
+  }, []);
+
+  // Monitor threadId changes
+  useEffect(() => {
+    console.log('[DEBUG] threadId state changed to:', threadId);
   }, [threadId]);
 
-  // Handle incoming messages (for debugging)
-  const handleMessage = useCallback((event: any) => {
-    console.log('[ChatKit] 📨 Message event received:', {
-      type: event?.type,
-      role: event?.role,
-      hasContent: !!event?.content,
-      timestamp: new Date().toISOString()
-    });
-  }, []);
-
-  // Handle stream events (for debugging)
-  const handleStreamEvent = useCallback((event: any) => {
-    console.log('[ChatKit] 🌊 Stream event received:', {
-      event_type: typeof event,
-      data: event,
-      timestamp: new Date().toISOString()
-    });
-  }, []);
-
-  // Add effect to check if web component is loaded
-  useEffect(() => {
-    console.log('🔍 Checking for openai-chatkit web component...');
-    const checkWebComponent = () => {
-      const element = document.querySelector('openai-chatkit');
-      if (element) {
-        console.log('✅ Found <openai-chatkit> element:', element);
-        console.log('   Element properties:', Object.keys(element));
-      } else {
-        console.log('❌ <openai-chatkit> element NOT found in DOM');
-      }
-    };
-
-    // Check immediately and after a delay
-    checkWebComponent();
-    const timer = setTimeout(checkWebComponent, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // Log the threadId before passing to ChatKit
+  console.log('[DEBUG] Initializing ChatKit with threadId:', threadId);
 
   // Initialize ChatKit with full configuration following official examples
   const chatkit = useChatKit({
     api: {
       url: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/chatkit`,
-      // For local development: empty string works
-      // For production: set NEXT_PUBLIC_CHATKIT_DOMAIN_KEY in .env.local
       domainKey: process.env.NEXT_PUBLIC_CHATKIT_DOMAIN_KEY || '',
       // Custom fetch function to inject auth headers
       // IMPORTANT: Must return Response directly for SSE stream handling
-      fetch: async (url: string, options?: RequestInit) => {
-        console.log('[ChatKit] 📤 Request:', {
-          method: options?.method || 'GET',
-          url,
-          hasToken: !!authToken,
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        console.log('[DEBUG] ChatKit fetch called:', {
+          url: input.toString(),
+          method: init?.method || 'GET',
+          hasAuth: !!authToken,
         });
 
-        // Return the fetch response directly without awaiting or processing
-        // This preserves SSE stream handling by ChatKit
-        return fetch(url, {
-          ...options,
+        const response = await fetch(input, {
+          ...init,
           headers: {
-            ...options?.headers,
+            ...init?.headers,
             'Authorization': `Bearer ${authToken}`,
             'Accept': 'text/event-stream',
           },
         });
+
+        console.log('[DEBUG] ChatKit fetch response:', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+        });
+
+        // Log response body for non-streaming responses
+        if (!response.headers.get('content-type')?.includes('event-stream')) {
+          const clonedResponse = response.clone();
+          try {
+            const text = await clonedResponse.text();
+            console.log('[DEBUG] Response body:', text.substring(0, 500));
+          } catch (e) {
+            console.error('[DEBUG] Failed to read response:', e);
+          }
+        }
+
+        return response;
+      },
+    },
+    initialThread: threadId,
+    history: {
+      enabled: true,
+      showDelete: true,
+      showRename: true,
+    },
+    header: {
+      enabled: true,
+      title: {
+        enabled: true,
+        text: undefined,
       },
     },
     theme: {
-      colorScheme: 'light',
+      colorScheme: isDarkMode ? 'dark' : 'light',
+      radius: 'soft',
+      density: 'normal',
+      typography: {
+        baseSize: 16,
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      },
       color: {
         grayscale: {
           hue: 220,
           tint: 6,
-          shade: -4,
+          shade: -2,
         },
         accent: {
-          primary: '#0f172a',
-          level: 1,
+          primary: '#3b82f6',
+          level: 2,
+        },
+        surface: {
+          background: isDarkMode ? '#111827' : '#ffffff',
+          foreground: isDarkMode ? '#f9fafb' : '#111827',
         },
       },
-      radius: 'round',
     },
     startScreen: {
-      greeting: 'How can I help you manage your tasks today?',
+      greeting: 'Welcome! I\'m here to help you manage your tasks efficiently. What would you like to do?',
       prompts: [
         {
-          label: 'Create a task',
-          prompt: 'Add a new task to buy groceries',
+          label: '📝 Create a new task',
+          prompt: 'Add a new task: Buy groceries for dinner tonight',
+          icon: 'plus',
         },
         {
-          label: 'List my tasks',
-          prompt: 'Show me all my tasks',
+          label: '📋 View all tasks',
+          prompt: 'Show me all my pending tasks organized by priority',
+          icon: 'book-open',
         },
         {
-          label: 'Update a task',
-          prompt: 'Update task #1',
+          label: '🎯 Today\'s priorities',
+          prompt: 'What tasks should I focus on today?',
+          icon: 'star',
         },
         {
-          label: 'Complete a task',
-          prompt: 'Mark task #1 as complete',
+          label: '✅ Complete a task',
+          prompt: 'Mark my first task as complete',
+          icon: 'check',
         },
       ],
     },
     composer: {
-      placeholder: 'Ask me to create, update, or complete tasks...',
+      placeholder: 'Type a message or describe what you need help with...',
+      attachments: {
+        enabled: false,
+      },
+    },
+    threadItemActions: {
+      feedback: true,
+      retry: true,
+    },
+    disclaimer: {
+      text: 'AI responses may occasionally be inaccurate. Please verify important information.',
+      highContrast: false,
     },
     onResponseEnd: handleResponseEnd,
     onThreadChange: handleThreadChange,
     onError: handleError,
     onReady: handleReady,
-    onMessage: handleMessage,
   });
 
-  // Debug logging
-  console.log('[ChatKit] 🎮 Control object created:', {
-    type: typeof chatkit.control,
-    isValid: typeof chatkit.control === 'object',
-    keys: chatkit.control ? Object.keys(chatkit.control) : [],
-    apiUrl: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/chatkit`,
-    threadId: threadId,
-    timestamp: new Date().toISOString()
-  });
+  // Handle new chat button click
+  const handleNewChat = useCallback(() => {
+    setThreadId(null);
+    setStoredThreadId(null);
+    // Refresh the page to start with a new conversation
+    window.location.reload();
+  }, []);
 
   // Check if control is valid
   const hasValidControl = chatkit && chatkit.control && typeof chatkit.control === 'object';
@@ -197,15 +265,51 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
-      <header className="border-b bg-background p-4">
+      <header className="border-b bg-gradient-to-r from-slate-50 to-blue-50 p-4 shadow-sm">
         <div className="container mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">AI Task Assistant [NEW IMPLEMENTATION]</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage your tasks through natural conversation
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
+              AI
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">AI Task Assistant</h1>
+              <p className="text-sm text-gray-600">
+                Manage your tasks through natural conversation
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
+            {/* New Chat Button */}
+            <button
+              onClick={handleNewChat}
+              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              title="Start a new conversation"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New Chat
+            </button>
+
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="rounded-md p-2 hover:bg-gray-100 transition-colors"
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+
             <span className="text-sm text-muted-foreground">
               {session.user?.email || session.user?.name || 'User'}
             </span>
@@ -216,18 +320,8 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
         </div>
       </header>
 
-      {/* Debug Info */}
-      <div className="bg-yellow-50 border-b border-yellow-200 p-2">
-        <p className="text-xs text-yellow-800">
-          🔧 Debug: ChatKit control type: {typeof chatkit.control} |
-          Has control: {chatkit.control ? 'YES' : 'NO'} |
-          Valid: {hasValidControl ? 'YES' : 'NO'} |
-          Thread: {threadId || 'none'}
-        </p>
-      </div>
-
       {/* ChatKit Component - Full height container */}
-      <div className="flex-1 overflow-hidden bg-white border-4 border-blue-500">
+      <div className="flex-1 overflow-hidden">
         <div className="h-full w-full bg-gray-50">
           {!hasValidControl ? (
             <div className="flex h-full items-center justify-center p-8">
@@ -249,13 +343,6 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
             <ChatKit control={chatkit.control} className="h-full w-full" />
           )}
         </div>
-      </div>
-
-      {/* Footer Debug */}
-      <div className="bg-blue-50 border-t border-blue-200 p-2">
-        <p className="text-xs text-blue-800 text-center">
-          ChatKit should appear in the blue-bordered area above
-        </p>
       </div>
     </div>
   );
@@ -291,28 +378,25 @@ export default function ChatPage() {
     if (session) {
       // Check if JWT is available directly in session (via JWT plugin)
       if ((session as any).jwt) {
-        console.log('[ChatKit] ✅ JWT found in session');
         setAuthToken((session as any).jwt);
         setTokenLoading(false);
       } else {
         // Fallback: fetch JWT from token endpoint
-        console.log('[ChatKit] 🔑 Fetching JWT token from /api/auth/token');
         setTokenLoading(true);
         fetch('/api/auth/token')
           .then(res => {
             if (!res.ok) {
-              console.error('[ChatKit] ❌ Token fetch failed:', res.status, res.statusText);
+              console.error('[ChatKit] Token fetch failed:', res.status, res.statusText);
               throw new Error(`Token fetch failed: ${res.status}`);
             }
             return res.json();
           })
           .then(data => {
             if (data.token) {
-              console.log('[ChatKit] ✅ JWT token fetched successfully');
               setAuthToken(data.token);
               setTokenError(null);
             } else {
-              console.error('[ChatKit] ❌ No token in response:', data);
+              console.error('[ChatKit] No token in response:', data);
               throw new Error('No token in response');
             }
           })

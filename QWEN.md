@@ -199,10 +199,3 @@ After design/architecture work, test for ADR significance:
 If ALL true, suggest:
 📋 Architectural decision detected: [brief-description]
    Document reasoning and tradeoffs? Run `/sp.adr [decision-title]`
-
-
-
-**\`\`\`markdown**	
-
-@AGENTS.md  
-**\`\`\`**
