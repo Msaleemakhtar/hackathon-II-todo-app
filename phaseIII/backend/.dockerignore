@@ -59,10 +59,10 @@ logs/
 *.sqlite
 *.sqlite3
 
-# Alembic (development)
-alembic.ini
+# Alembic (needed for migrations in container)
+# alembic.ini is required for running migrations
 
-# Tests
+# Tests (exclude from production image)
 tests/
 *.test.py
 

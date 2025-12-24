@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from '@/lib/auth';
+import { useSession, signOut } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -70,12 +70,14 @@ const setStoredThreadId = (threadId: string | null): void => {
  * https://github.com/openai/openai-chatkit-advanced-samples
  */
 function ChatInterface({ authToken, session }: { authToken: string; session: any }) {
+  const router = useRouter();
   const [threadId, setThreadId] = useState<string | null>(() => {
     const initialThreadId = getStoredThreadId();
     console.log('[DEBUG] ChatInterface initialized with threadId:', initialThreadId);
     return initialThreadId;
   });
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
   // Handle thread change events
   const handleThreadChange = useCallback(({ threadId: newThreadId }: { threadId?: string | null }) => {
@@ -88,6 +90,7 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
       console.log('[DEBUG] Thread ID changed from', threadId, 'to', normalizedThreadId);
       setThreadId(normalizedThreadId);
       setStoredThreadId(normalizedThreadId);
+      setCurrentThreadId(normalizedThreadId);
     } else {
       console.log('[DEBUG] Thread ID unchanged, skipping update');
     }
@@ -122,6 +125,74 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
   useEffect(() => {
     console.log('[DEBUG] threadId state changed to:', threadId);
   }, [threadId]);
+
+  // Read thread ID from URL query params on mount (for shared links)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const urlThreadId = params.get('thread');
+
+    if (urlThreadId && !threadId) {
+      console.log('[Share] Loading shared thread from URL:', urlThreadId);
+      setThreadId(urlThreadId);
+      setStoredThreadId(urlThreadId);
+      setCurrentThreadId(urlThreadId);
+    }
+  }, []); // Run only on mount
+
+  // Handle new chat button click
+  const handleNewChat = useCallback(() => {
+    setThreadId(null);
+    setStoredThreadId(null);
+    // Refresh the page to start with a new conversation
+    window.location.reload();
+  }, []);
+
+  // Handle share conversation
+  const handleShare = useCallback(async () => {
+    if (!currentThreadId) {
+      console.warn('[Share] No active conversation to share');
+      return;
+    }
+
+    const shareUrl = `${window.location.origin}/chat?thread=${currentThreadId}`;
+
+    try {
+      // Try native share sheet (mobile/PWA)
+      if (navigator.share) {
+        await navigator.share({
+          title: 'AI Task Assistant Conversation',
+          text: 'Check out this task conversation',
+          url: shareUrl,
+        });
+        console.log('[Share] Shared via native share sheet');
+      } else {
+        // Fallback: copy to clipboard (desktop)
+        await navigator.clipboard.writeText(shareUrl);
+        console.log('[Share] Link copied to clipboard:', shareUrl);
+
+        // Simple user feedback
+        alert('Conversation link copied to clipboard!');
+      }
+    } catch (error) {
+      // User cancelled or permission denied
+      if ((error as Error).name !== 'AbortError') {
+        console.error('[Share] Failed:', error);
+      }
+    }
+  }, [currentThreadId]);
+
+  // Handle logout
+  const handleLogout = useCallback(async () => {
+    try {
+      await signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('[Logout] Failed:', error);
+      router.push('/login'); // Force redirect anyway
+    }
+  }, [router]);
 
   // Log the threadId before passing to ChatKit
   console.log('[DEBUG] Initializing ChatKit with threadId:', threadId);
@@ -191,18 +262,9 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
         fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       },
       color: {
-        grayscale: {
-          hue: 220,
-          tint: 6,
-          shade: -2,
-        },
         accent: {
-          primary: '#3b82f6',
+          primary: '#10a37f',
           level: 2,
-        },
-        surface: {
-          background: isDarkMode ? '#111827' : '#ffffff',
-          foreground: isDarkMode ? '#f9fafb' : '#111827',
         },
       },
     },
@@ -242,7 +304,7 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
       retry: true,
     },
     disclaimer: {
-      text: 'AI responses may occasionally be inaccurate. Please verify important information.',
+      text: '💡 Tip: Select any message text to copy it. AI responses may be inaccurate—verify important information.',
       highContrast: false,
     },
     onResponseEnd: handleResponseEnd,
@@ -250,14 +312,6 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
     onError: handleError,
     onReady: handleReady,
   });
-
-  // Handle new chat button click
-  const handleNewChat = useCallback(() => {
-    setThreadId(null);
-    setStoredThreadId(null);
-    // Refresh the page to start with a new conversation
-    window.location.reload();
-  }, []);
 
   // Check if control is valid
   const hasValidControl = chatkit && chatkit.control && typeof chatkit.control === 'object';
@@ -279,11 +333,12 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {/* New Chat Button */}
+            {/* Share Button */}
             <button
-              onClick={handleNewChat}
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              title="Start a new conversation"
+              onClick={handleShare}
+              disabled={!currentThreadId}
+              className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Share this conversation"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -296,9 +351,13 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M12 5v14M5 12h14" />
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
               </svg>
-              New Chat
+              Share
             </button>
 
             {/* Dark Mode Toggle */}
@@ -310,11 +369,32 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
               {isDarkMode ? '☀️' : '🌙'}
             </button>
 
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              title="Sign out"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Logout
+            </button>
+
             <span className="text-sm text-muted-foreground">
               {session.user?.email || session.user?.name || 'User'}
-            </span>
-            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-              ChatKit v1.4.0
             </span>
           </div>
         </div>

@@ -63,10 +63,10 @@ class TaskChatServer(ChatKitServer):
             logger.info("TaskChatServer initialized with GPT-3.5-turbo via LiteLLM")
         elif settings.gemini_api_key:
             self.model = LitellmModel(
-                model="gemini/gemini-2.0-flash",  # Fast, cost-effective Gemini 2.0 model
+                model="gemini/gemini-2.5-pro",  # Gemini 2.5 Pro with higher quota
                 api_key=settings.gemini_api_key,
             )
-            logger.info("TaskChatServer initialized with Gemini 2.0 via LiteLLM")
+            logger.info("TaskChatServer initialized with Gemini 2.5 Pro via LiteLLM")
         else:
             raise ValueError("Either OPENAI_API_KEY or GEMINI_API_KEY must be set in environment")
 

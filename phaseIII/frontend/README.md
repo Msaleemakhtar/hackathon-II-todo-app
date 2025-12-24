@@ -99,7 +99,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=
 
 # Better Auth URL
-NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:8000/auth
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 ```
 
 ### 3. Run Development Server
@@ -259,12 +259,43 @@ AI: Here are your completed tasks:
 
 ### Running in Development Mode
 
+**Option 1: Full Docker Compose (Recommended)**
 ```bash
-# Terminal 1: Backend + MCP Server
-cd ../backend
+# From phaseIII directory - starts all services
 docker compose up
 
-# Terminal 2: Frontend
+# All services available:
+# - Frontend: http://localhost:3000
+# - Backend: http://localhost:8000
+# - MCP Server: http://localhost:8001
+# - Redis: localhost:6379
+```
+
+**Option 2: Backend in Docker + Frontend Local**
+```bash
+# Terminal 1: Backend + MCP Server + Redis
+cd phaseIII
+docker compose up backend mcp-server redis
+
+# Terminal 2: Frontend (local development)
+cd frontend
+bun run dev
+# or
+npm run dev
+```
+
+**Option 3: All Local (Development)**
+```bash
+# Terminal 1: MCP Server
+cd backend
+./scripts/dev-mcp-server.sh
+
+# Terminal 2: Backend
+cd backend
+./scripts/dev-backend.sh
+
+# Terminal 3: Frontend
+cd frontend
 bun run dev
 ```
 
@@ -407,6 +438,77 @@ onThreadChange?: ({ threadId }) => void;
 - Verify Better Auth secret matches backend
 - Check database has Better Auth tables
 
+#### 6. Signup/Login Returns "database error"
+
+**Symptoms**:
+- User sees "Failed to create account. Please try again. database error"
+- Console shows 500 errors on `/api/auth/sign-up/email` or `/api/auth/get-session`
+- Frontend logs show: `[BetterAuthError]: Failed to initialize database adapter`
+
+**Solutions**:
+
+**1. Verify NEXT_PUBLIC_BETTER_AUTH_URL** (Most Common Issue)
+
+```bash
+# Check in .env.local or .env
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000  # ✅ Correct
+
+# NOT this:
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:8000/auth  # ❌ Wrong
+```
+
+**Why**: Better Auth routes (`/api/auth/*`) are in the **frontend** Next.js app, not in the backend. The frontend needs to call its own API routes.
+
+**2. Check Better Auth Database Connection**
+
+Better Auth needs to connect to PostgreSQL. Verify in `src/lib/auth-server.ts`:
+
+```typescript
+// Should use Neon Pool directly
+database: new Pool({ connectionString: dbUrl })
+```
+
+If you see errors about kysely-neon or database adapters, ensure:
+- `DATABASE_URL` is set (same as backend uses)
+- Better Auth is using Neon Pool (not kysely-neon HTTP dialect)
+
+**3. Verify Database URL Format**
+
+The DATABASE_URL transformation should handle both protocols:
+
+```typescript
+// auth-server.ts should convert asyncpg → postgresql
+const dbUrl = process.env.DATABASE_URL
+  ?.replace('postgresql+asyncpg://', 'postgresql://') || '';
+```
+
+**4. Rebuild After .env Changes**
+
+Environment variables are baked into the Next.js build:
+
+```bash
+# Local development
+bun run dev  # Will pick up .env.local changes
+
+# Docker deployment
+docker compose build frontend
+docker compose up -d frontend
+```
+
+**5. Check Better Auth Tables Exist**
+
+Better Auth needs these tables in PostgreSQL:
+- `user`
+- `session`
+- `account`
+- `verification`
+
+Run backend migrations if missing:
+```bash
+cd ../backend
+uv run alembic upgrade head
+```
+
 ### Debug Mode
 
 The chat page includes a debug banner showing:
@@ -427,7 +529,7 @@ To enable additional logging:
 |----------|-------------|----------|---------|
 | `NEXT_PUBLIC_API_URL` | Backend API base URL | Yes | `http://localhost:8000` |
 | `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | ChatKit domain key | No | `''` (empty for localhost) |
-| `NEXT_PUBLIC_BETTER_AUTH_URL` | Better Auth endpoint | Yes | `http://localhost:8000/auth` |
+| `NEXT_PUBLIC_BETTER_AUTH_URL` | Better Auth endpoint | Yes | `http://localhost:3000` |
 
 ## Performance
 
@@ -465,7 +567,66 @@ To enable additional logging:
 
 ## Deployment
 
-### Vercel (Recommended)
+### Docker (Recommended for Self-Hosting)
+
+The frontend includes an optimized multi-stage Dockerfile for production deployment.
+
+#### Building the Image
+
+```bash
+# From frontend directory
+docker build -t phaseiii-frontend .
+
+# Or from phaseIII directory (includes all services)
+docker compose build frontend
+```
+
+#### Running with Docker Compose
+
+```bash
+# From phaseIII directory - starts all services
+docker compose up -d
+
+# Frontend will be available at http://localhost:3000
+```
+
+#### Running Standalone Container
+
+```bash
+# Run the frontend container independently
+docker run -d \
+  --name phaseiii-frontend \
+  -p 3000:3000 \
+  -e NEXT_PUBLIC_API_URL=http://localhost:8000 \
+  -e NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:8000/auth \
+  -e NEXT_PUBLIC_CHATKIT_DOMAIN_KEY= \
+  phaseiii-frontend
+```
+
+#### Docker Image Details
+
+**Dockerfile** (`phaseIII/frontend/Dockerfile`):
+- **Stage 1 (deps)**: Install dependencies with clean npm ci
+- **Stage 2 (builder)**: Build Next.js with standalone output
+- **Stage 3 (runner)**: Minimal production runtime with Node 20-alpine
+- **Security**: Non-root user (nextjs:nodejs)
+- **Health checks**: HTTP check on port 3000
+- **Image size**: ~150MB (optimized)
+
+#### Production Environment Variables
+
+```bash
+# Required for production
+NEXT_PUBLIC_API_URL=https://your-backend-domain.com
+NEXT_PUBLIC_BETTER_AUTH_URL=https://your-frontend-domain.com
+
+# Optional - for ChatKit production domain
+NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=domain_pk_prod_xxxxx
+```
+
+**Important**: `NEXT_PUBLIC_BETTER_AUTH_URL` should point to the **frontend domain**, not the backend. Better Auth API routes (`/api/auth/*`) are served by the Next.js frontend.
+
+### Vercel (Recommended for Managed Hosting)
 
 ```bash
 # Install Vercel CLI
@@ -477,27 +638,67 @@ vercel
 # Set environment variables in Vercel dashboard
 ```
 
-### Docker
+### Docker Compose Full Stack
 
-```bash
-# Build image
-docker build -t phaseiii-frontend .
+The docker-compose.yml includes all services with proper networking:
 
-# Run container
-docker run -p 3000:3000 \
-  -e NEXT_PUBLIC_API_URL=https://api.example.com \
-  -e NEXT_PUBLIC_BETTER_AUTH_URL=https://api.example.com/auth \
-  phaseiii-frontend
+```yaml
+services:
+  - mcp-server (Port 8001)
+  - backend (Port 8000)
+  - frontend (Port 3000)
+  - redis (Port 6379)
 ```
 
-### Environment Variables for Production
+**Features:**
+- Automatic service discovery via Docker networking
+- Health checks for all services
+- Resource limits configured
+- Persistent Redis data
+- Hot-reload support in development mode
 
-Set these in your deployment platform:
+### Kubernetes Deployment (Advanced)
+
+For Kubernetes deployments, use the provided Dockerfiles to build images and create deployments:
 
 ```bash
-NEXT_PUBLIC_API_URL=https://your-backend-domain.com
-NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=domain_pk_prod_xxxxx
-NEXT_PUBLIC_BETTER_AUTH_URL=https://your-backend-domain.com/auth
+# Build and push images
+docker build -t your-registry/phaseiii-frontend:latest ./frontend
+docker push your-registry/phaseiii-frontend:latest
+
+# Create Kubernetes resources
+kubectl apply -f k8s/frontend-deployment.yaml
+kubectl apply -f k8s/frontend-service.yaml
+```
+
+### Performance Optimization
+
+**Production Build:**
+```bash
+# Build with optimizations
+npm run build
+
+# Analyze bundle size
+npm install --save-dev @next/bundle-analyzer
+```
+
+**Docker Layer Caching:**
+The Dockerfile is optimized for layer caching:
+1. Dependencies installed first (rarely change)
+2. Source code copied last (changes frequently)
+3. Multi-stage build reduces final image size
+
+**Resource Limits:**
+Configure in docker-compose.yml:
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '1.0'
+      memory: 1G
+    reservations:
+      cpus: '0.5'
+      memory: 512M
 ```
 
 ## Testing

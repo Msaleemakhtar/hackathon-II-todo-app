@@ -136,6 +136,8 @@ async def root():
 
 
 # Import ChatKit SDK components
+from app.services.conversation_service import ConversationService
+from app.database import async_session_maker
 from fastapi.responses import StreamingResponse, JSONResponse
 from app.chatkit import PostgresStore, TaskChatServer, extract_user_context
 
@@ -264,6 +266,37 @@ async def chatkit_handler(request: Request):
             status_code=500,
             media_type="application/json",
         )
+
+
+@app.delete("/chatkit/threads/all")
+async def delete_all_threads(request: Request):
+    """
+    Delete all conversation threads for the authenticated user.
+
+    Returns:
+        {"deleted": count}
+    """
+    logger.info("📨 Delete all threads request")
+
+    try:
+        # Extract user context from JWT
+        context = await extract_user_context(request)
+        user_id = context.get("user_id")
+        logger.info(f"✅ Authenticated user: {user_id}")
+
+        # Delete all threads via store
+        deleted_count = await store.delete_all_threads(context)
+
+        logger.info(f"✅ Deleted {deleted_count} threads for user {user_id}")
+        return JSONResponse(content={"deleted": deleted_count})
+
+    except Exception as e:
+        logger.error(f"❌ Error in delete_all_threads: {str(e)}", exc_info=True)
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500,
+        )
+
 
 # MCP Server Architecture Note:
 # The MCP server runs as a standalone Docker service (phaseiii-mcp-server)

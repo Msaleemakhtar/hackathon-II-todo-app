@@ -74,3 +74,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ================================================
+   ChatKit ChatGPT-style Customization
+   ================================================ */
+
+openai-chatkit {
+  /* Ensure full height and width */
+  display: block;
+  height: 100%;
+  width: 100%;
+
+  /* ChatKit CSS variables (if exposed by SDK) */
+  --ck-accent-color: #10a37f;
+  --ck-radius: 8px;
+  --ck-sidebar-bg: #f7f7f8;
+  --ck-message-spacing: 1.5rem;
+}
+
+/* Dark mode overrides */
+openai-chatkit[data-color-scheme="dark"] {
+  --ck-accent-color: #19c37d;  /* Slightly brighter green for dark mode */
+  --ck-sidebar-bg: #171717;
+  --ck-surface-bg: #212121;
+}
+
