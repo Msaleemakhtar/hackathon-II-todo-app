@@ -1,0 +1,201 @@
+services:
+  # MCP Server - Standalone FastMCP HTTP service
+  mcp-server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.mcp
+    container_name: phaseiii-mcp-server
+    ports:
+      - "8001:8001"
+    environment:
+      # Database - Shared with backend (Neon Serverless PostgreSQL)
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@localhost:5432/todoapp_phaseiii}
+
+      # MCP Server Configuration
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8001
+
+      # Application
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    # Development mode: mount source code for hot-reload
+    # Production mode: remove volumes section
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/.env:/app/.env:ro
+
+    networks:
+      - phaseiii-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',8001)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+    # Resource limits (optional - adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: phaseiii-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database (Neon Serverless PostgreSQL)
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@localhost:5432/todoapp_phaseiii}
+
+      # AI Model API Keys (at least one required)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Better Auth
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+
+      # Application
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://frontend:3000}
+
+      # MCP Server - Use Docker service name for internal communication
+      - MCP_SERVER_URL=http://mcp-server:8001/mcp
+
+      # Redis (optional - for rate limiting and caching)
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    # Development mode: mount source code for hot-reload
+    # Production mode: remove volumes section
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/.env:/app/.env:ro
+
+    networks:
+      - phaseiii-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits (optional - adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Frontend - Next.js Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: phaseiii-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Backend API URL
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+
+      # ChatKit Configuration
+      - NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=${NEXT_PUBLIC_CHATKIT_DOMAIN_KEY:-}
+
+      # Better Auth (using frontend's own API routes)
+      - NEXT_PUBLIC_BETTER_AUTH_URL=${NEXT_PUBLIC_BETTER_AUTH_URL:-http://localhost:3000}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+
+      # Production settings
+      - NODE_ENV=production
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - phaseiii-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits (optional - adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cache (optional - for rate limiting and caching)
+  redis:
+    image: redis:7-alpine
+    container_name: phaseiii-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    networks:
+      - phaseiii-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - redis-data:/data
+
+    # Resource limits (optional - adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+networks:
+  phaseiii-network:
+    driver: bridge
+    name: phaseiii-network
+
+volumes:
+  redis-data:
+    driver: local
+    name: phaseiii-redis-data
