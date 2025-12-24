@@ -229,7 +229,18 @@ docker compose up -d --build
 This starts all services:
 - Backend API (ChatKit SDK): http://localhost:8000
 - MCP Server: http://localhost:8001
+- Frontend (Next.js): http://localhost:3000
+- Redis Cache: http://localhost:6379
 - ChatKit endpoint: http://localhost:8000/chatkit
+
+**Docker Compose Services:**
+- `backend` - FastAPI + ChatKit SDK (Port 8000)
+- `mcp-server` - FastMCP HTTP Server (Port 8001)
+- `frontend` - Next.js Application (Port 3000)
+- `redis` - Redis Cache (Port 6379)
+
+**Resource Management:**
+Each service has configured resource limits for optimal performance. Adjust in docker-compose.yml if needed.
 
 ### Option 2: Local Development
 
@@ -440,6 +451,38 @@ def _get_system_instructions(self) -> str:
 - Gemini: Check usage at https://ai.dev/usage
 - Switch models: Set `OPENAI_API_KEY` or `GEMINI_API_KEY`
 
+#### 6. Gemini Rate Limiting (Free Tier)
+
+**Error**: `litellm.RateLimitError: Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests`
+
+**Solutions**:
+- **Switch to OpenAI**: Set valid `OPENAI_API_KEY` in `.env` and restart
+- **Upgrade Gemini**: Move to paid tier for higher quotas
+- **Use Gemini 2.5 Pro**: Has higher free tier limits than 2.0 Flash
+- **Wait for reset**: Free tier quotas reset daily
+
+**Model Selection Logic** (see `task_server.py:58-71`):
+```python
+if settings.openai_api_key:    # Prefers OpenAI if available
+    model = "gpt-3.5-turbo"
+elif settings.gemini_api_key:  # Falls back to Gemini
+    model = "gemini/gemini-2.5-pro"
+```
+
+To switch models, update `.env` and restart:
+```bash
+# Use OpenAI
+OPENAI_API_KEY=sk-proj-your-key-here
+#GEMINI_API_KEY=  # Comment out
+
+# Or use Gemini
+#OPENAI_API_KEY=  # Comment out
+GEMINI_API_KEY=your-gemini-key-here
+
+# Restart backend
+docker compose restart backend
+```
+
 ### Viewing Logs
 
 ```bash
@@ -462,6 +505,11 @@ docker compose logs --tail 50 backend
 # Check status
 docker compose ps
 
+# View logs
+docker compose logs -f backend
+docker compose logs -f mcp-server
+docker compose logs -f frontend
+
 # Restart service
 docker compose restart backend
 
@@ -473,6 +521,58 @@ docker compose down
 
 # Stop and remove volumes
 docker compose down -v
+
+# Scale services (if needed)
+docker compose up -d --scale backend=2
+```
+
+### Docker Image Optimization
+
+All Dockerfiles use multi-stage builds for minimal image size:
+
+**Backend Dockerfile** (`phaseIII/backend/Dockerfile`):
+- Builder stage: UV package manager + dependencies
+- Runtime stage: Python 3.11-slim with only production dependencies
+- Security: Non-root user (appuser)
+- Health checks: curl-based
+- Size: ~200MB
+
+**MCP Server Dockerfile** (`phaseIII/backend/Dockerfile.mcp`):
+- Builder stage: UV package manager + dependencies
+- Runtime stage: Python 3.11-slim with MCP-specific dependencies
+- Security: Non-root user (mcpuser)
+- Health checks: curl-based
+- Size: ~200MB
+
+**Frontend Dockerfile** (`phaseIII/frontend/Dockerfile`):
+- Dependencies stage: Clean npm ci install
+- Builder stage: Next.js build with standalone output
+- Runner stage: Node 20-alpine with minimal production files
+- Security: Non-root user (nextjs)
+- Health checks: Node-based HTTP check
+- Size: ~150MB
+
+### Production Deployment
+
+For production deployments, remove the volume mounts in docker-compose.yml:
+
+```yaml
+# Remove these sections for production
+# volumes:
+#   - ./backend/app:/app/app:ro
+#   - ./backend/.env:/app/.env:ro
+```
+
+Set proper environment variables:
+```bash
+# Create production .env file
+cp .env.example .env.production
+
+# Edit with production values
+nano .env.production
+
+# Run with production config
+docker compose --env-file .env.production up -d
 ```
 
 ## Configuration Details

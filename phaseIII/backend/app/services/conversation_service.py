@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import select, delete
 
 from app.models.conversation import Conversation
 from app.models.message import Message
@@ -137,6 +137,82 @@ class ConversationService:
 
         result = await db.execute(query)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def delete_conversation(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+    ) -> bool:
+        """
+        Delete a conversation and all its messages.
+
+        Args:
+            db: Database session
+            conversation_id: ID of conversation to delete
+            user_id: User ID for ownership validation
+
+        Returns:
+            True if deleted, False if not found or not owned by user
+        """
+        # Validate ownership
+        conversation = await ConversationService.get_conversation(db, conversation_id, user_id)
+        if not conversation:
+            logger.warning(f"Delete failed - conversation not found or access denied: {conversation_id}")
+            return False
+
+        # Delete all associated messages first (foreign key constraint)
+        await db.execute(
+            delete(Message).where(Message.conversation_id == conversation_id)
+        )
+
+        # Delete the conversation
+        await db.delete(conversation)
+        await db.commit()
+
+        logger.info(f"✅ Conversation deleted: conversation_id={conversation_id}, user_id={user_id}")
+        return True
+
+    @staticmethod
+    async def delete_all_conversations(
+        db: AsyncSession,
+        user_id: str,
+    ) -> int:
+        """
+        Delete all conversations and messages for a user.
+
+        Args:
+            db: Database session
+            user_id: User ID for ownership validation
+
+        Returns:
+            Number of conversations deleted
+        """
+        # Get all user's conversations
+        conversations = await ConversationService.list_conversations(db, user_id)
+
+        if not conversations:
+            logger.info(f"No conversations to delete for user: {user_id}")
+            return 0
+
+        conversation_ids = [conv.id for conv in conversations]
+
+        # Delete all messages for these conversations
+        await db.execute(
+            delete(Message).where(Message.conversation_id.in_(conversation_ids))
+        )
+
+        # Delete all conversations
+        await db.execute(
+            delete(Conversation).where(
+                Conversation.user_id == user_id
+            )
+        )
+
+        await db.commit()
+
+        logger.info(f"🗑️  Deleted {len(conversations)} conversations for user: {user_id}")
+        return len(conversations)
 
 
 # Global service instance

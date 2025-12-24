@@ -94,10 +94,19 @@ class PostgresStore(Store):
                 )
 
                 if conversation:
-                    # Update existing conversation
+                    # Update existing conversation timestamp
                     await ConversationService.update_conversation_timestamp(
                         db=db, conversation_id=conversation.id
                     )
+                    # Update title if provided by ChatKit
+                    if thread.title and thread.title != "New Chat" and thread.title != conversation.title:
+                        await ConversationService.update_title(
+                            db=db,
+                            conversation_id=conversation.id,
+                            user_id=user_id,
+                            title=thread.title
+                        )
+                        logger.info(f"✅ Updated conversation title: {conversation.id} -> '{thread.title}'")
                     logger.info(f"✅ Updated conversation: {conversation.id} (external_id={thread.id})")
                 else:
                     # Create new conversation with external_id
@@ -333,6 +342,21 @@ class PostgresStore(Store):
                     content=content,
                 )
                 logger.info(f"✅ Saved USER message: id={msg.id}, content={content[:50]}...")
+
+                # Auto-generate title from first user message if conversation has no title or is "New Chat"
+                if not conversation.title or conversation.title == "New Chat":
+                    # Generate title from first 50 characters of user message
+                    title = content[:50].strip()
+                    if len(content) > 50:
+                        title = title + "..."
+
+                    await ConversationService.update_title(
+                        db=db,
+                        conversation_id=conversation.id,
+                        user_id=user_id,
+                        title=title
+                    )
+                    logger.info(f"🏷️  Auto-generated title: '{title}' for conversation {conversation.id}")
             else:
                 msg = await MessageService.create_assistant_message(
                     db=db,
@@ -358,8 +382,61 @@ class PostgresStore(Store):
         context: dict[str, Any],
     ) -> None:
         """Delete a thread and all its items."""
-        # TODO: Implement if needed
-        raise NotImplementedError("delete_thread not implemented")
+        user_id = context.get("user_id")
+        if not user_id:
+            logger.error("delete_thread called without user_id in context")
+            raise ValueError("User ID required for delete operation")
+
+        logger.info(f"🗑️  delete_thread() called - thread_id={thread_id}, user_id={user_id}")
+
+        async with async_session_maker() as db:
+            # Get conversation by ChatKit thread ID (external_id)
+            conversation = await ConversationService.get_conversation_by_external_id(
+                db, thread_id, user_id
+            )
+
+            if not conversation:
+                logger.warning(f"Thread not found for deletion: thread_id={thread_id}")
+                return  # Thread doesn't exist or user doesn't own it
+
+            # Delete via service (handles messages + conversation)
+            deleted = await ConversationService.delete_conversation(
+                db, conversation.id, user_id
+            )
+
+            if deleted:
+                logger.info(f"✅ Thread successfully deleted: thread_id={thread_id}")
+            else:
+                logger.error(f"❌ Failed to delete thread: thread_id={thread_id}")
+
+    async def delete_all_threads(
+        self,
+        context: dict[str, Any],
+    ) -> int:
+        """
+        Delete all threads for the authenticated user.
+
+        Args:
+            context: Contains user_id from JWT authentication
+
+        Returns:
+            Number of threads deleted
+        """
+        user_id = context.get("user_id")
+        if not user_id:
+            logger.error("delete_all_threads called without user_id in context")
+            raise ValueError("User ID required for delete all operation")
+
+        logger.info(f"🗑️ delete_all_threads() called - user_id={user_id}")
+
+        async with async_session_maker() as db:
+            # Use existing service method
+            deleted_count = await ConversationService.delete_all_conversations(
+                db, user_id
+            )
+
+            logger.info(f"✅ All threads deleted: user_id={user_id}, count={deleted_count}")
+            return deleted_count
 
     async def delete_thread_item(
         self,
