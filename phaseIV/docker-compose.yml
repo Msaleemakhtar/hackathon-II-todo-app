@@ -4,7 +4,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.mcp
-    container_name: phaseiii-mcp-server
+    container_name: phaseiv-mcp-server
     ports:
       - "8001:8001"
     environment:
@@ -31,7 +31,13 @@ services:
     restart: unless-stopped
 
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',8001)); s.close()"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(); s.connect(('localhost',8001)); s.close()",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -41,10 +47,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
         reservations:
-          cpus: '0.25'
+          cpus: "0.25"
           memory: 256M
 
   # Backend API Service
@@ -52,7 +58,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: phaseiii-backend
+    container_name: phaseiv-backend
     ports:
       - "8000:8000"
     environment:
@@ -107,10 +113,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: "1.0"
           memory: 1G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
 
   # Frontend - Next.js Application
@@ -118,7 +124,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: phaseiii-frontend
+    container_name: phaseiv-frontend
     ports:
       - "3000:3000"
     environment:
@@ -156,16 +162,16 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: "1.0"
           memory: 1G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
 
   # Redis Cache (optional - for rate limiting and caching)
   redis:
     image: redis:7-alpine
-    container_name: phaseiii-redis
+    container_name: phaseiv-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
@@ -184,18 +190,18 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 256M
         reservations:
-          cpus: '0.25'
+          cpus: "0.25"
           memory: 128M
 
 networks:
   phaseiii-network:
     driver: bridge
-    name: phaseiii-network
+    name: phaseiv-network
 
 volumes:
   redis-data:
     driver: local
-    name: phaseiii-redis-data
+    name: phaseiv-redis-data
