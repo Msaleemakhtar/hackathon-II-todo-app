@@ -1,76 +1,75 @@
 <!--
 SYNC IMPACT REPORT:
-Version Change: 2.3.0 -> 2.4.0
-Amendment Date: 2025-12-16
+Version Change: 2.4.0 -> 2.5.0
+Amendment Date: 2025-12-25
 
 Modified Sections:
 
   - Mission Statement:
-    * CHANGED: Extended to acknowledge Phase I (CLI), Phase II (web app) as COMPLETE
-    * ADDED: Phase III AI chatbot development as NEW, SEPARATE implementation
-    * RATIONALE: Provides clear phase separation and project evolution context
+    * CHANGED: Updated Phase III status from ACTIVE to COMPLETE
+    * ADDED: Phase IV Kubernetes deployment as NEW, ACTIVE implementation
+    * RATIONALE: Phase III completed; Phase IV adds orchestration and production deployment patterns
 
   - Core Principles:
-    * ADDED: Principle XI - MCP Server Architecture (stateless tools, database state management)
-    * ADDED: Principle XII - OpenAI Agents SDK Integration
-    * ADDED: Principle XIII - Conversational AI Standards
-    * RATIONALE: Governs Phase III AI chatbot architecture and behavior
+    * ADDED: Principle XIV - Containerization & Orchestration (Phase IV only)
+    * ADDED: Principle XV - Production-Grade Deployment (Phase IV only)
+    * RATIONALE: Governs Phase IV Kubernetes architecture, Helm charts, and production features
 
   - Repository Structure (Principle II):
-    * ADDED: phaseIII/ directory structure showing complete separation from phaseI/ and phaseII/
-    * ADDED: Phase III-specific directory layout (backend, frontend, mcp, tests)
-    * RATIONALE: Enforces complete separation between phases as required
+    * ADDED: /phaseIV/ directory structure with kubernetes/ subdirectory
+    * ADDED: Phase IV-specific directory layout (frontend, backend, kubernetes/helm/, scripts)
+    * ADDED: Exception clause for container artifact reuse from Phase III
+    * RATIONALE: Phase IV deploys Phase III containers; exception clarifies constitutional compliance
 
   - Specs Organization:
-    * ADDED: `/specs/sphaseIII/` directory for Phase III specifications
+    * ADDED: `/specs/sphaseIV/` directory for Phase IV specifications
     * RATIONALE: Maintains spec organization pattern for new phase
 
-  - Data Model Specification:
-    * ADDED: Phase III Data Models section with Conversation and Message entities
-    * ADDED: Task entity clarification for Phase III (tasks_phaseiii table)
-    * RATIONALE: Phase III requires separate data models for chat functionality
-
-  - API Design Standards:
-    * ADDED: Phase III Chat API Endpoint specification (POST /api/{user_id}/chat)
-    * ADDED: MCP Tools Specification section documenting 5 required tools
-    * RATIONALE: Defines chat endpoint and MCP tool contracts
-
   - Technology Constraints:
-    * ADDED: Phase III-specific technology stack requirements
-    * ADDED: OpenAI ChatKit, OpenAI Agents SDK, MCP SDK requirements
-    * ADDED: UV for backend, Bun for frontend package management
-    * RATIONALE: Enforces mandatory technology stack for Phase III
+    * ADDED: Phase IV-specific technology stack (Docker, Kubernetes, Minikube, Helm, Nginx Ingress)
+    * ADDED: Cluster requirements (4 CPU, 8GB RAM minimum)
+    * ADDED: Namespace requirement (todo-phaseiv)
+    * RATIONALE: Enforces mandatory orchestration stack for Phase IV hackathon
 
   - Success Criteria:
-    * ADDED: Phase III-specific functional requirements (chatbot, MCP tools, NLU)
-    * ADDED: Phase III-specific technical requirements
-    * RATIONALE: Defines completion criteria for Phase III
+    * ADDED: Phase IV-specific functional requirements (4 services deployed, Ingress, HPA, Redis persistence)
+    * ADDED: Phase IV-specific technical requirements (Helm best practices, health probes, resource limits)
+    * ADDED: Phase IV-specific documentation requirements (KUBERNETES_GUIDE.md, RUNBOOK.md)
+    * ADDED: Phase IV-specific testing requirements (E2E, load, resilience, persistence, ingress tests)
+    * RATIONALE: Defines completion criteria for Phase IV hackathon
 
   - Requirement-to-Rule Mapping:
-    * ADDED: Phase III requirements (FR-P3-001 through FR-P3-008)
-    * ADDED: Phase III structural requirements (SR-P3-001, SR-P3-002)
-    * ADDED: Phase III interface requirements (IR-P3-001, IR-P3-002)
-    * RATIONALE: Maintains traceability for Phase III governance
+    * ADDED: Phase IV functional requirements (FR-P4-001 through FR-P4-010)
+    * ADDED: Phase IV structural requirements (SR-P4-001 through SR-P4-004)
+    * ADDED: Phase IV technology constraints (TC-P4-001 through TC-P4-004)
+    * RATIONALE: Maintains traceability for Phase IV governance
+
+  - Workflow Guidance (Principle I):
+    * ADDED: Phase IV-specific Spec-Driven Development workflow (Specification → Generation → Validation → Deployment → Testing)
+    * RATIONALE: Kubernetes deployment requires infrastructure-as-code specification approach
 
 Templates Requiring Updates:
   - None - existing templates remain compatible
 
 Follow-up TODOs:
-  - Create initial specs in /specs/sphaseIII/ directory
-  - Set up phaseIII directory structure
+  - Create initial comprehensive spec in /specs/sphaseIV/001-kubernetes-deployment/
+  - Generate Helm charts in /phaseIV/kubernetes/helm/todo-app/
+  - Create KUBERNETES_GUIDE.md and RUNBOOK.md documentation
 -->
 
 # Todo App - Multi-Phase Constitution
 
 ## Mission Statement
 
-This project implements a todo application across three distinct phases, each with complete separation:
+This project implements a todo application across four distinct phases, each with complete separation:
 
 **Phase I (COMPLETED)**: Command-line interface (CLI) todo application with in-memory storage and rich terminal UI.
 
 **Phase II (COMPLETED)**: Full-stack web application with persistent storage, multi-user authentication via Better Auth, Next.js frontend, and FastAPI backend.
 
-**Phase III (ACTIVE)**: AI-powered chatbot interface for managing todos through natural language using MCP (Model Context Protocol) server architecture and OpenAI Agents SDK.
+**Phase III (COMPLETED)**: AI-powered chatbot interface for managing todos through natural language using MCP (Model Context Protocol) server architecture and OpenAI Agents SDK.
+
+**Phase IV (ACTIVE)**: Kubernetes deployment with Helm charts, enabling local orchestration via Minikube with production-grade features (Nginx Ingress, Horizontal Pod Autoscaling, Persistent Volumes).
 
 Each phase is a **completely independent implementation** with no code sharing between phases. The constitution governs all phases while providing phase-specific guidance.
 
@@ -96,7 +95,14 @@ Each phase is a **completely independent implementation** with no code sharing b
   - Phase I: `/specs/sphaseI/NNN-feature-name/`
   - Phase II: `/specs/sphaseII/NNN-feature-name/`
   - Phase III: `/specs/sphaseIII/NNN-feature-name/`
+  - Phase IV: `/specs/sphaseIV/NNN-feature-name/`
   - Each feature directory contains `spec.md`, `plan.md`, `tasks.md`, and related artifacts.
+- **Phase IV Workflow**: Phase IV follows infrastructure-as-code specification approach:
+  1. **Specification Phase**: Create comprehensive spec.md covering infrastructure, Helm charts, deployments, production features, and testing
+  2. **Generation Phase**: AI generates Helm charts, Kubernetes manifests, scripts, and documentation from spec
+  3. **Validation Phase**: Run `helm lint`, `helm template`, and dry-run deployments to validate generated artifacts
+  4. **Deployment Phase**: Incremental rollout (Redis → MCP → Backend → Frontend → Ingress)
+  5. **Testing Phase**: Execute helm tests, E2E tests, load tests, resilience tests, persistence tests, ingress tests
 
 **Verification**:
 - Commit history shows specification files created/modified before implementation files.
@@ -115,7 +121,8 @@ Each phase is a **completely independent implementation** with no code sharing b
 - **Repository Structure**: Monorepo with distinct directories per phase:
   - `/phaseI` - CLI application (Python, Rich UI) - COMPLETED
   - `/phaseII` - Full-stack web application (Next.js + FastAPI) - COMPLETED
-  - `/phaseIII` - AI Chatbot (OpenAI ChatKit + FastAPI + MCP) - ACTIVE
+  - `/phaseIII` - AI Chatbot (OpenAI ChatKit + FastAPI + MCP) - COMPLETED
+  - `/phaseIV` - Kubernetes Deployment (Minikube + Helm + Nginx Ingress) - ACTIVE
   - `/specs` - All specifications organized by phase
   - `/.specify` - Spec-Kit Plus configuration and templates
 
@@ -124,6 +131,15 @@ Each phase is a **completely independent implementation** with no code sharing b
 - **NO SHARED CODE** or modules between phases
 - **INDEPENDENT IMPLEMENTATIONS** - each phase reimplements required functionality
 - **SEPARATE DATABASE TABLES** - Phase III uses `tasks_phaseiii` table, not Phase II tables
+
+**Phase IV Exception for Container Artifact Reuse**:
+Phase IV deploys containerized versions of Phase III services. While source code separation is maintained (Phase IV does not import Phase III source files directly), Phase IV Dockerfiles build from Phase III source directories located in `/phaseIV/frontend/` and `/phaseIV/backend/`.
+
+This is constitutionally acceptable because:
+- Docker images are deployment artifacts, not source code
+- Helm charts and Kubernetes manifests are Phase IV-specific implementations
+- Phase IV demonstrates deployment/orchestration patterns, not new application logic
+- Source code remains separated (no cross-phase imports at runtime)
 
 **Phase III Directory Structure**:
 ```
@@ -205,6 +221,37 @@ phaseII/
 └── docker-compose.yml
 ```
 
+**Phase IV Directory Structure** (ACTIVE):
+```
+phaseIV/
+├── frontend/                    # Next.js frontend (from Phase III)
+├── backend/                     # FastAPI backend (from Phase III)
+├── kubernetes/                  # NEW: Kubernetes-specific artifacts
+│   ├── helm/
+│   │   └── todo-app/            # Helm chart (20 YAML templates)
+│   │       ├── Chart.yaml
+│   │       ├── values.yaml
+│   │       ├── templates/
+│   │       │   ├── frontend-deployment.yaml
+│   │       │   ├── backend-deployment.yaml
+│   │       │   ├── mcp-deployment.yaml
+│   │       │   ├── redis-statefulset.yaml
+│   │       │   ├── ingress.yaml
+│   │       │   ├── hpa-frontend.yaml
+│   │       │   ├── hpa-backend.yaml
+│   │       │   └── ...
+│   │       └── tests/
+│   ├── scripts/                 # Deployment automation
+│   │   ├── setup-minikube.sh
+│   │   ├── deploy.sh
+│   │   └── test.sh
+│   └── docs/
+│       ├── KUBERNETES_GUIDE.md
+│       └── RUNBOOK.md
+├── docker-compose.yml           # Local Docker Compose (from Phase III)
+└── DOCKER_GUIDE.md              # Docker documentation
+```
+
 **Specs Directory Structure**:
 ```
 specs/
@@ -216,10 +263,15 @@ specs/
 │   ├── 001-foundational-backend-setup/
 │   ├── 002-task-tag-api/
 │   └── ...
-└── sphaseIII/             # Phase III specifications (ACTIVE)
-    ├── 001-mcp-server-setup/
-    ├── 002-chat-endpoint/
-    └── ...
+├── sphaseIII/             # Phase III specifications (COMPLETED)
+│   ├── 001-mcp-server-setup/
+│   ├── 002-chat-endpoint/
+│   └── ...
+└── sphaseIV/              # Phase IV specifications (ACTIVE)
+    └── 001-kubernetes-deployment/
+        ├── spec.md
+        ├── plan.md
+        └── tasks.md
 ```
 
 **Rationale**: Complete phase separation ensures each implementation is independent and can evolve without affecting other phases. This also demonstrates the ability to implement the same functionality using different architectural approaches.
@@ -729,6 +781,112 @@ The chatbot MUST understand and respond to:
 
 ---
 
+### XIV. Containerization & Orchestration (Phase IV Only)
+
+**Philosophy**: Infrastructure as Code with declarative Kubernetes configuration.
+
+**Requirements**:
+
+**Container Runtime**:
+- Docker Desktop as the container runtime
+- Multi-stage Dockerfiles for optimized image sizes
+- Docker images as deployment artifacts (not source code)
+- Container health checks (liveness and readiness probes)
+
+**Kubernetes Orchestration**:
+- Minikube for local Kubernetes cluster (4 CPU, 8GB RAM minimum)
+- Namespace isolation (todo-phaseiv)
+- Service communication via ClusterIP and internal DNS
+- Declarative YAML manifests for all resources
+
+**Helm Package Management**:
+- Helm v3.13+ for templating and package management
+- Chart follows Helm best practices
+- Values externalized in values.yaml
+- Templating for environment-specific configuration
+- helm lint passes with zero warnings
+- helm test validates deployment
+
+**Infrastructure as Code Principles**:
+- All infrastructure defined in version control
+- Reproducible deployments across environments
+- No manual kubectl apply of raw YAML
+- Git-tracked Helm charts and values
+
+**Service Architecture**:
+```
+Minikube Cluster (todo-phaseiv namespace)
+├── Frontend Deployment (2-5 replicas, HPA)
+├── Backend Deployment (2-5 replicas, HPA)
+├── MCP Server Deployment (1 replica)
+├── Redis StatefulSet (1 replica, 1Gi PVC)
+├── Nginx Ingress (todo-app.local)
+│   ├── / → frontend:3000
+│   └── /api → backend:8000
+└── External: Neon PostgreSQL (shared)
+```
+
+**Rationale**: Kubernetes provides production-grade orchestration, Helm enables reusable deployment templates, and Infrastructure as Code ensures reproducibility.
+
+---
+
+### XV. Production-Grade Deployment (Phase IV Only)
+
+**Philosophy**: Production-ready features even in local development environments.
+
+**Requirements**:
+
+**Nginx Ingress Controller (MANDATORY)**:
+- MUST use Nginx Ingress Controller for HTTP routing
+- Single entry point at todo-app.local
+- Path-based routing (/ → frontend, /api → backend)
+- Ingress annotations for CORS, rate limiting (optional)
+- TLS termination support (optional for local)
+
+**Horizontal Pod Autoscaling (MANDATORY)**:
+- Frontend HPA: min 2, max 5 replicas
+- Backend HPA: min 2, max 5 replicas
+- CPU target: 70%
+- Memory target: 80%
+- Metrics Server MUST be enabled in Minikube
+- HPA status MUST show scaling activity
+
+**Persistent Volumes (MANDATORY)**:
+- Redis StatefulSet with 1Gi PersistentVolumeClaim
+- Standard StorageClass (Minikube default)
+- Data persists across pod restarts
+- PVC bound status verified
+
+**Health Probes (MANDATORY)**:
+- Liveness probes for all services (frontend, backend, mcp, redis)
+- Readiness probes for all services
+- Probes configured with appropriate timeouts and thresholds
+- Failed probes trigger pod restarts
+
+**Resource Limits and Requests (MANDATORY)**:
+- CPU requests and limits defined for all containers
+- Memory requests and limits defined for all containers
+- Resource quotas prevent cluster overcommitment
+- QoS classes: Guaranteed or Burstable (not BestEffort)
+
+**Observability (RECOMMENDED)**:
+- Metrics Server for HPA and resource monitoring
+- kubectl top pods/nodes commands functional
+- Pod logs accessible via kubectl logs
+- Optional: Prometheus/Grafana integration
+
+**Testing Requirements**:
+- helm test passes
+- End-to-end test covers complete user flow
+- Load test validates HPA scaling
+- Resilience test validates pod restart recovery
+- Persistence test validates Redis data retention
+- Ingress test validates HTTP routing
+
+**Rationale**: Production-grade features in local development prepare deployments for real-world conditions and demonstrate Kubernetes capabilities.
+
+---
+
 ## Data Model Specification
 
 ### Phase II Data Models
@@ -1026,13 +1184,57 @@ The chatbot MUST understand and respond to:
 - [ ] **OpenAI ChatKit**: Frontend built with ChatKit starter template
 - [ ] **API Docs**: Chat endpoint documented in OpenAPI
 
-### Documentation Requirements
+### Documentation Requirements (Phase III)
 
 - [ ] Specs exist for all features in `/specs/sphaseIII/NNN-feature-name/spec.md`
 - [ ] Implementation plans exist in `/specs/sphaseIII/NNN-feature-name/plan.md`
 - [ ] Task breakdowns exist in `/specs/sphaseIII/NNN-feature-name/tasks.md`
 - [ ] README.md includes setup, development, and deployment instructions
 - [ ] DEVIATIONS.md documents any manual code (if any)
+
+---
+
+### Phase IV Completion (ACTIVE)
+
+#### Functional Requirements
+- [ ] **Four Services Deployed**: Frontend, Backend, MCP Server, Redis all running in Kubernetes
+- [ ] **Ingress Routing**: Nginx Ingress routes / to frontend and /api to backend at todo-app.local
+- [ ] **Horizontal Pod Autoscaling**: HPA scales frontend and backend based on CPU/memory metrics
+- [ ] **Redis Persistence**: Redis data persists across pod restarts via PersistentVolume
+- [ ] **Complete User Flow**: End-to-end user journey works (auth → chat → task operations via MCP tools)
+- [ ] **All 5 MCP Tools Working**: add_task, list_tasks, complete_task, delete_task, update_task functional in Kubernetes
+- [ ] **Namespace Isolation**: All resources deployed in todo-phaseiv namespace
+- [ ] **External Database**: Backend connects to shared Neon PostgreSQL instance
+- [ ] **Service Discovery**: Services communicate via Kubernetes internal DNS (ClusterIP)
+- [ ] **Load Balancing**: Multiple frontend/backend replicas load-balanced automatically
+
+#### Technical Requirements
+- [ ] **Comprehensive Spec**: `/specs/sphaseIV/001-kubernetes-deployment/spec.md` exists and complete
+- [ ] **Helm Chart Best Practices**: Chart follows Helm conventions, passes helm lint with zero warnings
+- [ ] **Resource Limits**: CPU/memory requests and limits defined for all containers
+- [ ] **Health Probes**: Liveness and readiness probes configured for all services
+- [ ] **Secrets Management**: Database credentials, API keys stored in Kubernetes Secrets
+- [ ] **ConfigMaps**: Non-sensitive configuration externalized in ConfigMaps
+- [ ] **helm test Passes**: Helm test suite validates deployment correctness
+- [ ] **Incremental Rollout**: Deployment script follows Redis → MCP → Backend → Frontend → Ingress order
+- [ ] **Rollback Strategy**: helm rollback tested and functional
+- [ ] **Values Templating**: Environment-specific values templated in values.yaml
+
+#### Documentation Requirements (Phase IV)
+- [ ] **KUBERNETES_GUIDE.md**: Comprehensive guide covering Minikube setup, Helm installation, deployment steps, testing procedures
+- [ ] **Helm README.md**: Chart-specific README in `/phaseIV/kubernetes/helm/todo-app/README.md`
+- [ ] **RUNBOOK.md**: Operational runbook covering common tasks (scale replicas, view logs, restart pods, troubleshoot Ingress)
+- [ ] **Architecture Diagram**: Visual diagram of Kubernetes architecture (services, ingress, PVCs)
+- [ ] **Deployment Scripts**: Automated scripts in `/phaseIV/kubernetes/scripts/` (setup-minikube.sh, deploy.sh, test.sh)
+
+#### Testing Requirements
+- [ ] **E2E Test**: End-to-end test covers full user flow (login → chat → task CRUD → verify persistence)
+- [ ] **Load Test**: Load test triggers HPA scaling (verify replicas scale from 2 to 5 under load)
+- [ ] **Resilience Test**: Pod deletion test (kubectl delete pod) validates automatic restart and service continuity
+- [ ] **Persistence Test**: Redis pod restart test validates data retention via PVC
+- [ ] **Ingress Test**: HTTP requests to todo-app.local validate correct routing (/ → frontend, /api → backend)
+- [ ] **helm test**: Helm-provided tests validate deployment health
+- [ ] **Resource Monitoring**: kubectl top pods shows resource usage; metrics-server functional
 
 ---
 
@@ -1064,6 +1266,18 @@ The chatbot MUST understand and respond to:
 - **Authentication**: Better Auth
 - **Backend Package Manager**: UV (`uv add <package>`)
 - **Frontend Package Manager**: Bun (`bun add <package>`)
+
+**Phase IV** (MANDATORY per hackathon requirements):
+- **Container Runtime**: Docker Desktop only
+- **Orchestration**: Kubernetes via Minikube only
+- **Package Manager**: Helm Charts v3.13+ only
+- **Ingress Controller**: Nginx Ingress only
+- **Storage**: PersistentVolume with standard StorageClass
+- **Autoscaling**: Horizontal Pod Autoscaler with metrics-server
+- **Cluster Requirements**: Minikube with 4 CPU, 8GB RAM minimum
+- **Namespace**: todo-phaseiv (MUST use this namespace)
+- **Database**: Neon Serverless PostgreSQL (shared with Phase III)
+- **Optional AI DevOps Tools**: kubectl-ai, kagent, Docker AI (Gordon)
 
 ### Security Constraints
 - **No Secrets in Code**: All secrets via environment variables
@@ -1187,45 +1401,70 @@ Any deviation from this constitution MUST be:
 | TC-P3-004   | UV package manager for backend                | Technology Constraints - Phase III         | Constraints  |
 | TC-P3-005   | Bun package manager for frontend              | Technology Constraints - Phase III         | Constraints  |
 
+### Phase IV Requirements
+
+| Req ID      | Requirement Description                       | Constitutional Rule(s)                     | Section      |
+|-------------|----------------------------------------------|--------------------------------------------|--------------|
+| FR-P4-001   | Four services deployed in Kubernetes          | Containerization & Orchestration           | XIV          |
+| FR-P4-002   | Nginx Ingress routing                         | Production-Grade Deployment - Ingress      | XV           |
+| FR-P4-003   | Horizontal Pod Autoscaling                    | Production-Grade Deployment - HPA          | XV           |
+| FR-P4-004   | Redis persistence via PersistentVolume        | Production-Grade Deployment - PV           | XV           |
+| FR-P4-005   | Complete user flow in Kubernetes              | Success Criteria - Functional              | Success      |
+| FR-P4-006   | All 5 MCP tools functional                    | Success Criteria - Functional              | Success      |
+| FR-P4-007   | Namespace isolation (todo-phaseiv)            | Containerization & Orchestration           | XIV          |
+| FR-P4-008   | External Neon PostgreSQL connection           | Success Criteria - Functional              | Success      |
+| FR-P4-009   | Service discovery via ClusterIP               | Containerization & Orchestration           | XIV          |
+| FR-P4-010   | Load balancing across replicas                | Success Criteria - Functional              | Success      |
+| SR-P4-001   | Phase IV directory structure                  | Repository Structure                       | II           |
+| SR-P4-002   | Helm chart best practices                     | Containerization & Orchestration           | XIV          |
+| SR-P4-003   | Infrastructure as Code principles             | Containerization & Orchestration           | XIV          |
+| SR-P4-004   | Container artifact reuse exception            | Phase IV Exception for Container Reuse     | II           |
+| TC-P4-001   | Docker Desktop container runtime              | Technology Constraints - Phase IV          | Constraints  |
+| TC-P4-002   | Kubernetes via Minikube                       | Technology Constraints - Phase IV          | Constraints  |
+| TC-P4-003   | Helm Charts v3.13+                            | Technology Constraints - Phase IV          | Constraints  |
+| TC-P4-004   | Nginx Ingress Controller                      | Technology Constraints - Phase IV          | Constraints  |
+
 ---
 
 ## Constitutional Self-Checks
 
 ### 1. Alignment Check
 **Status**: PASS
-- All 40+ rules map to documented requirements
+- All 50+ rules map to documented requirements
 - No orphan rules without requirement backing
-- Requirement-to-Rule mapping table complete for both Phase II and Phase III
-- New Phase III requirements (FR-P3-001 through FR-P3-008) added
+- Requirement-to-Rule mapping table complete for Phase II, Phase III, and Phase IV
+- New Phase IV requirements added (FR-P4-001 through FR-P4-010, SR-P4-001 through SR-P4-004, TC-P4-001 through TC-P4-004)
 
 ### 2. Coverage Check
 **Status**: PASS
-- Functional Requirements: Covered (FR-001 through FR-008, FR-P3-001 through FR-P3-008)
+- Functional Requirements: Covered (FR-001 through FR-008, FR-P3-001 through FR-P3-008, FR-P4-001 through FR-P4-010)
 - Quality Requirements: Covered (QR-001 through QR-003, QR-P3-001)
-- Structural Requirements: Covered (SR-001 through SR-003, SR-P3-001, SR-P3-002)
+- Structural Requirements: Covered (SR-001 through SR-003, SR-P3-001, SR-P3-002, SR-P4-001 through SR-P4-004)
 - Interface Requirements: Covered (IR-001, IR-002, IR-P3-001, IR-P3-002)
 - Process Requirements: Covered (PR-001 through PR-003)
 - Security Requirements: Covered (SEC-001 through SEC-004)
-- Technology Constraints: Covered (TC-P3-001 through TC-P3-005)
+- Technology Constraints: Covered (TC-P3-001 through TC-P3-005, TC-P4-001 through TC-P4-004)
 
 ### 3. Conflict Check
 **Status**: PASS
 - No contradictory rules identified
-- Phase II and Phase III rules are complementary, not conflicting
+- Phase II, Phase III, and Phase IV rules are complementary, not conflicting
 - Phase separation rules prevent cross-phase conflicts
-- Package manager rules consistent (bun for frontend, uv for backend in both phases)
+- Phase IV container artifact reuse exception explicitly documented and justified
+- Technology stack consistent within each phase
 
 ### 4. Completeness Check
 **Status**: PASS
 - All Phase II features have governance rules (COMPLETED)
-- All Phase III features have governance rules (ACTIVE)
-- MCP Server Architecture fully specified
-- OpenAI Agents SDK Integration fully specified
-- Conversational AI Standards fully specified
-- Data models cover all entities for both phases
-- Validation rules comprehensive
-- API design standards complete for both phases
+- All Phase III features have governance rules (COMPLETED)
+- All Phase IV features have governance rules (ACTIVE)
+- Containerization & Orchestration principles fully specified (Principle XIV)
+- Production-Grade Deployment principles fully specified (Principle XV)
+- Phase IV workflow guidance integrated into Principle I
+- Kubernetes architecture, Helm charts, production features all covered
+- Testing requirements comprehensive (E2E, load, resilience, persistence, ingress)
+- Documentation requirements specified (KUBERNETES_GUIDE.md, RUNBOOK.md)
 
 ---
 
-**Version**: 2.4.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-16
+**Version**: 2.5.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-25
