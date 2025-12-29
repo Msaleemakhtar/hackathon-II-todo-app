@@ -3,7 +3,7 @@
 
 # Global Configuration
 global:
-  namespace: "todo-phaseiv"  # Constitutional requirement
+  namespace: "todo-phasev"  # Constitutional requirement
   imagePullPolicy: "IfNotPresent"  # Avoid pulling if image exists locally
 
 # Frontend Configuration
@@ -175,7 +175,7 @@ ingress:
   className: "nginx"
   host: "todo-app.local"
   tls:
-    enabled: false  # Set to true to enable HTTPS
+    enabled: true  # Enable HTTPS
     # TLS secret (todo-app-tls) should be created separately with cert and key
 
 # Secrets Configuration
@@ -193,13 +193,13 @@ secrets:
 
 # ConfigMap Configuration (Non-sensitive data)
 configMap:
-  REDIS_HOST: "redis-service.todo-phaseiv.svc.cluster.local"
+  REDIS_HOST: "redis-service.todo-phasev.svc.cluster.local"
   REDIS_PORT: "6379"
-  MCP_SERVER_URL: "http://mcp-service.todo-phaseiv.svc.cluster.local:8001/mcp"
-  NEXT_PUBLIC_API_URL: "http://todo-app.local/api"
-  NEXT_PUBLIC_BETTER_AUTH_URL: "http://todo-app.local"
+  MCP_SERVER_URL: "http://mcp-service.todo-phasev.svc.cluster.local:8001/mcp"
+  NEXT_PUBLIC_API_URL: "https://todo-app.local/api"
+  NEXT_PUBLIC_BETTER_AUTH_URL: "https://todo-app.local"
   NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: ""  # Empty for local development
-  CORS_ORIGINS: '["http://todo-app.local", "http://localhost:3000", "http://127.0.0.1:3000"]'
+  CORS_ORIGINS: '["https://todo-app.local", "http://todo-app.local", "http://localhost:3000", "http://127.0.0.1:3000"]'
 
 # Helm Test Configuration
 tests:

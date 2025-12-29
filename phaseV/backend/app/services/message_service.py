@@ -82,10 +82,7 @@ class MessageService:
         """
         query = (
             select(Message)
-            .where(
-                Message.conversation_id == conversation_id,
-                Message.user_id == user_id
-            )
+            .where(Message.conversation_id == conversation_id, Message.user_id == user_id)
             .order_by(Message.created_at.asc())
         )
 

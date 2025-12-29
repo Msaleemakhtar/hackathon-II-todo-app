@@ -204,6 +204,8 @@ If ALL true, suggest:
 ## Active Technologies
 - Neon Serverless PostgreSQL (shared database instance with Phase II) (003-fix-chatkit-auth)
 - YAML (Kubernetes manifests), Helm 3.13+ (templating), Bash (deployment scripts) (001-kubernetes-deployment)
+- Python 3.11+ + FastAPI 0.109+, SQLModel 0.0.14+, Alembic 1.13+, asyncpg 0.29+, openai-agents 0.6.3+, openai-chatkit, mcp[cli] 1.24+ (001-foundation-api)
+- Neon Serverless PostgreSQL (shared database instance with Phase II/III/IV, separate tables_phaseiii table + new Phase V tables) (001-foundation-api)
 
 ## Recent Changes
 - 003-fix-chatkit-auth: Added Neon Serverless PostgreSQL (shared database instance with Phase II)

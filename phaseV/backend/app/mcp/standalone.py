@@ -31,8 +31,8 @@ def run_mcp_server() -> NoReturn:
     """Run the MCP server using FastMCP's streamable HTTP transport."""
     # Import server and tools
     # Tools are registered via decorators when module loads
-    from app.mcp.server import mcp
     import app.mcp.tools  # noqa: F401 - Import needed for tool registration
+    from app.mcp.server import mcp
 
     # Get configuration from environment
     host = os.getenv("MCP_HOST", "0.0.0.0")

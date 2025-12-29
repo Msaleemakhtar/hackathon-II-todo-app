@@ -42,10 +42,7 @@ async def extract_user_context(request: Request) -> dict[str, Any]:
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         logger.warning("Missing Authorization header in ChatKit request")
-        raise HTTPException(
-            status_code=401,
-            detail="Missing Authorization header"
-        )
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
 
     try:
         # Reuse existing JWT validation from auth.py:59-112
@@ -69,7 +66,4 @@ async def extract_user_context(request: Request) -> dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Unexpected error in extract_user_context: {str(e)}")
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication failed"
-        ) from e
+        raise HTTPException(status_code=401, detail="Authentication failed") from e

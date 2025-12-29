@@ -21,7 +21,7 @@ mcp = FastMCP(
             "0.0.0.0:*",  # All interfaces
             "mcp-server:*",  # Docker service name
             "*.phaseiii-network:*",  # Docker network (wildcard)
-            "mcp-service.todo-phaseiv.svc.cluster.local:*",  # Kubernetes service DNS
+            "mcp-service.todo-phasev.svc.cluster.local:*",  # Kubernetes service DNS
             "*.svc.cluster.local:*",  # Kubernetes cluster services (wildcard)
         ],
         allowed_origins=[
