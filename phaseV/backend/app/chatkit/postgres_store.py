@@ -6,26 +6,24 @@ This module maps ChatKit threads and items to our existing PostgreSQL database:
 - Items → Message table
 """
 
-import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from chatkit.server import Store
 from chatkit.types import (
-    ThreadMetadata,
-    ThreadItem,
-    Page,
-    UserMessageItem,
+    AssistantMessageContent,
     AssistantMessageItem,
     Attachment,
-    AssistantMessageContent,
+    Page,
+    ThreadItem,
+    ThreadMetadata,
+    UserMessageItem,
     UserMessageTextContent,
 )
 
 from app.database import async_session_maker
-from app.models.conversation import Conversation
-from app.models.message import Message, MessageRole
+from app.models.message import MessageRole
 from app.services.conversation_service import ConversationService
 from app.services.message_service import MessageService
 
@@ -58,13 +56,13 @@ class PostgresStore(Store):
             # Extract text from content objects
             texts = []
             for item in content:
-                if hasattr(item, 'text'):
+                if hasattr(item, "text"):
                     texts.append(item.text)
-                elif isinstance(item, dict) and 'text' in item:
-                    texts.append(item['text'])
+                elif isinstance(item, dict) and "text" in item:
+                    texts.append(item["text"])
                 else:
                     texts.append(str(item))
-            return ' '.join(texts)
+            return " ".join(texts)
         else:
             return str(content)
 
@@ -99,15 +97,23 @@ class PostgresStore(Store):
                         db=db, conversation_id=conversation.id
                     )
                     # Update title if provided by ChatKit
-                    if thread.title and thread.title != "New Chat" and thread.title != conversation.title:
+                    if (
+                        thread.title
+                        and thread.title != "New Chat"
+                        and thread.title != conversation.title
+                    ):
                         await ConversationService.update_title(
                             db=db,
                             conversation_id=conversation.id,
                             user_id=user_id,
-                            title=thread.title
+                            title=thread.title,
                         )
-                        logger.info(f"✅ Updated conversation title: {conversation.id} -> '{thread.title}'")
-                    logger.info(f"✅ Updated conversation: {conversation.id} (external_id={thread.id})")
+                        logger.info(
+                            f"✅ Updated conversation title: {conversation.id} -> '{thread.title}'"
+                        )
+                    logger.info(
+                        f"✅ Updated conversation: {conversation.id} (external_id={thread.id})"
+                    )
                 else:
                     # Create new conversation with external_id
                     conversation = await ConversationService.create_conversation(
@@ -115,7 +121,9 @@ class PostgresStore(Store):
                         user_id=user_id,
                         external_id=thread.id,
                     )
-                    logger.info(f"✅ Created conversation: {conversation.id} with external_id={thread.id}")
+                    logger.info(
+                        f"✅ Created conversation: {conversation.id} with external_id={thread.id}"
+                    )
             else:
                 # No thread ID, create new conversation
                 conversation = await ConversationService.create_conversation(
@@ -166,12 +174,18 @@ class PostgresStore(Store):
                 logger.error(f"❌ Thread not found: {thread_id}")
                 raise Exception(f"Thread not found: {thread_id}")
 
-            logger.info(f"✅ Thread loaded: id={conversation.id}, external_id={conversation.external_id}")
+            logger.info(
+                f"✅ Thread loaded: id={conversation.id}, external_id={conversation.external_id}"
+            )
             return ThreadMetadata(
                 id=conversation.external_id or str(conversation.id),
                 title=conversation.title or "New Chat",  # Provide default title if None
-                created_at=conversation.created_at if conversation.created_at else datetime.now(timezone.utc),
-                updated_at=conversation.updated_at if conversation.updated_at else datetime.now(timezone.utc),
+                created_at=conversation.created_at
+                if conversation.created_at
+                else datetime.now(UTC),
+                updated_at=conversation.updated_at
+                if conversation.updated_at
+                else datetime.now(UTC),
             )
 
     async def load_thread_items(
@@ -233,16 +247,21 @@ class PostgresStore(Store):
             # We return simple text content since we only store text in the database
             items = []
             for msg in messages:
-                logger.info(f"   Processing message: id={msg.id}, role={msg.role}, content={msg.content[:50]}...")
+                logger.info(
+                    f"   Processing message: id={msg.id}, role={msg.role}, content={msg.content[:50]}..."
+                )
                 if msg.role == MessageRole.USER:
                     item = UserMessageItem(
                         thread_id=thread_id,
                         id=str(msg.id),
                         content=[UserMessageTextContent(text=msg.content)],
-                        created_at=msg.created_at if msg.created_at else datetime.now(timezone.utc),
+                        created_at=msg.created_at if msg.created_at else datetime.now(UTC),
                         attachments=[],  # Empty list for attachments
-                        quoted_text='',  # Empty string for quoted_text
-                        inference_options={'tool_choice': None, 'model': None},  # Proper inference options
+                        quoted_text="",  # Empty string for quoted_text
+                        inference_options={
+                            "tool_choice": None,
+                            "model": None,
+                        },  # Proper inference options
                     )
                     items.append(item)
                     logger.info(f"   ✅ Created UserMessageItem: {item.model_dump()}")
@@ -252,17 +271,21 @@ class PostgresStore(Store):
                     item = AssistantMessageItem(
                         thread_id=thread_id,
                         id=str(msg.id),
-                        content=[AssistantMessageContent(
-                            text=msg.content,
-                            type="output_text",  # Explicitly set
-                            annotations=[]  # Explicitly set
-                        )],
-                        created_at=msg.created_at if msg.created_at else datetime.now(timezone.utc),
+                        content=[
+                            AssistantMessageContent(
+                                text=msg.content,
+                                type="output_text",  # Explicitly set
+                                annotations=[],  # Explicitly set
+                            )
+                        ],
+                        created_at=msg.created_at if msg.created_at else datetime.now(UTC),
                     )
                     items.append(item)
                     logger.info(f"   ✅ Created AssistantMessageItem: {item.model_dump()}")
 
-            logger.info(f"✅ Thread items loaded: thread_id={thread_id}, count={len(items)}, returning={min(len(items), limit)}")
+            logger.info(
+                f"✅ Thread items loaded: thread_id={thread_id}, count={len(items)}, returning={min(len(items), limit)}"
+            )
             logger.info(f"📤 Returning Page with {len(items[:limit])} items")
             return Page(data=items[:limit], has_more=len(items) > limit)
 
@@ -296,7 +319,9 @@ class PostgresStore(Store):
             item: ThreadItem to save
             context: Contains user_id
         """
-        logger.info(f"💾 save_item() called - thread_id={thread_id}, item_type={type(item).__name__}")
+        logger.info(
+            f"💾 save_item() called - thread_id={thread_id}, item_type={type(item).__name__}"
+        )
 
         user_id = context.get("user_id")
         if not user_id:
@@ -351,12 +376,11 @@ class PostgresStore(Store):
                         title = title + "..."
 
                     await ConversationService.update_title(
-                        db=db,
-                        conversation_id=conversation.id,
-                        user_id=user_id,
-                        title=title
+                        db=db, conversation_id=conversation.id, user_id=user_id, title=title
                     )
-                    logger.info(f"🏷️  Auto-generated title: '{title}' for conversation {conversation.id}")
+                    logger.info(
+                        f"🏷️  Auto-generated title: '{title}' for conversation {conversation.id}"
+                    )
             else:
                 msg = await MessageService.create_assistant_message(
                     db=db,
@@ -400,9 +424,7 @@ class PostgresStore(Store):
                 return  # Thread doesn't exist or user doesn't own it
 
             # Delete via service (handles messages + conversation)
-            deleted = await ConversationService.delete_conversation(
-                db, conversation.id, user_id
-            )
+            deleted = await ConversationService.delete_conversation(db, conversation.id, user_id)
 
             if deleted:
                 logger.info(f"✅ Thread successfully deleted: thread_id={thread_id}")
@@ -431,9 +453,7 @@ class PostgresStore(Store):
 
         async with async_session_maker() as db:
             # Use existing service method
-            deleted_count = await ConversationService.delete_all_conversations(
-                db, user_id
-            )
+            deleted_count = await ConversationService.delete_all_conversations(db, user_id)
 
             logger.info(f"✅ All threads deleted: user_id={user_id}, count={deleted_count}")
             return deleted_count
@@ -464,9 +484,7 @@ class PostgresStore(Store):
 
         async with async_session_maker() as db:
             # Get user's conversations from database
-            conversations = await ConversationService.list_conversations(
-                db=db, user_id=user_id
-            )
+            conversations = await ConversationService.list_conversations(db=db, user_id=user_id)
 
             logger.info(f"📋 Found {len(conversations)} conversations for user {user_id}")
 
@@ -476,8 +494,8 @@ class PostgresStore(Store):
                 thread = ThreadMetadata(
                     id=conv.external_id or str(conv.id),
                     title=conv.title or "New Chat",
-                    created_at=conv.created_at if conv.created_at else datetime.now(timezone.utc),
-                    updated_at=conv.updated_at if conv.updated_at else datetime.now(timezone.utc),
+                    created_at=conv.created_at if conv.created_at else datetime.now(UTC),
+                    updated_at=conv.updated_at if conv.updated_at else datetime.now(UTC),
                 )
                 threads.append(thread)
                 logger.info(f"   Thread: id={thread.id}, title={thread.title}")

@@ -8,8 +8,8 @@ including:
 - middleware: Authentication and context extraction
 """
 
+from app.chatkit.middleware import extract_user_context
 from app.chatkit.postgres_store import PostgresStore
 from app.chatkit.task_server import TaskChatServer
-from app.chatkit.middleware import extract_user_context
 
 __all__ = ["PostgresStore", "TaskChatServer", "extract_user_context"]

@@ -49,6 +49,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Phase IV Backend...")
     # Import and create database tables
     from app.database import create_db_and_tables
+
     await create_db_and_tables()
     logger.info("Database tables created/verified")
 
@@ -136,7 +137,8 @@ async def root():
 
 
 # Import ChatKit SDK components
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+
 from app.chatkit import PostgresStore, TaskChatServer, extract_user_context
 
 # Initialize ChatKit SDK
@@ -168,7 +170,7 @@ async def chatkit_handler(request: Request):
         result = await task_server.process(body, context)
 
         # Handle streaming vs non-streaming results
-        if hasattr(result, '__aiter__'):
+        if hasattr(result, "__aiter__"):
             # Streaming result
             async def stream_generator():
                 try:
@@ -186,17 +188,18 @@ async def chatkit_handler(request: Request):
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
-                }
+                },
             )
         else:
             # Non-streaming result - parse ChatKit SDK response
-            if hasattr(result, 'json'):
+            if hasattr(result, "json"):
                 import json as json_lib
+
                 try:
                     # Handle both bytes and str
                     json_data = result.json
                     if isinstance(json_data, bytes):
-                        json_data = json_data.decode('utf-8')
+                        json_data = json_data.decode("utf-8")
 
                     # Parse and return JSON
                     parsed_data = json_lib.loads(json_data)

@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select, delete
+from sqlmodel import delete, select
 
 from app.models.conversation import Conversation
 from app.models.message import Message
@@ -26,7 +26,9 @@ class ConversationService:
         db.add(conversation)
         await db.commit()
         await db.refresh(conversation)
-        logger.info(f"Conversation created: conversation_id={conversation.id}, user_id={user_id}, external_id={external_id}")
+        logger.info(
+            f"Conversation created: conversation_id={conversation.id}, user_id={user_id}, external_id={external_id}"
+        )
         return conversation
 
     @staticmethod
@@ -54,8 +56,7 @@ class ConversationService:
         """
         result = await db.execute(
             select(Conversation).where(
-                Conversation.external_id == external_id,
-                Conversation.user_id == user_id
+                Conversation.external_id == external_id, Conversation.user_id == user_id
             )
         )
         return result.scalar_one_or_none()
@@ -120,7 +121,9 @@ class ConversationService:
             conversation.updated_at = datetime.utcnow()
             await db.commit()
             await db.refresh(conversation)
-            logger.info(f"Conversation title updated: conversation_id={conversation_id}, title={title}")
+            logger.info(
+                f"Conversation title updated: conversation_id={conversation_id}, title={title}"
+            )
         return conversation
 
     @staticmethod
@@ -158,19 +161,21 @@ class ConversationService:
         # Validate ownership
         conversation = await ConversationService.get_conversation(db, conversation_id, user_id)
         if not conversation:
-            logger.warning(f"Delete failed - conversation not found or access denied: {conversation_id}")
+            logger.warning(
+                f"Delete failed - conversation not found or access denied: {conversation_id}"
+            )
             return False
 
         # Delete all associated messages first (foreign key constraint)
-        await db.execute(
-            delete(Message).where(Message.conversation_id == conversation_id)
-        )
+        await db.execute(delete(Message).where(Message.conversation_id == conversation_id))
 
         # Delete the conversation
         await db.delete(conversation)
         await db.commit()
 
-        logger.info(f"✅ Conversation deleted: conversation_id={conversation_id}, user_id={user_id}")
+        logger.info(
+            f"✅ Conversation deleted: conversation_id={conversation_id}, user_id={user_id}"
+        )
         return True
 
     @staticmethod
@@ -198,16 +203,10 @@ class ConversationService:
         conversation_ids = [conv.id for conv in conversations]
 
         # Delete all messages for these conversations
-        await db.execute(
-            delete(Message).where(Message.conversation_id.in_(conversation_ids))
-        )
+        await db.execute(delete(Message).where(Message.conversation_id.in_(conversation_ids)))
 
         # Delete all conversations
-        await db.execute(
-            delete(Conversation).where(
-                Conversation.user_id == user_id
-            )
-        )
+        await db.execute(delete(Conversation).where(Conversation.user_id == user_id))
 
         await db.commit()
 

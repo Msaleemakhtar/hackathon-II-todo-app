@@ -8,22 +8,22 @@ Integrates:
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
-from chatkit.server import ChatKitServer
-from chatkit.types import (
-    ThreadMetadata,
-    UserMessageItem,
-    AssistantMessageItem,
-    ThreadStreamEvent,
-    ThreadItemDoneEvent,
-    AssistantMessageContent,
-    UserMessageTextContent,
-)
 from agents import Agent, Runner
 from agents.extensions.models.litellm_model import LitellmModel
 from agents.mcp import MCPServerStreamableHttp
+from chatkit.server import ChatKitServer
+from chatkit.types import (
+    AssistantMessageContent,
+    AssistantMessageItem,
+    ThreadItemDoneEvent,
+    ThreadMetadata,
+    ThreadStreamEvent,
+    UserMessageItem,
+)
 
 from app.config import settings
 
@@ -136,7 +136,11 @@ class TaskChatServer(ChatKitServer):
                     logger.info(f"🔍 has 'tools' attr: {hasattr(tools_list, 'tools')}")
                     logger.info(f"🔍 dir: {dir(tools_list)}")
 
-                    tool_names = [tool.name for tool in tools_list.tools] if hasattr(tools_list, 'tools') else []
+                    tool_names = (
+                        [tool.name for tool in tools_list.tools]
+                        if hasattr(tools_list, "tools")
+                        else []
+                    )
                     logger.info(f"🔧 MCP tools discovered: {tool_names}")
                 except Exception as e:
                     logger.error(f"❌ Could not list MCP tools: {str(e)}", exc_info=True)
@@ -166,14 +170,20 @@ class TaskChatServer(ChatKitServer):
 
                         # Convert ChatKit items to conversation history format
                         for item in items_page.data:
-                            if hasattr(item, 'content'):
+                            if hasattr(item, "content"):
                                 # Extract text from ChatKit content format
                                 text = self._extract_text_from_content(item.content)
                                 # Determine role based on item type
-                                role = "user" if type(item).__name__ == "UserMessageItem" else "assistant"
+                                role = (
+                                    "user"
+                                    if type(item).__name__ == "UserMessageItem"
+                                    else "assistant"
+                                )
                                 conversation_history.append({"role": role, "content": text})
 
-                        logger.info(f"📜 Loaded {len(conversation_history)} messages from conversation history")
+                        logger.info(
+                            f"📜 Loaded {len(conversation_history)} messages from conversation history"
+                        )
                     except Exception as e:
                         logger.warning(f"Failed to load conversation history: {str(e)}")
                         # Continue with empty history on error
@@ -197,18 +207,22 @@ class TaskChatServer(ChatKitServer):
                 # ChatKit expects us to yield ThreadStreamEvent with all required fields
                 # CRITICAL: Explicitly set type="output_text" to ensure serialization includes it
                 assistant_message = AssistantMessageItem(
-                    id=f"msg_{datetime.now(timezone.utc).timestamp()}",
+                    id=f"msg_{datetime.now(UTC).timestamp()}",
                     thread_id=thread.id,
-                    content=[AssistantMessageContent(
-                        text=result.final_output,
-                        type="output_text",  # Explicitly set to force serialization
-                        annotations=[]  # Explicitly set empty list
-                    )],
-                    created_at=datetime.now(timezone.utc),
+                    content=[
+                        AssistantMessageContent(
+                            text=result.final_output,
+                            type="output_text",  # Explicitly set to force serialization
+                            annotations=[],  # Explicitly set empty list
+                        )
+                    ],
+                    created_at=datetime.now(UTC),
                 )
-                logger.info(f"📤 Created AssistantMessageItem: id={assistant_message.id}, thread_id={assistant_message.thread_id}")
+                logger.info(
+                    f"📤 Created AssistantMessageItem: id={assistant_message.id}, thread_id={assistant_message.thread_id}"
+                )
                 # Debug: Log the serialized content
-                logger.info(f"🔍 Content serialization check:")
+                logger.info("🔍 Content serialization check:")
                 logger.info(f"   content object: {assistant_message.content}")
                 logger.info(f"   content[0] type: {type(assistant_message.content[0])}")
                 logger.info(f"   content[0] dict: {assistant_message.content[0].model_dump()}")
@@ -217,10 +231,12 @@ class TaskChatServer(ChatKitServer):
                 # CRITICAL FIX: Wrap assistant message in ThreadItemDoneEvent
                 # The ChatKit SDK expects ThreadItemDoneEvent, not raw AssistantMessageItem
                 # This ensures proper SSE formatting and automatic persistence
-                logger.info(f"📤 Yielding ThreadItemDoneEvent with assistant message to ChatKit SDK")
+                logger.info("📤 Yielding ThreadItemDoneEvent with assistant message to ChatKit SDK")
                 yield ThreadItemDoneEvent(item=assistant_message)
 
-                logger.info(f"✅ Response generated and yielded for user_id={user_id}, thread_id={thread.id}")
+                logger.info(
+                    f"✅ Response generated and yielded for user_id={user_id}, thread_id={thread.id}"
+                )
 
         except Exception as e:
             logger.error(f"Error in respond(): {str(e)}", exc_info=True)
@@ -238,18 +254,20 @@ class TaskChatServer(ChatKitServer):
             # Create error message as assistant response with all required fields
             # Explicitly set all fields to force serialization
             error_message = AssistantMessageItem(
-                id=f"msg_{datetime.now(timezone.utc).timestamp()}",
+                id=f"msg_{datetime.now(UTC).timestamp()}",
                 thread_id=thread.id,
-                content=[AssistantMessageContent(
-                    text=error_msg,
-                    type="output_text",  # Explicitly set
-                    annotations=[]  # Explicitly set
-                )],
-                created_at=datetime.now(timezone.utc),
+                content=[
+                    AssistantMessageContent(
+                        text=error_msg,
+                        type="output_text",  # Explicitly set
+                        annotations=[],  # Explicitly set
+                    )
+                ],
+                created_at=datetime.now(UTC),
             )
 
             # Wrap error message in ThreadItemDoneEvent for proper SDK handling
-            logger.info(f"📤 Yielding ThreadItemDoneEvent with error message to ChatKit SDK")
+            logger.info("📤 Yielding ThreadItemDoneEvent with error message to ChatKit SDK")
             yield ThreadItemDoneEvent(item=error_message)
 
     def _extract_text_from_content(self, content: Any) -> str:
@@ -266,13 +284,13 @@ class TaskChatServer(ChatKitServer):
         elif isinstance(content, list):
             texts = []
             for item in content:
-                if isinstance(item, dict) and 'text' in item:
-                    texts.append(item['text'])
-                elif hasattr(item, 'text'):
+                if isinstance(item, dict) and "text" in item:
+                    texts.append(item["text"])
+                elif hasattr(item, "text"):
                     texts.append(item.text)
                 else:
                     texts.append(str(item))
-            return ' '.join(texts)
+            return " ".join(texts)
         else:
             return str(content)
 

@@ -10,9 +10,7 @@ class ChatRequest(BaseModel):
     conversation_id: int | None = Field(
         None, description="Existing conversation ID to continue, or None for new conversation"
     )
-    user_id: str | None = Field(
-        None, description="User ID (optional, for testing without JWT)"
-    )
+    user_id: str | None = Field(None, description="User ID (optional, for testing without JWT)")
 
     class Config:
         json_schema_extra = {
