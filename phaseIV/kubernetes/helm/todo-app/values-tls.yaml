@@ -1,0 +1,4 @@
+# Enable HTTPS with self-signed certificates
+ingress:
+  tls:
+    enabled: true

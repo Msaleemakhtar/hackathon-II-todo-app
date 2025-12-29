@@ -203,6 +203,7 @@ If ALL true, suggest:
 
 ## Active Technologies
 - Neon Serverless PostgreSQL (shared database instance with Phase II) (003-fix-chatkit-auth)
+- YAML (Kubernetes manifests), Helm 3.13+ (templating), Bash (deployment scripts) (001-kubernetes-deployment)
 
 ## Recent Changes
 - 003-fix-chatkit-auth: Added Neon Serverless PostgreSQL (shared database instance with Phase II)

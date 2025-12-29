@@ -1,0 +1,51 @@
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.redis.labels" . | nindent 4 }}
+spec:
+  serviceName: redis-service
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "todo-app.redis.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "todo-app.redis.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: redis
+        image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+        imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+        command:
+          {{- toYaml .Values.redis.command | nindent 10 }}
+        ports:
+        - containerPort: {{ .Values.redis.service.targetPort }}
+          name: redis
+          protocol: TCP
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          {{- toYaml .Values.redis.resources | nindent 10 }}
+        livenessProbe:
+          {{- toYaml .Values.redis.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.redis.readinessProbe | nindent 10 }}
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+      labels:
+        {{- include "todo-app.redis.labels" . | nindent 8 }}
+    spec:
+      accessModes:
+        - {{ .Values.redis.persistence.accessMode }}
+      storageClassName: {{ .Values.redis.persistence.storageClassName }}
+      resources:
+        requests:
+          storage: {{ .Values.redis.persistence.size }}
+{{- end }}

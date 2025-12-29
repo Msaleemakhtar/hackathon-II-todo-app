@@ -1,0 +1,19 @@
+{{- if .Values.redis.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.redis.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.redis.service.type }}
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    {{- include "todo-app.redis.selectorLabels" . | nindent 4 }}
+  ports:
+  - port: {{ .Values.redis.service.port }}
+    targetPort: {{ .Values.redis.service.targetPort }}
+    protocol: TCP
+    name: redis
+{{- end }}

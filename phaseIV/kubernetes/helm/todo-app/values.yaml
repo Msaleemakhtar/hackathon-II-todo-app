@@ -1,0 +1,209 @@
+# Helm Values for Todo App Phase IV
+# Override these values using --set flag or custom values-local.yaml
+
+# Global Configuration
+global:
+  namespace: "todo-phaseiv"  # Constitutional requirement
+  imagePullPolicy: "IfNotPresent"  # Avoid pulling if image exists locally
+
+# Frontend Configuration
+frontend:
+  enabled: true
+  replicaCount: 2  # Initial replicas (HPA manages dynamically)
+  image:
+    repository: "todo-frontend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 3000
+    targetPort: 3000
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  livenessProbe:
+    httpGet:
+      path: "/"
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/"
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# Backend Configuration
+backend:
+  enabled: true
+  replicaCount: 2  # Initial replicas (HPA manages dynamically)
+  image:
+    repository: "todo-backend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 8000
+    targetPort: 8000
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  livenessProbe:
+    httpGet:
+      path: "/health"
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/health"
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# MCP Server Configuration
+mcpServer:
+  enabled: true
+  replicaCount: 1  # Fixed single replica
+  image:
+    repository: "todo-backend"  # Reuses backend image
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 8001
+    targetPort: 8001
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  livenessProbe:
+    tcpSocket:
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    tcpSocket:
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Redis Configuration
+redis:
+  enabled: true
+  image:
+    repository: "redis"
+    tag: "7-alpine"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 6379
+    targetPort: 6379
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  livenessProbe:
+    exec:
+      command:
+        - "redis-cli"
+        - "ping"
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    exec:
+      command:
+        - "redis-cli"
+        - "ping"
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  persistence:
+    enabled: true
+    storageClassName: "standard"
+    accessMode: "ReadWriteOnce"
+    size: "1Gi"
+  command:
+    - "redis-server"
+    - "--appendonly"
+    - "yes"
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "todo-app.local"
+  tls:
+    enabled: false  # Set to true to enable HTTPS
+    # TLS secret (todo-app-tls) should be created separately with cert and key
+
+# Secrets Configuration
+# IMPORTANT: DO NOT commit actual secrets to git
+# Use values-local.yaml (gitignored) or --set flags for sensitive data
+# All values MUST be base64-encoded
+# Example: echo -n "postgres://..." | base64
+secrets:
+  databaseUrl: ""  # Base64-encoded Neon PostgreSQL URL (backend - asyncpg driver)
+  frontendDatabaseUrl: ""  # Base64-encoded Neon PostgreSQL URL (frontend - plain driver)
+  openaiApiKey: ""  # Base64-encoded OpenAI API key
+  betterAuthSecret: ""  # Base64-encoded Better Auth shared secret
+  betterAuthUrl: ""  # Base64-encoded Better Auth URL
+  redisPassword: ""  # Base64-encoded Redis password (optional)
+
+# ConfigMap Configuration (Non-sensitive data)
+configMap:
+  REDIS_HOST: "redis-service.todo-phaseiv.svc.cluster.local"
+  REDIS_PORT: "6379"
+  MCP_SERVER_URL: "http://mcp-service.todo-phaseiv.svc.cluster.local:8001/mcp"
+  NEXT_PUBLIC_API_URL: "http://todo-app.local/api"
+  NEXT_PUBLIC_BETTER_AUTH_URL: "http://todo-app.local"
+  NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: ""  # Empty for local development
+  CORS_ORIGINS: '["http://todo-app.local", "http://localhost:3000", "http://127.0.0.1:3000"]'
+
+# Helm Test Configuration
+tests:
+  enabled: true
+  image:
+    repository: "busybox"
+    tag: "latest"

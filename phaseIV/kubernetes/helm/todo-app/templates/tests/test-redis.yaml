@@ -1,0 +1,28 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "todo-app.fullname" . }}-test-redis"
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+    test: redis-connection
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+  - name: redis-test
+    image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+    command: ['sh', '-c']
+    args:
+      - |
+        echo "Testing Redis connection..."
+        if command -v redis-cli > /dev/null; then
+          redis-cli -h redis-service.{{ include "todo-app.namespace" . }}.svc.cluster.local -p 6379 ping
+        else
+          echo "redis-cli not available in busybox, using nc instead"
+          nc -zv redis-service.{{ include "todo-app.namespace" . }}.svc.cluster.local 6379
+        fi
+  restartPolicy: Never
+{{- end }}

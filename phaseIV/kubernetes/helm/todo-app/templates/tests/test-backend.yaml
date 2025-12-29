@@ -1,0 +1,23 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "todo-app.fullname" . }}-test-backend"
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+    test: backend-health
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+  - name: backend-test
+    image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+    command: ['sh', '-c']
+    args:
+      - |
+        echo "Testing Backend health endpoint..."
+        wget -O- http://backend-service.{{ include "todo-app.namespace" . }}.svc.cluster.local:8000/health || exit 1
+  restartPolicy: Never
+{{- end }}

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: todo-app
+description: Phase IV Todo Chatbot - Kubernetes deployment with Helm
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - todo
+  - chatbot
+  - kubernetes
+  - phase-iv
+maintainers:
+  - name: Phase IV Team
+    email: dev@todo-app.local
+sources:
+  - https://github.com/your-org/hackathon-II-todo-app

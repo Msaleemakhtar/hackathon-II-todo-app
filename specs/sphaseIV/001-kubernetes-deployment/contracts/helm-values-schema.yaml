@@ -1,0 +1,277 @@
+# Helm Values Schema Contract
+# Feature: 001-kubernetes-deployment
+# Date: 2025-12-26
+# Purpose: Define the contract for values.yaml configuration in Helm chart
+
+# This schema defines all configurable values for the todo-app Helm chart.
+# All values have defaults; operators can override via --set or custom values.yaml
+
+---
+# Global Configuration
+global:
+  namespace: "todo-phaseiv"  # Kubernetes namespace (constitutional requirement)
+  imagePullPolicy: "IfNotPresent"  # Avoid pulling if image exists locally
+
+# Frontend Configuration
+frontend:
+  enabled: true
+  replicaCount: 2  # Initial replicas (HPA manages dynamically)
+  image:
+    repository: "todo-frontend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 3000
+    targetPort: 3000
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  livenessProbe:
+    httpGet:
+      path: "/health"
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/health"
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  env:
+    # Environment variables from ConfigMap
+    NEXT_PUBLIC_API_URL: "http://todo-app.local/api"
+
+# Backend Configuration
+backend:
+  enabled: true
+  replicaCount: 2  # Initial replicas (HPA manages dynamically)
+  image:
+    repository: "todo-backend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 8000
+    targetPort: 8000
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+  livenessProbe:
+    httpGet:
+      path: "/health"
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/health"
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    # Environment variables from ConfigMap
+    REDIS_HOST: "redis-service.todo-phaseiv.svc.cluster.local"
+    REDIS_PORT: "6379"
+    MCP_SERVER_URL: "http://mcp-service.todo-phaseiv.svc.cluster.local:8001"
+
+# MCP Server Configuration
+mcpServer:
+  enabled: true
+  replicaCount: 1  # Fixed single replica
+  image:
+    repository: "todo-backend"  # Reuses backend image
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 8001
+    targetPort: 8001
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  livenessProbe:
+    httpGet:
+      path: "/health"
+      port: 8001
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/health"
+      port: 8001
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  env:
+    # Environment variables from ConfigMap
+    REDIS_HOST: "redis-service.todo-phaseiv.svc.cluster.local"
+    REDIS_PORT: "6379"
+
+# Redis Configuration
+redis:
+  enabled: true
+  image:
+    repository: "redis"
+    tag: "7-alpine"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 6379
+    targetPort: 6379
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  livenessProbe:
+    exec:
+      command:
+        - "redis-cli"
+        - "ping"
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    exec:
+      command:
+        - "redis-cli"
+        - "ping"
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  persistence:
+    enabled: true
+    storageClassName: "standard"
+    accessMode: "ReadWriteOnce"
+    size: "1Gi"
+  command:
+    - "redis-server"
+    - "--appendonly"
+    - "yes"
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "todo-app.local"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: "/"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"  # For local dev
+  paths:
+    - path: "/api"
+      pathType: "Prefix"
+      backend:
+        serviceName: "backend-service"
+        servicePort: 8000
+    - path: "/"
+      pathType: "Prefix"
+      backend:
+        serviceName: "frontend-service"
+        servicePort: 3000
+
+# Secrets Configuration
+# IMPORTANT: These values MUST be base64-encoded
+# Example: echo -n "postgres://..." | base64
+secrets:
+  databaseUrl: ""  # Base64-encoded Neon PostgreSQL URL
+  openaiApiKey: ""  # Base64-encoded OpenAI API key
+  betterAuthSecret: ""  # Base64-encoded Better Auth shared secret
+  betterAuthUrl: ""  # Base64-encoded Better Auth URL
+  redisPassword: ""  # Base64-encoded Redis password (optional)
+
+# ConfigMap Configuration (Non-sensitive data)
+configMap:
+  REDIS_HOST: "redis-service.todo-phaseiv.svc.cluster.local"
+  REDIS_PORT: "6379"
+  MCP_SERVER_URL: "http://mcp-service.todo-phaseiv.svc.cluster.local:8001"
+  NEXT_PUBLIC_API_URL: "http://todo-app.local/api"
+
+# Helm Test Configuration
+tests:
+  enabled: true
+  image:
+    repository: "busybox"
+    tag: "latest"
+
+---
+# Validation Rules (enforced during helm install)
+
+# 1. Namespace Validation
+# - global.namespace MUST be "todo-phaseiv" (constitutional requirement)
+
+# 2. Resource Limits Validation
+# - All containers MUST have resources.requests and resources.limits defined
+# - QoS class MUST be Burstable or Guaranteed (never BestEffort)
+
+# 3. Secrets Validation
+# - All secrets.* values MUST be non-empty strings (enforced via helm install --set)
+# - All secrets.* values MUST be valid base64-encoded strings
+
+# 4. Image Pull Policy Validation
+# - imagePullPolicy MUST be "IfNotPresent" for local Minikube (constitutional requirement)
+
+# 5. Autoscaling Validation
+# - frontend.autoscaling.minReplicas MUST be >= 2
+# - frontend.autoscaling.maxReplicas MUST be <= 5
+# - backend.autoscaling.minReplicas MUST be >= 2
+# - backend.autoscaling.maxReplicas MUST be <= 5
+
+# 6. Service Type Validation
+# - All services (frontend, backend, mcp, redis) MUST use type: ClusterIP
+# - Only Ingress exposes services externally
+
+# 7. Persistence Validation
+# - redis.persistence.enabled MUST be true (constitutional requirement)
+# - redis.persistence.storageClassName MUST be "standard" (Minikube default)
+# - redis.persistence.accessMode MUST be "ReadWriteOnce"
+
+# 8. Health Probe Validation
+# - All deployments MUST have livenessProbe and readinessProbe defined
+# - Probes MUST have initialDelaySeconds: 10, periodSeconds: 10, timeoutSeconds: 5, failureThreshold: 3
+
+# 9. Ingress Path Validation
+# - ingress.paths[0].path MUST be "/api" (API path MUST come first)
+# - ingress.paths[1].path MUST be "/" (Frontend path MUST come second)
+
+# 10. Host Validation
+# - ingress.host MUST be "todo-app.local" (constitutional requirement)

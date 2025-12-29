@@ -79,3 +79,16 @@ env/
 *.tmp
 *.temp
 .sass-cache/
+
+# Kubernetes & Helm (Phase IV)
+values-local.yaml
+values-*.local.yaml
+*.secret.yaml
+phaseIV/kubernetes/secrets/
+.minikube/
+.kube/
+kubeconfig*
+*.key
+*.crt
+*.pem
+*.csr

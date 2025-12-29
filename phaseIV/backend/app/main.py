@@ -46,31 +46,31 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded) ->
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    print("Starting Phase III Backend...")
+    logger.info("Starting Phase IV Backend...")
     # Import and create database tables
     from app.database import create_db_and_tables
     await create_db_and_tables()
-    print("Database tables created/verified")
+    logger.info("Database tables created/verified")
 
     # MCP tools are defined in app/mcp/tools.py and run in a separate MCP server service
-    print("MCP tools defined (running in separate mcp-server service)")
+    logger.info("MCP tools defined (running in separate mcp-server service)")
 
     yield
 
     # Shutdown
-    print("Shutting down Phase III Backend...")
+    logger.info("Shutting down Phase IV Backend...")
 
 
 # Create FastAPI application
 app = FastAPI(
-    title="Phase III AI Chat Service",
+    title="Phase IV AI Chat Service",
     description="""
     **Conversational Task Management API**
 
     An AI-powered chat service that allows users to manage their tasks through natural language conversations.
 
     ## Features
-    - 🤖 Natural language task management using Google Gemini
+    - 🤖 Natural language task management using OpenAI ChatKit
     - 💬 Persistent conversation history
     - 🔒 Secure authentication with Better Auth
     - ⚡ Rate limiting and input sanitization
@@ -136,8 +136,6 @@ async def root():
 
 
 # Import ChatKit SDK components
-from app.services.conversation_service import ConversationService
-from app.database import async_session_maker
 from fastapi.responses import StreamingResponse, JSONResponse
 from app.chatkit import PostgresStore, TaskChatServer, extract_user_context
 
@@ -157,56 +155,27 @@ async def chatkit_handler(request: Request):
     Routes all ChatKit protocol requests to the TaskChatServer.process() method.
     Authenticates user via JWT and passes context to ChatKitServer.
     """
-    logger.info(f"📨 ChatKit request: {request.method} {request.url.path}")
+    logger.info(f"ChatKit request: {request.method} {request.url.path}")
 
     try:
         # Extract user context from JWT
         context = await extract_user_context(request)
         user_id = context.get("user_id")
-        logger.info(f"✅ Authenticated user: {user_id}")
+        logger.info(f"Authenticated user: {user_id}")
 
-        # Get request body
+        # Get request body and process via ChatKitServer
         body = await request.body()
-        logger.info(f"📨 Request body length: {len(body)} bytes")
-        if body:
-            import json
-            try:
-                body_json = json.loads(body)
-                logger.info(f"📨 Request type: {body_json.get('type', 'unknown')}")
-                logger.info(f"📨 Request params: {body_json.get('params', {})}")
-            except:
-                pass
-
-        # Process request via ChatKitServer
         result = await task_server.process(body, context)
-        logger.info(f"📤 Result type: {type(result).__name__}")
 
         # Handle streaming vs non-streaming results
         if hasattr(result, '__aiter__'):
             # Streaming result
-            logger.info("🌊 Streaming response detected")
-            chunk_count = 0
-
             async def stream_generator():
-                nonlocal chunk_count
                 try:
                     async for chunk in result:
-                        chunk_count += 1
-                        # Debug logging for SSE chunks
-                        logger.info(f"📤 SSE Chunk {chunk_count}: type={type(chunk).__name__}, size={len(chunk) if isinstance(chunk, (str, bytes)) else 'N/A'}")
-                        if isinstance(chunk, bytes):
-                            try:
-                                logger.info(f"   Content preview: {chunk[:200].decode('utf-8', errors='ignore')}")
-                            except:
-                                logger.info(f"   Binary content: {chunk[:100]}")
-                        elif isinstance(chunk, str):
-                            logger.info(f"   Content preview: {chunk[:200]}")
-                        else:
-                            logger.info(f"   Object: {str(chunk)[:200]}")
                         yield chunk
-                    logger.info(f"✅ Streaming completed: {chunk_count} chunks sent to user {user_id}")
                 except Exception as e:
-                    logger.error(f"❌ Error in stream generator: {str(e)}", exc_info=True)
+                    logger.error(f"Error in stream generator: {str(e)}", exc_info=True)
                     # Yield error event in SSE format
                     error_msg = f'data: {{"error": "Stream error: {str(e)}"}}\n\n'
                     yield error_msg.encode()
@@ -220,21 +189,7 @@ async def chatkit_handler(request: Request):
                 }
             )
         else:
-            # Non-streaming result - ChatKit SDK returns a response object
-            logger.info(f"📄 Non-streaming response for user {user_id}")
-
-            # DEBUG: Inspect the result object structure
-            logger.info(f"🔍 Result object type: {type(result)}")
-            logger.info(f"🔍 Result object dir: {dir(result)[:20]}")  # First 20 attributes
-            logger.info(f"🔍 Has 'json' attr: {hasattr(result, 'json')}")
-
-            if hasattr(result, 'json'):
-                logger.info(f"🔍 json type: {type(result.json)}")
-                logger.info(f"🔍 json value preview: {str(result.json)[:200]}")
-
-            # CRITICAL: ChatKit SDK returns an object with a .json attribute containing
-            # JSON data (either as bytes or string). We need to parse this and return
-            # the actual JSON content, not the wrapper object, to avoid double-serialization.
+            # Non-streaming result - parse ChatKit SDK response
             if hasattr(result, 'json'):
                 import json as json_lib
                 try:
@@ -243,23 +198,18 @@ async def chatkit_handler(request: Request):
                     if isinstance(json_data, bytes):
                         json_data = json_data.decode('utf-8')
 
-                    # Parse the JSON string
+                    # Parse and return JSON
                     parsed_data = json_lib.loads(json_data)
-                    logger.info(f"✅ Parsed ChatKit response: {str(parsed_data)[:200]}...")
-                    # Return as JSONResponse to ensure proper serialization
                     return JSONResponse(content=parsed_data)
                 except (json_lib.JSONDecodeError, UnicodeDecodeError) as e:
-                    logger.error(f"❌ Failed to parse ChatKit JSON: {str(e)}")
-                    logger.error(f"   Raw JSON data: {str(result.json)[:500]}")
-                    # Fallback to returning result as-is
+                    logger.error(f"Failed to parse ChatKit JSON: {str(e)}")
                     return result
 
             # If no .json attribute, return as-is
-            logger.info(f"⚠️ No .json attribute, returning result as-is")
             return result
 
     except Exception as e:
-        logger.error(f"❌ Error in chatkit_handler: {str(e)}", exc_info=True)
+        logger.error(f"Error in chatkit_handler: {str(e)}", exc_info=True)
         # Return error response with proper CORS headers
         return Response(
             content=f'{{"error": "{str(e)}"}}',
@@ -276,22 +226,19 @@ async def delete_all_threads(request: Request):
     Returns:
         {"deleted": count}
     """
-    logger.info("📨 Delete all threads request")
-
     try:
         # Extract user context from JWT
         context = await extract_user_context(request)
         user_id = context.get("user_id")
-        logger.info(f"✅ Authenticated user: {user_id}")
 
         # Delete all threads via store
         deleted_count = await store.delete_all_threads(context)
 
-        logger.info(f"✅ Deleted {deleted_count} threads for user {user_id}")
+        logger.info(f"Deleted {deleted_count} threads for user {user_id}")
         return JSONResponse(content={"deleted": deleted_count})
 
     except Exception as e:
-        logger.error(f"❌ Error in delete_all_threads: {str(e)}", exc_info=True)
+        logger.error(f"Error in delete_all_threads: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": str(e)},
             status_code=500,

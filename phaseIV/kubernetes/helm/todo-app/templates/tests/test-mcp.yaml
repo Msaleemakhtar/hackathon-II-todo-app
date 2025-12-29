@@ -1,0 +1,23 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "todo-app.fullname" . }}-test-mcp"
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+    test: mcp-health
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+  - name: mcp-test
+    image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+    command: ['sh', '-c']
+    args:
+      - |
+        echo "Testing MCP Server health endpoint..."
+        wget -O- http://mcp-service.{{ include "todo-app.namespace" . }}.svc.cluster.local:8001/health || exit 1
+  restartPolicy: Never
+{{- end }}

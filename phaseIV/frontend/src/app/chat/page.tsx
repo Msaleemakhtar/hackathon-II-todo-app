@@ -34,11 +34,8 @@ const THREAD_STORAGE_KEY = 'chatkit_current_thread_id';
 const getStoredThreadId = (): string | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const storedId = localStorage.getItem(THREAD_STORAGE_KEY);
-    console.log('[DEBUG] getStoredThreadId:', storedId);
-    return storedId;
-  } catch (error) {
-    console.error('[DEBUG] Failed to get stored thread ID:', error);
+    return localStorage.getItem(THREAD_STORAGE_KEY);
+  } catch {
     return null;
   }
 };
@@ -52,13 +49,11 @@ const setStoredThreadId = (threadId: string | null): void => {
   try {
     if (threadId) {
       localStorage.setItem(THREAD_STORAGE_KEY, threadId);
-      console.log('[DEBUG] Stored thread ID:', threadId);
     } else {
       localStorage.removeItem(THREAD_STORAGE_KEY);
-      console.log('[DEBUG] Cleared thread ID from localStorage');
     }
-  } catch (error) {
-    console.error('[DEBUG] Failed to store thread ID:', error);
+  } catch {
+    // Silently fail if localStorage is unavailable
   }
 };
 
@@ -71,60 +66,26 @@ const setStoredThreadId = (threadId: string | null): void => {
  */
 function ChatInterface({ authToken, session }: { authToken: string; session: any }) {
   const router = useRouter();
-  const [threadId, setThreadId] = useState<string | null>(() => {
-    const initialThreadId = getStoredThreadId();
-    console.log('[DEBUG] ChatInterface initialized with threadId:', initialThreadId);
-    return initialThreadId;
-  });
+  const [threadId, setThreadId] = useState<string | null>(getStoredThreadId);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
   // Handle thread change events
   const handleThreadChange = useCallback(({ threadId: newThreadId }: { threadId?: string | null }) => {
     const normalizedThreadId = newThreadId ?? null;
-    console.log('[DEBUG] handleThreadChange called with:', newThreadId, '-> normalized:', normalizedThreadId);
 
     // Only update if the thread ID actually changed
-    // This prevents clearing the thread ID on errors
     if (normalizedThreadId !== threadId) {
-      console.log('[DEBUG] Thread ID changed from', threadId, 'to', normalizedThreadId);
       setThreadId(normalizedThreadId);
       setStoredThreadId(normalizedThreadId);
       setCurrentThreadId(normalizedThreadId);
-    } else {
-      console.log('[DEBUG] Thread ID unchanged, skipping update');
     }
   }, [threadId]);
-
-  // Handle response completion
-  const handleResponseEnd = useCallback(() => {
-    // Response completed
-  }, []);
 
   // Handle errors
   const handleError = useCallback(({ error }: { error: Error }) => {
     console.error('[ChatKit] Error:', error);
   }, []);
-
-  // Handle ready event
-  const handleReady = useCallback(() => {
-    console.log('[DEBUG] ChatKit ready event fired');
-  }, []);
-
-  // Handle incoming messages
-  const handleMessage = useCallback((event: any) => {
-    // Message received
-  }, []);
-
-  // Handle stream events
-  const handleStreamEvent = useCallback((event: any) => {
-    // Stream event received
-  }, []);
-
-  // Monitor threadId changes
-  useEffect(() => {
-    console.log('[DEBUG] threadId state changed to:', threadId);
-  }, [threadId]);
 
   // Read thread ID from URL query params on mount (for shared links)
   useEffect(() => {
@@ -134,7 +95,6 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
     const urlThreadId = params.get('thread');
 
     if (urlThreadId && !threadId) {
-      console.log('[Share] Loading shared thread from URL:', urlThreadId);
       setThreadId(urlThreadId);
       setStoredThreadId(urlThreadId);
       setCurrentThreadId(urlThreadId);
@@ -152,7 +112,6 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
   // Handle share conversation
   const handleShare = useCallback(async () => {
     if (!currentThreadId) {
-      console.warn('[Share] No active conversation to share');
       return;
     }
 
@@ -166,17 +125,13 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
           text: 'Check out this task conversation',
           url: shareUrl,
         });
-        console.log('[Share] Shared via native share sheet');
       } else {
         // Fallback: copy to clipboard (desktop)
         await navigator.clipboard.writeText(shareUrl);
-        console.log('[Share] Link copied to clipboard:', shareUrl);
-
-        // Simple user feedback
         alert('Conversation link copied to clipboard!');
       }
     } catch (error) {
-      // User cancelled or permission denied
+      // User cancelled or permission denied - silently ignore
       if ((error as Error).name !== 'AbortError') {
         console.error('[Share] Failed:', error);
       }
@@ -194,9 +149,6 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
     }
   }, [router]);
 
-  // Log the threadId before passing to ChatKit
-  console.log('[DEBUG] Initializing ChatKit with threadId:', threadId);
-
   // Initialize ChatKit with full configuration following official examples
   const chatkit = useChatKit({
     api: {
@@ -205,13 +157,7 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
       // Custom fetch function to inject auth headers
       // IMPORTANT: Must return Response directly for SSE stream handling
       fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
-        console.log('[DEBUG] ChatKit fetch called:', {
-          url: input.toString(),
-          method: init?.method || 'GET',
-          hasAuth: !!authToken,
-        });
-
-        const response = await fetch(input, {
+        return fetch(input, {
           ...init,
           headers: {
             ...init?.headers,
@@ -219,25 +165,6 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
             'Accept': 'text/event-stream',
           },
         });
-
-        console.log('[DEBUG] ChatKit fetch response:', {
-          status: response.status,
-          statusText: response.statusText,
-          contentType: response.headers.get('content-type'),
-        });
-
-        // Log response body for non-streaming responses
-        if (!response.headers.get('content-type')?.includes('event-stream')) {
-          const clonedResponse = response.clone();
-          try {
-            const text = await clonedResponse.text();
-            console.log('[DEBUG] Response body:', text.substring(0, 500));
-          } catch (e) {
-            console.error('[DEBUG] Failed to read response:', e);
-          }
-        }
-
-        return response;
       },
     },
     initialThread: threadId,
@@ -307,10 +234,8 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
       text: '💡 Tip: Select any message text to copy it. AI responses may be inaccurate—verify important information.',
       highContrast: false,
     },
-    onResponseEnd: handleResponseEnd,
     onThreadChange: handleThreadChange,
     onError: handleError,
-    onReady: handleReady,
   });
 
   // Check if control is valid
