@@ -1,0 +1,25 @@
+# Kubernetes Secrets (NEVER commit these)
+values-local.yaml
+values-*.local.yaml
+*.secret.yaml
+secrets/
+
+# Minikube
+.minikube/
+.kube/
+kubeconfig*
+
+# TLS Certificates
+*.key
+*.crt
+*.pem
+*.csr
+
+# Temporary files
+*.tmp
+*.log
+.cache/
+
+# Test outputs
+test-results/
+coverage/

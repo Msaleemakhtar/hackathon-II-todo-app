@@ -6,6 +6,15 @@ A full-stack, production-ready task management application showcasing Spec-Drive
 
 This repository contains a comprehensive todo application developed in multiple phases, demonstrating progressive development approaches and architectural decisions following Spec-Driven Development principles.
 
+## Quick Links
+
+- **[Phase III Documentation](phaseIII/)** - AI-powered task management setup
+- **[Phase IV Documentation](phaseIV/README.md)** - Kubernetes deployment guide
+- **[Kubernetes Guide](phaseIV/kubernetes/docs/KUBERNETES_GUIDE.md)** - Complete K8s deployment instructions
+- **[Operational Runbook](phaseIV/kubernetes/docs/RUNBOOK.md)** - Troubleshooting and operations
+- **[Constitution](.specify/memory/constitution.md)** - Project governance and architectural principles
+- **[Architecture Decisions](history/adr/)** - ADR records for significant decisions
+
 ## Completed Phases
 
 ### Phase I - Command-Line Todo Application
@@ -26,16 +35,40 @@ A modern full-stack todo application built with Next.js 16, FastAPI, and Postgre
 - Real-time updates and PWA capabilities
 - Complete API with JWT validation
 
-## Phase III - Coming Soon
-Next phase will continue to build upon the foundations established in previous phases, incorporating advanced features and architectural improvements.
+### Phase III - AI-Powered Task Management
+Integration of AI capabilities through Model Context Protocol (MCP) and OpenAI Agents SDK. Features include:
+- MCP server implementation with 5 stateless tools (add, list, complete, delete, update)
+- OpenAI Agents SDK integration for conversational AI
+- ChatKit frontend for natural language task management
+- Database-backed state with separate Phase III tables
+- Better Auth + JWT authentication integration
+- Stateless, horizontally scalable architecture
+- Complete data isolation per user
+
+### Phase IV - Kubernetes Production Deployment
+Production-ready Kubernetes deployment with enterprise-grade infrastructure. Features include:
+- Kubernetes orchestration with Helm 3.13+ charts
+- HTTPS with Nginx Ingress Controller
+- Horizontal Pod Autoscaling (HPA) based on CPU/memory metrics
+- Redis StatefulSet for session caching with persistent storage
+- Neon Serverless PostgreSQL integration
+- Minikube local development environment
+- Health checks and liveness/readiness probes
+- Resource management with Burstable QoS
+- Sequential rollout deployment strategy
+- Comprehensive operational runbooks
 
 ## Architecture & Technologies
 
-- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS
-- **Backend**: FastAPI, Python 3.11+, SQLModel, PostgreSQL
-- **Authentication**: Better Auth
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, OpenAI ChatKit
+- **Backend**: FastAPI, Python 3.11+, SQLModel, Neon Serverless PostgreSQL
+- **AI Integration**: Model Context Protocol (MCP), OpenAI Agents SDK
+- **Authentication**: Better Auth with JWT validation
+- **Infrastructure**: Kubernetes, Helm 3.13+, Docker, Nginx Ingress
+- **Caching**: Redis (StatefulSet with persistent volumes)
 - **Package Managers**: UV (Python), Bun (JavaScript)
 - **Development Methodology**: Spec-Driven Development (SDD)
+- **Deployment**: Minikube (local), Horizontal Pod Autoscaling (HPA)
 
 ## Contributing
 

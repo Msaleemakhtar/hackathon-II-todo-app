@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-app-config
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+data:
+  REDIS_HOST: {{ .Values.configMap.REDIS_HOST | quote }}
+  REDIS_PORT: {{ .Values.configMap.REDIS_PORT | quote }}
+  MCP_SERVER_URL: {{ .Values.configMap.MCP_SERVER_URL | quote }}
+  {{- if .Values.ingress.tls.enabled }}
+  NEXT_PUBLIC_API_URL: {{ printf "https://%s/api" .Values.ingress.host | quote }}
+  NEXT_PUBLIC_BETTER_AUTH_URL: {{ printf "https://%s" .Values.ingress.host | quote }}
+  CORS_ORIGINS: {{ printf "[\"https://%s\", \"http://%s\", \"http://localhost:3000\", \"http://127.0.0.1:3000\"]" .Values.ingress.host .Values.ingress.host | quote }}
+  {{- else }}
+  NEXT_PUBLIC_API_URL: {{ printf "http://%s/api" .Values.ingress.host | quote }}
+  NEXT_PUBLIC_BETTER_AUTH_URL: {{ printf "http://%s" .Values.ingress.host | quote }}
+  CORS_ORIGINS: {{ printf "[\"http://%s\", \"https://%s\", \"http://localhost:3000\", \"http://127.0.0.1:3000\"]" .Values.ingress.host .Values.ingress.host | quote }}
+  {{- end }}
+  NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: {{ .Values.configMap.NEXT_PUBLIC_CHATKIT_DOMAIN_KEY | quote }}

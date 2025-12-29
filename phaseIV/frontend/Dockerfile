@@ -30,6 +30,12 @@ RUN mkdir -p public
 # Set build-time environment variables
 # These are safe to include as they're prefixed with NEXT_PUBLIC_
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL=http://todo-app.local/api
+ARG NEXT_PUBLIC_BETTER_AUTH_URL=http://todo-app.local
+ARG NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_BETTER_AUTH_URL=$NEXT_PUBLIC_BETTER_AUTH_URL
+ENV NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=$NEXT_PUBLIC_CHATKIT_DOMAIN_KEY
 
 # Build Next.js application
 RUN npm run build
@@ -42,6 +48,14 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Set runtime environment variables for server-side code
+ARG NEXT_PUBLIC_API_URL=http://todo-app.local/api
+ARG NEXT_PUBLIC_BETTER_AUTH_URL=http://todo-app.local
+ARG NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_BETTER_AUTH_URL=$NEXT_PUBLIC_BETTER_AUTH_URL
+ENV NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=$NEXT_PUBLIC_CHATKIT_DOMAIN_KEY
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \

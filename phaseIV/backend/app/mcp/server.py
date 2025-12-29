@@ -21,6 +21,8 @@ mcp = FastMCP(
             "0.0.0.0:*",  # All interfaces
             "mcp-server:*",  # Docker service name
             "*.phaseiii-network:*",  # Docker network (wildcard)
+            "mcp-service.todo-phaseiv.svc.cluster.local:*",  # Kubernetes service DNS
+            "*.svc.cluster.local:*",  # Kubernetes cluster services (wildcard)
         ],
         allowed_origins=[
             "http://127.0.0.1:*",
@@ -33,7 +35,7 @@ mcp = FastMCP(
 )
 
 logger.info("FastMCP Server initialized: phaseiii-task-manager (stateless HTTP)")
-logger.info("Allowed hosts: localhost, mcp-server, Docker network")
+logger.info("Allowed hosts: localhost, mcp-server, Docker network, Kubernetes services")
 
 
 def get_mcp_app():
