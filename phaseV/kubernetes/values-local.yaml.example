@@ -1,0 +1,194 @@
+# values-local.yaml.example
+# Example Helm values file with secrets configuration
+#
+# IMPORTANT: This is an EXAMPLE file. DO NOT commit actual secrets to git!
+#
+# Usage:
+# 1. Copy this file: cp values-local.yaml.example helm/todo-app/values-local.yaml
+# 2. Replace placeholder values with your actual secrets (base64-encoded)
+# 3. Install Helm chart: helm install todo-app ./helm/todo-app -f helm/todo-app/values-local.yaml
+#
+# Note: values-local.yaml is gitignored to prevent accidental secret commits
+
+# ============================================================================
+# SECRETS CONFIGURATION (ALL VALUES MUST BE BASE64-ENCODED)
+# ============================================================================
+
+secrets:
+  # Neon PostgreSQL Database URL
+  # Format: postgresql://user:password@host/database?sslmode=require
+  #
+  # Encode command:
+  #   echo -n 'postgresql://user:password@ep-xyz.us-east-2.aws.neon.tech/todo_db?sslmode=require' | base64
+  #
+  # Example encoded value: cG9zdGdyZXNxbDovL3VzZXI6cGFzc3dvcmRAZXAteHl6LnVzLWVhc3QtMi5hd3MubmVvbi50ZWNoL3RvZG9fZGI/c3NsbW9kZT1yZXF1aXJl
+  databaseUrl: ""  # REPLACE WITH YOUR BASE64-ENCODED DATABASE URL
+
+  # OpenAI API Key
+  # Get your API key from: https://platform.openai.com/api-keys
+  #
+  # Encode command:
+  #   echo -n 'sk-proj-abc123...' | base64
+  #
+  # Example encoded value: c2stcHJvai1hYmMxMjMuLi4=
+  openaiApiKey: ""  # REPLACE WITH YOUR BASE64-ENCODED OPENAI API KEY
+
+  # Better Auth Secret (Random secret for JWT signing)
+  # Generate a secure random secret:
+  #   openssl rand -base64 32
+  #
+  # This command automatically outputs base64, so use directly
+  # Example: dGVzdC1zZWNyZXQtcGxlYXNlLWNoYW5nZS1tZQ==
+  betterAuthSecret: ""  # REPLACE WITH GENERATED BASE64 SECRET
+
+  # Better Auth URL (Application URL)
+  # For local Minikube: http://todo-app.local
+  #
+  # Encode command:
+  #   echo -n 'http://todo-app.local' | base64
+  #
+  # Example encoded value: aHR0cDovL3RvZG8tYXBwLmxvY2Fs
+  betterAuthUrl: "aHR0cDovL3RvZG8tYXBwLmxvY2Fs"  # Default for Minikube (http://todo-app.local)
+
+  # Redis Password (Optional - leave empty for no authentication)
+  # If you want to enable Redis authentication:
+  #   echo -n 'your-redis-password' | base64
+  redisPassword: ""  # OPTIONAL: Leave empty for no Redis auth
+
+# ============================================================================
+# STEP-BY-STEP SECRET ENCODING GUIDE
+# ============================================================================
+#
+# 1. DATABASE_URL (Neon PostgreSQL)
+#    a. Get your connection string from Neon Console
+#    b. Format: postgresql://user:password@host/database?sslmode=require
+#    c. Encode: echo -n 'YOUR_DATABASE_URL' | base64
+#    d. Paste result into secrets.databaseUrl above
+#
+# 2. OPENAI_API_KEY
+#    a. Create API key at https://platform.openai.com/api-keys
+#    b. Copy key (starts with sk-proj- or sk-)
+#    c. Encode: echo -n 'YOUR_OPENAI_KEY' | base64
+#    d. Paste result into secrets.openaiApiKey above
+#
+# 3. BETTER_AUTH_SECRET
+#    a. Generate: openssl rand -base64 32
+#    b. Copy output (already base64-encoded)
+#    c. Paste result into secrets.betterAuthSecret above
+#
+# 4. BETTER_AUTH_URL
+#    a. For Minikube: http://todo-app.local (already encoded in example)
+#    b. For production: https://your-domain.com
+#    c. Encode: echo -n 'YOUR_URL' | base64
+#    d. Paste result into secrets.betterAuthUrl above
+#
+# ============================================================================
+
+# ============================================================================
+# OPTIONAL OVERRIDES (Uncomment and modify if needed)
+# ============================================================================
+
+# Override image tags (default: latest)
+# frontend:
+#   image:
+#     tag: "v1.0.0"
+# backend:
+#   image:
+#     tag: "v1.0.0"
+
+# Override replica counts (default: 2 for frontend/backend)
+# frontend:
+#   replicaCount: 3
+# backend:
+#   replicaCount: 3
+
+# Override resource limits (default values shown)
+# frontend:
+#   resources:
+#     requests:
+#       cpu: "500m"
+#       memory: "512Mi"
+#     limits:
+#       cpu: "1000m"
+#       memory: "1024Mi"
+
+# backend:
+#   resources:
+#     requests:
+#       cpu: "500m"
+#       memory: "512Mi"
+#     limits:
+#       cpu: "1000m"
+#       memory: "1024Mi"
+
+# Override HPA settings (default values shown)
+# frontend:
+#   autoscaling:
+#     enabled: true
+#     minReplicas: 2
+#     maxReplicas: 5
+#     targetCPUUtilizationPercentage: 70
+
+# backend:
+#   autoscaling:
+#     enabled: true
+#     minReplicas: 2
+#     maxReplicas: 5
+#     targetCPUUtilizationPercentage: 70
+#     targetMemoryUtilizationPercentage: 80
+
+# Override Ingress host (default: todo-app.local)
+# ingress:
+#   host: "my-custom-domain.local"
+
+# Override Redis persistence (default values shown)
+# redis:
+#   persistence:
+#     enabled: true
+#     storageClassName: "standard"
+#     size: "1Gi"
+
+# ============================================================================
+# VERIFICATION
+# ============================================================================
+#
+# After configuring secrets, verify your values:
+#
+# 1. Decode to check correctness:
+#    echo 'YOUR_BASE64_VALUE' | base64 -d
+#
+# 2. Dry-run installation:
+#    helm install todo-app ./helm/todo-app -f helm/todo-app/values-local.yaml --dry-run --debug
+#
+# 3. Install:
+#    helm install todo-app ./helm/todo-app -f helm/todo-app/values-local.yaml --namespace todo-phaseiv --create-namespace
+#
+# ============================================================================
+
+# ============================================================================
+# SECURITY NOTES
+# ============================================================================
+#
+# - NEVER commit values-local.yaml to git (it's in .gitignore)
+# - Store actual secrets securely (password manager, secrets manager)
+# - Rotate secrets regularly (especially BETTER_AUTH_SECRET)
+# - Use different secrets for dev/staging/production environments
+# - For production, consider using:
+#   - External Secrets Operator (sync from AWS Secrets Manager, Vault, etc.)
+#   - Sealed Secrets (encrypt secrets before committing to git)
+#   - SOPS (encrypt values files with GPG/KMS)
+#
+# ============================================================================
+
+# ============================================================================
+# EXAMPLE: Complete values-local.yaml (with fake secrets)
+# ============================================================================
+#
+# secrets:
+#   databaseUrl: "cG9zdGdyZXNxbDovL3VzZXI6cGFzc3dvcmRAZXAtYWJjLnVzLWVhc3QtMi5hd3MubmVvbi50ZWNoL3RvZG9fZGI/c3NsbW9kZT1yZXF1aXJl"
+#   openaiApiKey: "c2stcHJvai14eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4"
+#   betterAuthSecret: "ZEdWemRDMXpaV055WlhRdGNHeGxZWE5sTFdOb1lXNW5aUzF0WlE9PQ=="
+#   betterAuthUrl: "aHR0cDovL3RvZG8tYXBwLmxvY2Fs"
+#   redisPassword: ""
+#
+# ============================================================================

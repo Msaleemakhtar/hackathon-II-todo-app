@@ -1,0 +1,219 @@
+"""Conversation service for managing chat sessions."""
+
+import logging
+from datetime import datetime
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select, delete
+
+from app.models.conversation import Conversation
+from app.models.message import Message
+
+logger = logging.getLogger(__name__)
+
+
+class ConversationService:
+    """Service layer for conversation management."""
+
+    @staticmethod
+    async def create_conversation(
+        db: AsyncSession,
+        user_id: str,
+        external_id: str | None = None,
+    ) -> Conversation:
+        """Create a new conversation."""
+        conversation = Conversation(user_id=user_id, external_id=external_id)
+        db.add(conversation)
+        await db.commit()
+        await db.refresh(conversation)
+        logger.info(f"Conversation created: conversation_id={conversation.id}, user_id={user_id}, external_id={external_id}")
+        return conversation
+
+    @staticmethod
+    async def get_conversation(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+    ) -> Conversation | None:
+        """Get a conversation by ID (with user ownership validation)."""
+        conversation = await db.get(Conversation, conversation_id)
+        if conversation and conversation.user_id == user_id:
+            return conversation
+        return None
+
+    @staticmethod
+    async def get_conversation_by_external_id(
+        db: AsyncSession,
+        external_id: str,
+        user_id: str,
+    ) -> Conversation | None:
+        """
+        Get conversation by ChatKit thread ID.
+
+        This links ChatKit threads to internal conversations.
+        """
+        result = await db.execute(
+            select(Conversation).where(
+                Conversation.external_id == external_id,
+                Conversation.user_id == user_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_conversation_with_messages(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+        limit: int = 20,
+    ) -> tuple[Conversation | None, list[Message]]:
+        """
+        Load conversation and last N messages for AI context.
+
+        Returns:
+            tuple: (conversation, messages) or (None, []) if not found
+        """
+        conversation = await ConversationService.get_conversation(db, conversation_id, user_id)
+        if not conversation:
+            return None, []
+
+        # Load last N messages in chronological order
+        query = (
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+
+        result = await db.execute(query)
+        messages = list(result.scalars().all())
+        messages.reverse()  # Chronological order for AI context
+
+        logger.info(
+            f"Loaded conversation: conversation_id={conversation_id}, messages={len(messages)}"
+        )
+
+        return conversation, messages
+
+    @staticmethod
+    async def update_conversation_timestamp(
+        db: AsyncSession,
+        conversation_id: int,
+    ) -> None:
+        """Update conversation updated_at timestamp."""
+        conversation = await db.get(Conversation, conversation_id)
+        if conversation:
+            conversation.updated_at = datetime.utcnow()
+            await db.commit()
+
+    @staticmethod
+    async def update_title(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+        title: str,
+    ) -> Conversation | None:
+        """Update conversation title with user ownership validation."""
+        conversation = await ConversationService.get_conversation(db, conversation_id, user_id)
+        if conversation:
+            conversation.title = title
+            conversation.updated_at = datetime.utcnow()
+            await db.commit()
+            await db.refresh(conversation)
+            logger.info(f"Conversation title updated: conversation_id={conversation_id}, title={title}")
+        return conversation
+
+    @staticmethod
+    async def list_conversations(
+        db: AsyncSession,
+        user_id: str,
+    ) -> list[Conversation]:
+        """List user's conversations ordered by most recent."""
+        query = (
+            select(Conversation)
+            .where(Conversation.user_id == user_id)
+            .order_by(Conversation.updated_at.desc())
+        )
+
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def delete_conversation(
+        db: AsyncSession,
+        conversation_id: int,
+        user_id: str,
+    ) -> bool:
+        """
+        Delete a conversation and all its messages.
+
+        Args:
+            db: Database session
+            conversation_id: ID of conversation to delete
+            user_id: User ID for ownership validation
+
+        Returns:
+            True if deleted, False if not found or not owned by user
+        """
+        # Validate ownership
+        conversation = await ConversationService.get_conversation(db, conversation_id, user_id)
+        if not conversation:
+            logger.warning(f"Delete failed - conversation not found or access denied: {conversation_id}")
+            return False
+
+        # Delete all associated messages first (foreign key constraint)
+        await db.execute(
+            delete(Message).where(Message.conversation_id == conversation_id)
+        )
+
+        # Delete the conversation
+        await db.delete(conversation)
+        await db.commit()
+
+        logger.info(f"✅ Conversation deleted: conversation_id={conversation_id}, user_id={user_id}")
+        return True
+
+    @staticmethod
+    async def delete_all_conversations(
+        db: AsyncSession,
+        user_id: str,
+    ) -> int:
+        """
+        Delete all conversations and messages for a user.
+
+        Args:
+            db: Database session
+            user_id: User ID for ownership validation
+
+        Returns:
+            Number of conversations deleted
+        """
+        # Get all user's conversations
+        conversations = await ConversationService.list_conversations(db, user_id)
+
+        if not conversations:
+            logger.info(f"No conversations to delete for user: {user_id}")
+            return 0
+
+        conversation_ids = [conv.id for conv in conversations]
+
+        # Delete all messages for these conversations
+        await db.execute(
+            delete(Message).where(Message.conversation_id.in_(conversation_ids))
+        )
+
+        # Delete all conversations
+        await db.execute(
+            delete(Conversation).where(
+                Conversation.user_id == user_id
+            )
+        )
+
+        await db.commit()
+
+        logger.info(f"🗑️  Deleted {len(conversations)} conversations for user: {user_id}")
+        return len(conversations)
+
+
+# Global service instance
+conversation_service = ConversationService()
