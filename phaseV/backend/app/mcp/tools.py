@@ -7,9 +7,18 @@ from typing import Any
 from sqlmodel import select
 
 from app.database import async_session_maker
+from app.kafka.events import (
+    ReminderSentEvent,
+    TaskCompletedEvent,
+    TaskCreatedEvent,
+    TaskDeletedEvent,
+    TaskUpdatedEvent,
+)
+from app.kafka.producer import kafka_producer
 from app.models.category import Category
 from app.models.task import TaskPhaseIII
 from app.services import task_service
+from app.utils.rrule_parser import validate_rrule
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +79,16 @@ async def add_task(
                 "code": "TOO_MANY_TAGS",
             }
 
+        # T022: Validate recurrence_rule against whitelist
+        if recurrence_rule:
+            is_valid, error_message = validate_rrule(recurrence_rule)
+            if not is_valid:
+                return {
+                    "status": "error",
+                    "message": error_message,
+                    "code": "INVALID_RECURRENCE_RULE",
+                }
+
         # Parse and convert due_date to UTC if provided
         due_date_utc = None
         if due_date:
@@ -124,6 +143,9 @@ async def add_task(
                 result = await session.execute(select(TagPhaseV).where(TagPhaseV.id.in_(tag_ids)))
                 tag_objects = result.scalars().all()
                 tags = [{"id": t.id, "name": t.name, "color": t.color} for t in tag_objects]
+
+            # Note: TaskCreatedEvent is now published by task_service.create_task()
+            # No need to publish here to avoid duplicates
 
             return {
                 "status": "created",
@@ -395,6 +417,22 @@ async def complete_task(user_id: str, task_id: int) -> dict[str, Any]:
 
             logger.info(f"Task completed: user={user_id}, task_id={task_id}")
 
+            # T024: Publish TaskCompletedEvent to task-recurrence topic
+            try:
+                event = TaskCompletedEvent(
+                    user_id=int(user_id) if user_id.isdigit() else hash(user_id),
+                    task_id=task.id,
+                    recurrence_rule=task.recurrence_rule,
+                    completed_at=datetime.now(UTC),
+                )
+                await kafka_producer.publish_event(
+                    topic="task-recurrence", event=event, key=str(task.id)
+                )
+                logger.info(f"Published TaskCompletedEvent for task {task.id}")
+            except Exception as e:
+                logger.error(f"Failed to publish TaskCompletedEvent for task {task.id}: {e}")
+                # Continue - event publishing is non-blocking
+
             return {
                 "status": "completed",
                 "task_id": task.id,
@@ -542,10 +580,25 @@ async def delete_task(user_id: str, task_id: int) -> dict[str, Any]:
 
             # Delete task
             title = task.title
+            task_id_for_event = task.id  # Store before deletion
             await session.delete(task)
             await session.commit()
 
             logger.info(f"Task deleted: user={user_id}, task_id={task_id}")
+
+            # T026: Publish TaskDeletedEvent to task-events topic
+            try:
+                event = TaskDeletedEvent(
+                    user_id=int(user_id) if user_id.isdigit() else hash(user_id),
+                    task_id=task_id_for_event,
+                )
+                await kafka_producer.publish_event(
+                    topic="task-events", event=event, key=str(task_id_for_event)
+                )
+                logger.info(f"Published TaskDeletedEvent for task {task_id_for_event}")
+            except Exception as e:
+                logger.error(f"Failed to publish TaskDeletedEvent for task {task_id_for_event}: {e}")
+                # Continue - event publishing is non-blocking
 
             return {
                 "status": "deleted",
@@ -659,6 +712,14 @@ async def update_task(
             if recurrence_rule == "":
                 recurrence_rule_value = None
             else:
+                # T025: Validate recurrence_rule against whitelist
+                is_valid, error_message = validate_rrule(recurrence_rule)
+                if not is_valid:
+                    return {
+                        "status": "error",
+                        "message": error_message,
+                        "code": "INVALID_RECURRENCE_RULE",
+                    }
                 recurrence_rule_value = recurrence_rule
 
         async with async_session_maker() as session:
@@ -712,6 +773,38 @@ async def update_task(
                 )
 
             logger.info(f"Task updated: user={user_id}, task_id={task_id}")
+
+            # T025: Publish TaskUpdatedEvent to task-events topic
+            try:
+                # Build updated_fields dictionary
+                updated_fields = {}
+                if title is not None:
+                    updated_fields["title"] = title
+                if description is not None:
+                    updated_fields["description"] = description
+                if completed is not None:
+                    updated_fields["completed"] = completed
+                if priority is not None:
+                    updated_fields["priority"] = priority
+                if category_id is not None:
+                    updated_fields["category_id"] = category_id
+                if update_due_date:
+                    updated_fields["due_date"] = task.due_date.isoformat() if task.due_date else None
+                if update_recurrence:
+                    updated_fields["recurrence_rule"] = task.recurrence_rule
+
+                event = TaskUpdatedEvent(
+                    user_id=int(user_id) if user_id.isdigit() else hash(user_id),
+                    task_id=task.id,
+                    updated_fields=updated_fields,
+                )
+                await kafka_producer.publish_event(
+                    topic="task-events", event=event, key=str(task.id)
+                )
+                logger.info(f"Published TaskUpdatedEvent for task {task.id}")
+            except Exception as e:
+                logger.error(f"Failed to publish TaskUpdatedEvent for task {task.id}: {e}")
+                # Continue - event publishing is non-blocking
 
             return {
                 "status": "updated",
@@ -1355,12 +1448,28 @@ async def set_reminder(user_id: str, task_id: int, remind_before_minutes: int) -
                 f"remind_at={remind_at.isoformat()}Z"
             )
 
-            # NOTE: Actual reminder metadata storage will be implemented in 002-event-streaming
-            # For now, this tool only validates and calculates the remind_at timestamp
+            # Publish ReminderSentEvent to task-reminders topic (T006)
+            try:
+                # Convert user_id for event publishing
+                if isinstance(user_id, str):
+                    event_user_id = int(user_id) if user_id.isdigit() else hash(user_id)
+                else:
+                    event_user_id = user_id
+
+                event = ReminderSentEvent(
+                    user_id=event_user_id,
+                    task_id=task_id,
+                    reminder_time=remind_at,
+                )
+                await kafka_producer.publish_event("task-reminders", event, wait=False)
+                logger.info(f"Queued ReminderSentEvent for task_id={task_id}")
+            except Exception as e:
+                logger.error(f"Failed to publish ReminderSentEvent for task_id={task_id}: {e}")
+                # Don't fail the request if event publishing fails
 
             return {
                 "success": True,
-                "message": f"Reminder configured for task '{task.title}' (notification logic pending in 002-event-streaming)",
+                "message": f"Reminder configured for task '{task.title}' and queued for processing",
                 "task_id": task_id,
                 "remind_at": f"{remind_at.isoformat()}Z",
             }

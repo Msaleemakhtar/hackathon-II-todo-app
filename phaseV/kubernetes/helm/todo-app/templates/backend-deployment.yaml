@@ -65,6 +65,33 @@ spec:
             secretKeyRef:
               name: todo-app-secrets
               key: BETTER_AUTH_URL
+        # Kafka configuration (secrets)
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            secretKeyRef:
+              name: todo-app-secrets
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: KAFKA_SASL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: todo-app-secrets
+              key: KAFKA_SASL_USERNAME
+        - name: KAFKA_SASL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: todo-app-secrets
+              key: KAFKA_SASL_PASSWORD
+        # Kafka configuration (non-sensitive)
+        - name: KAFKA_SECURITY_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: todo-app-config
+              key: KAFKA_SECURITY_PROTOCOL
+        - name: KAFKA_SASL_MECHANISM
+          valueFrom:
+            configMapKeyRef:
+              name: todo-app-config
+              key: KAFKA_SASL_MECHANISM
         {{- if .Values.secrets.redisPassword }}
         - name: REDIS_PASSWORD
           valueFrom:

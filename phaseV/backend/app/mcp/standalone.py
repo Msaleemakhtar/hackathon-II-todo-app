@@ -14,8 +14,10 @@ Environment Variables:
     LOG_LEVEL: Logging level (default: INFO)
 """
 
+import asyncio
 import logging
 import os
+import signal
 from typing import NoReturn
 
 # Configure logging
@@ -25,6 +27,29 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def initialize_kafka_producer() -> None:
+    """Initialize Kafka producer for event publishing."""
+    from app.kafka.producer import kafka_producer
+
+    try:
+        await kafka_producer.start()
+        logger.info("Kafka producer initialized successfully in MCP server")
+    except Exception as e:
+        logger.error(f"Failed to initialize Kafka producer: {e}")
+        logger.warning("Continuing without Kafka - event publishing will be disabled")
+
+
+async def shutdown_kafka_producer() -> None:
+    """Shutdown Kafka producer gracefully."""
+    from app.kafka.producer import kafka_producer
+
+    try:
+        await kafka_producer.stop()
+        logger.info("Kafka producer stopped gracefully")
+    except Exception as e:
+        logger.error(f"Error stopping Kafka producer: {e}")
 
 
 def run_mcp_server() -> NoReturn:
@@ -40,6 +65,20 @@ def run_mcp_server() -> NoReturn:
 
     logger.info(f"Starting MCP Server: {mcp.name}")
     logger.info(f"Listening on {host}:{port}")
+
+    # Initialize Kafka producer before starting server
+    logger.info("Initializing Kafka producer...")
+    asyncio.run(initialize_kafka_producer())
+
+    # Setup shutdown handler
+    def signal_handler(sig, frame):
+        logger.info(f"Received signal {sig}, shutting down...")
+        asyncio.run(shutdown_kafka_producer())
+        exit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     logger.info("MCP tools will be registered when server starts")
     logger.info("MCP HTTP transport enabled (stateless)")
     logger.info("MCP routes will be available at:")

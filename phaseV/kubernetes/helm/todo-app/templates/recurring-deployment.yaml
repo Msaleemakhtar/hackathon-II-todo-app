@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recurring-service
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: recurring-service
+spec:
+  replicas: 1  # Single replica for MVP to simplify idempotency
+  selector:
+    matchLabels:
+      app: recurring-service
+  template:
+    metadata:
+      labels:
+        app: recurring-service
+        {{- include "todo-app.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: recurring-service
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        command:
+          - "python"
+          - "-m"
+          - "app.services.recurring_task_service_standalone"
+        env:
+          # Database connection
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: todo-app-secrets
+                key: DATABASE_URL
+          # Kafka configuration (secrets)
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            valueFrom:
+              secretKeyRef:
+                name: todo-app-secrets
+                key: KAFKA_BOOTSTRAP_SERVERS
+          - name: KAFKA_SASL_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: todo-app-secrets
+                key: KAFKA_SASL_USERNAME
+          - name: KAFKA_SASL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: todo-app-secrets
+                key: KAFKA_SASL_PASSWORD
+          # Kafka configuration (non-sensitive)
+          - name: KAFKA_SECURITY_PROTOCOL
+            valueFrom:
+              configMapKeyRef:
+                name: todo-app-config
+                key: KAFKA_SECURITY_PROTOCOL
+          - name: KAFKA_SASL_MECHANISM
+            valueFrom:
+              configMapKeyRef:
+                name: todo-app-config
+                key: KAFKA_SASL_MECHANISM
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recurring-service
+  namespace: {{ include "todo-app.namespace" . }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: recurring-service
+spec:
+  selector:
+    app: recurring-service
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8003
+      targetPort: 8003
+  type: ClusterIP

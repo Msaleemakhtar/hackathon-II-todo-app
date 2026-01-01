@@ -46,12 +46,21 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded) ->
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    logger.info("Starting Phase IV Backend...")
+    logger.info("Starting Phase V Backend with Event-Driven Architecture...")
+
     # Import and create database tables
     from app.database import create_db_and_tables
-
     await create_db_and_tables()
     logger.info("Database tables created/verified")
+
+    # Initialize Kafka producer
+    from app.kafka.producer import kafka_producer
+    try:
+        await kafka_producer.start()
+        logger.info("Kafka producer initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Kafka producer: {e}")
+        logger.warning("Continuing without Kafka - event publishing will be disabled")
 
     # MCP tools are defined in app/mcp/tools.py and run in a separate MCP server service
     logger.info("MCP tools defined (running in separate mcp-server service)")
@@ -59,7 +68,14 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Shutting down Phase IV Backend...")
+    logger.info("Shutting down Phase V Backend...")
+
+    # Stop Kafka producer gracefully
+    try:
+        await kafka_producer.stop()
+        logger.info("Kafka producer stopped gracefully")
+    except Exception as e:
+        logger.error(f"Error stopping Kafka producer: {e}")
 
 
 # Create FastAPI application

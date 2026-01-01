@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     # MCP Server Configuration
     mcp_server_url: str = "http://localhost:8001/mcp"
 
+    # SMTP Email Configuration
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str = "Todo App Reminders"
+
+    # Email Delivery Service Configuration
+    email_delivery_group_id: str = "email-delivery-consumer-group"
+
     class Config:
         env_file = ".env"
         case_sensitive = False
