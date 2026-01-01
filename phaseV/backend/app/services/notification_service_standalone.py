@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from app.kafka.producer import kafka_producer
 from app.services.notification_service import notification_service, setup_signal_handlers
 
 # Configure logging
@@ -69,6 +70,13 @@ async def health_check():
 async def startup():
     """Start notification service on application startup."""
     logger.info("Starting notification service...")
+
+    # Initialize Kafka producer FIRST (required for publishing events)
+    logger.info("Initializing Kafka producer...")
+    await kafka_producer.start()
+    logger.info("Kafka producer initialized successfully")
+
+    # Start notification service (database polling loop)
     await notification_service.start()
     setup_signal_handlers()
 
@@ -78,6 +86,10 @@ async def shutdown():
     """Stop notification service on application shutdown."""
     logger.info("Shutting down notification service...")
     await notification_service.stop()
+
+    # Stop Kafka producer
+    logger.info("Stopping Kafka producer...")
+    await kafka_producer.stop()
 
 
 def main():

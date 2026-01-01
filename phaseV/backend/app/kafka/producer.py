@@ -249,18 +249,13 @@ class KafkaProducerManager:
             return False
 
     async def health_check(self) -> bool:
-        """Check Kafka producer health."""
-        if not self._producer or not self._is_healthy:
-            return False
+        """
+        Check Kafka producer health.
 
-        try:
-            # Try to get cluster metadata as health check
-            metadata = await self._producer.client.fetch_all_metadata()
-            return len(metadata.topics) > 0
-        except Exception as e:
-            logger.error(f"Kafka health check failed: {e}")
-            self._is_healthy = False
-            return False
+        Returns True if producer is initialized and healthy flag is set.
+        Avoids cross-event-loop complexity by trusting the internal health flag.
+        """
+        return self._producer is not None and self._is_healthy
 
     def get_pending_tasks_count(self) -> int:
         """

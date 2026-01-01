@@ -234,7 +234,7 @@ class EmailDeliveryService:
                 # TODO: Implement proper user_id mapping (int hash -> string ID lookup)
                 from sqlalchemy import text
                 result = await conn.execute(
-                    text("SELECT email FROM user LIMIT 1")
+                    text('SELECT email FROM "user" LIMIT 1')
                 )
                 row = result.first()
 
