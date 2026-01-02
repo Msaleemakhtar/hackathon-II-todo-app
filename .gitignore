@@ -92,3 +92,4 @@ kubeconfig*
 *.crt
 *.pem
 *.csr
+redpanda.md
