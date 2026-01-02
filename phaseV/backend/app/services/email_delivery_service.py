@@ -192,12 +192,12 @@ class EmailDeliveryService:
             Exception: If email delivery fails (will prevent offset commit for retry)
         """
         try:
-            # Fetch user email from database
-            user_email = await self._get_user_email(event.user_id)
+            # Fetch user email from database via task_id (not hashed user_id)
+            user_email = await self._get_user_email_by_task(event.task_id)
 
             if not user_email:
                 logger.warning(
-                    f"No email found for user {event.user_id}, skipping reminder for task {event.task_id}"
+                    f"No email found for task {event.task_id}, skipping reminder"
                 )
                 return
 
@@ -217,34 +217,49 @@ class EmailDeliveryService:
             logger.error(f"Failed to process reminder for task {event.task_id}: {e}", exc_info=True)
             raise
 
-    async def _get_user_email(self, user_id: int) -> Optional[str]:
+    async def _get_user_email_by_task(self, task_id: int) -> Optional[str]:
         """
-        Fetch user email from Better Auth user table.
+        Fetch user email from Better Auth user table via task lookup.
 
         Args:
-            user_id: User ID (hashed from string user_id in tasks)
+            task_id: Task ID to lookup user
 
         Returns:
             User email address or None if not found
         """
         try:
             async with self._db_engine.begin() as conn:
-                # Query Better Auth user table directly
-                # Note: For MVP, we query the first user email
-                # TODO: Implement proper user_id mapping (int hash -> string ID lookup)
                 from sqlalchemy import text
-                result = await conn.execute(
-                    text('SELECT email FROM "user" LIMIT 1')
+
+                # Query task to get the original string user_id (Better Auth ID)
+                task_result = await conn.execute(
+                    text('SELECT user_id FROM tasks_phaseiii WHERE id = :task_id'),
+                    {'task_id': task_id}
                 )
-                row = result.first()
+                task_row = task_result.first()
 
-                if row:
-                    return row[0]  # email column
+                if not task_row:
+                    logger.warning(f"Task {task_id} not found in database")
+                    return None
 
+                user_id = task_row[0]
+
+                # Query Better Auth user table with the original string user_id
+                user_result = await conn.execute(
+                    text('SELECT email FROM "user" WHERE id = :user_id'),
+                    {'user_id': user_id}
+                )
+                user_row = user_result.first()
+
+                if user_row:
+                    logger.debug(f"Found email for user {user_id} (task {task_id})")
+                    return user_row[0]  # email column
+
+                logger.warning(f"User {user_id} not found in Better Auth user table")
                 return None
 
         except Exception as e:
-            logger.error(f"Failed to fetch user email for user_id {user_id}: {e}", exc_info=True)
+            logger.error(f"Failed to fetch user email for task {task_id}: {e}", exc_info=True)
             return None
 
     def _format_email(self, event: ReminderSentEvent) -> tuple[str, str]:
