@@ -208,6 +208,10 @@ If ALL true, suggest:
 - Neon Serverless PostgreSQL (shared database instance with Phase II/III/IV, separate tables_phaseiii table + new Phase V tables) (001-foundation-api)
 - Python 3.11+ + FastAPI 0.109+, aiokafka 0.11.0, python-dateutil 2.8.2, asyncpg 0.29.0, pydantic 2.5.0 (002-event-driven)
 - Neon PostgreSQL Serverless (shared database with Phase III/IV, enhanced tasks_phaseiii table with priority, due_date, category_id, recurrence_rule, reminder_sent fields; new tables: categories, tags_phasev, task_tags; tsvector search_vector with GIN index) (002-event-driven)
+- Python 3.11+ (backend), TypeScript 5.x + Next.js 15 (frontend) (003-chatkit-ui)
+- Neon Serverless PostgreSQL (shared with Phase II/III/IV/V, using `tasks_phaseiii`, `categories`, `tags_phasev`, `task_tags` tables - all schema already complete from Feature 002) (003-chatkit-ui)
+- TypeScript 5.x (frontend), Python 3.11+ (backend - config only) + Next.js 15 (frontend), OpenAI ChatKit SDK, OpenAI Agents SDK 0.6.3+ (backend system prompt) (003-chatkit-ui)
+- N/A (no database changes - all data models exist from Features 001/002) (003-chatkit-ui)
 
 ## Recent Changes
 - 003-fix-chatkit-auth: Added Neon Serverless PostgreSQL (shared database instance with Phase II)
