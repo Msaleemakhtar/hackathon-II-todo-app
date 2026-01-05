@@ -1658,6 +1658,8 @@ async def set_reminder(
                 event = ReminderSentEvent(
                     user_id=event_user_id,
                     task_id=task_id,
+                    task_title=task.title,
+                    task_due_date=task.due_date,
                     reminder_time=calculated_remind_at,
                 )
                 await kafka_producer.publish_event("task-reminders", event, wait=False)
