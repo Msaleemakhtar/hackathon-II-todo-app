@@ -4,6 +4,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.database import async_session_maker
@@ -29,7 +31,52 @@ from app.mcp.server import mcp
 logger.info("🔧 tools.py module loading - registering MCP tools...")
 
 
-@mcp.tool(name="add_task", description="Create a new task for the user")
+async def force_session_sync(session: AsyncSession) -> None:
+    """
+    Force session to synchronize with database.
+
+    Ensures committed changes are visible to subsequent queries,
+    especially important with Neon Serverless PostgreSQL connection pooling.
+
+    This defensive measure helps prevent read-after-write consistency issues
+    where a task created in one session may not be immediately visible when
+    queried from a different session due to connection pool state.
+
+    Args:
+        session: The async SQLAlchemy session to synchronize
+
+    Raises:
+        No exceptions - errors are logged but not raised to avoid breaking the main flow
+    """
+    try:
+        await session.execute(text("SELECT 1"))
+        logger.debug("Session synchronized with database")
+    except Exception as e:
+        logger.warning(f"Session sync failed (non-critical): {e}")
+
+
+@mcp.tool(
+    name="add_task",
+    description="""Create a new task for the user.
+
+NATURAL LANGUAGE PARSING GUIDE:
+
+Due Date Extraction:
+  - "due tomorrow" → Calculate tomorrow's date, convert to ISO format
+  - "due 2026-1-11" or "due date is 2026-1-11" → Convert to ISO: "2026-01-11T23:59:59Z"
+  - "due next Monday" → Calculate next Monday's date, convert to ISO format
+  - "in 3 days" → Add 3 days to current date, convert to ISO format
+
+Recurrence Pattern Extraction:
+  - "every day" or "daily" → "FREQ=DAILY"
+  - "every sunday" → "FREQ=WEEKLY;BYDAY=SU"
+  - "every monday and friday" → "FREQ=WEEKLY;BYDAY=MO,FR"
+  - "weekly" → "FREQ=WEEKLY"
+  - "monthly" → "FREQ=MONTHLY"
+
+ALWAYS convert natural language dates and recurrence patterns to proper formats before calling this tool.
+"""
+)
 async def add_task(
     user_id: str,
     title: str,
@@ -50,9 +97,23 @@ async def add_task(
         priority: Task priority (low, medium, high, urgent) - default: medium
         category_id: Optional category ID to assign task to
         tag_ids: Optional list of tag IDs to assign (max 10 tags)
-        due_date: Optional due date in ISO 8601 format (e.g., 2025-01-15T17:00:00-05:00)
-        recurrence_rule: Optional iCalendar RRULE for recurring tasks (RFC 5545)
-            Examples:
+
+        due_date: Due date in ISO 8601 format (e.g., "2026-01-11T23:59:59Z")
+            PARSE FROM NATURAL LANGUAGE:
+            - "2026-1-11" → "2026-01-11T23:59:59Z"
+            - "tomorrow" → Calculate tomorrow's date and convert to ISO format
+            - "next Monday" → Calculate next Monday's date and convert to ISO format
+            IMPORTANT: Convert ALL date strings to proper ISO 8601 format with timezone
+
+        recurrence_rule: iCalendar RRULE in RFC 5545 format
+            CONVERT FROM NATURAL LANGUAGE:
+            - "every sunday" → "FREQ=WEEKLY;BYDAY=SU"
+            - "daily" or "every day" → "FREQ=DAILY"
+            - "weekly on monday and friday" → "FREQ=WEEKLY;BYDAY=MO,FR"
+
+            Day abbreviations: MO, TU, WE, TH, FR, SA, SU
+
+            Standard RFC 5545 Examples:
             - "FREQ=DAILY" - Every day
             - "FREQ=WEEKLY;BYDAY=MO,WE,FR" - Every Monday, Wednesday, Friday
             - "FREQ=MONTHLY;BYMONTHDAY=15" - 15th of every month
@@ -93,9 +154,16 @@ async def add_task(
         due_date_utc = None
         if due_date:
             try:
-                from datetime import datetime
+                from datetime import datetime, time
 
                 dt = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+
+                # If date-only (midnight time), default to end-of-day (23:59:59)
+                # This prevents reminders from being "in the past" when set earlier in the day
+                if dt.time() == time(0, 0, 0):
+                    dt = dt.replace(hour=23, minute=59, second=59)
+                    logger.info(f"Date-only due_date detected, defaulting to end-of-day: {dt.isoformat()}")
+
                 # Convert to UTC and make naive (as per data model)
                 if dt.tzinfo is not None:
                     due_date_utc = dt.astimezone(UTC).replace(tzinfo=None)
@@ -146,6 +214,9 @@ async def add_task(
 
             # Note: TaskCreatedEvent is now published by task_service.create_task()
             # No need to publish here to avoid duplicates
+
+            # Force session sync to ensure write visibility for subsequent reads
+            await force_session_sync(session)
 
             return {
                 "status": "created",
@@ -433,6 +504,9 @@ async def complete_task(user_id: str, task_id: int) -> dict[str, Any]:
                 logger.error(f"Failed to publish TaskCompletedEvent for task {task.id}: {e}")
                 # Continue - event publishing is non-blocking
 
+            # Force session sync to ensure write visibility for subsequent reads
+            await force_session_sync(session)
+
             return {
                 "status": "completed",
                 "task_id": task.id,
@@ -599,6 +673,9 @@ async def delete_task(user_id: str, task_id: int) -> dict[str, Any]:
             except Exception as e:
                 logger.error(f"Failed to publish TaskDeletedEvent for task {task_id_for_event}: {e}")
                 # Continue - event publishing is non-blocking
+
+            # Force session sync to ensure write visibility for subsequent reads
+            await force_session_sync(session)
 
             return {
                 "status": "deleted",
@@ -805,6 +882,9 @@ async def update_task(
             except Exception as e:
                 logger.error(f"Failed to publish TaskUpdatedEvent for task {task.id}: {e}")
                 # Continue - event publishing is non-blocking
+
+            # Force session sync to ensure write visibility for subsequent reads
+            await force_session_sync(session)
 
             return {
                 "status": "updated",
@@ -1399,53 +1479,172 @@ async def search_tasks(user_id: str, query: str, limit: int = 50) -> list[dict[s
 
 @mcp.tool(
     name="set_reminder",
-    description="Configure a reminder for a task (stores reminder metadata; actual notification sending deferred to 002-event-streaming)",
+    description="""Set a reminder for a task.
+
+TIME EXPRESSION PARSING (CRITICAL):
+Convert natural language time expressions to minutes before due date:
+  - "one day before" → remind_before_minutes = 1440 (1 × 24 × 60)
+  - "2 hours before" → remind_before_minutes = 120 (2 × 60)
+  - "30 minutes before" → remind_before_minutes = 30
+  - "one week before" → remind_before_minutes = 10080 (7 × 24 × 60)
+  - "48 hours before" → remind_before_minutes = 2880 (48 × 60)
+
+CALCULATION RULES:
+  - Days: X × 24 × 60 minutes
+  - Hours: X × 60 minutes
+  - Weeks: X × 7 × 24 × 60 minutes
+  - Minutes: X (no conversion needed)
+
+Extract the number and unit from user input, then calculate minutes.
+ALWAYS use remind_before_minutes for relative times like "X days before".
+"""
 )
-async def set_reminder(user_id: str, task_id: int, remind_before_minutes: int) -> dict[str, Any]:
+async def set_reminder(
+    user_id: str,
+    task_id: int,
+    remind_before_minutes: int | None = None,
+    remind_at: str | None = None,
+) -> dict[str, Any]:
     """
     Configure a reminder for a task.
 
-    This tool validates inputs and calculates the remind_at timestamp.
-    Actual notification sending will be implemented in feature 002-event-streaming.
+    CRITICAL: You must convert natural language time expressions to minutes!
+
+    Use remind_before_minutes for relative times ("X hours/days before due date")
+    Use remind_at for absolute times ("remind me on January 5th at 2pm")
 
     Args:
-        user_id: User ID (for authorization)
+        user_id: User ID (for authorization) - ALWAYS pass this!
         task_id: Task ID to set reminder for
-        remind_before_minutes: Minutes before due_date to send reminder (must be positive)
+
+        remind_before_minutes: Minutes before due_date to send reminder (mutually exclusive with remind_at)
+            PARSE FROM NATURAL LANGUAGE:
+            - "one day before" → 1440 (1 day = 24 hours = 1440 minutes)
+            - "2 hours before" → 120 (2 hours = 120 minutes)
+            - "30 minutes before" → 30
+            - "one week before" → 10080 (7 × 24 × 60 = 10080 minutes)
+
+            Formula: [number] × [unit multiplier]
+            - minutes: ×1
+            - hours: ×60
+            - days: ×1440 (24 × 60)
+            - weeks: ×10080 (7 × 24 × 60)
+
+            Examples: 120 (2 hours), 1440 (1 day), 2880 (2 days), 10080 (1 week)
+
+        remind_at: Specific reminder time in ISO 8601 format (mutually exclusive with remind_before_minutes)
+            Examples: "2026-01-03T14:00:00Z", "2026-01-05T09:00:00-05:00", "2026-01-03"
 
     Returns:
         Dictionary with success status, message, task_id, and calculated remind_at timestamp
+        Example: {"success": True, "message": "Reminder set", "task_id": 123, "remind_at": "2026-01-04T21:59:59Z"}
 
     Raises:
         ValueError: If task not found, belongs to different user, or has no due_date
-        ValueError: If remind_before_minutes is invalid or would result in past reminder time
+        ValueError: If both or neither parameters provided
+        ValueError: If calculated reminder time would be in the past
     """
     logger.info(
-        f"set_reminder called: user={user_id}, task_id={task_id}, remind_before_minutes={remind_before_minutes}"
+        f"set_reminder called: user={user_id}, task_id={task_id}, "
+        f"remind_before_minutes={remind_before_minutes}, remind_at={remind_at}"
     )
+
+    # Validation: exactly one parameter must be provided
+    if (remind_before_minutes is None) == (remind_at is None):
+        return {
+            "success": False,
+            "message": "Must provide either remind_before_minutes OR remind_at (not both, not neither)",
+            "task_id": task_id,
+            "remind_at": None,
+        }
 
     async with async_session_maker() as session:
         try:
             # Fetch the task
             task = await session.get(TaskPhaseIII, task_id)
             if not task:
-                raise ValueError(f"Task not found: {task_id}")
+                return {
+                    "success": False,
+                    "message": f"Task not found: {task_id}",
+                    "task_id": task_id,
+                    "remind_at": None,
+                }
 
             # Check authorization
             if task.user_id != user_id:
-                raise ValueError(f"Task {task_id} belongs to different user")
+                return {
+                    "success": False,
+                    "message": f"Task {task_id} belongs to different user",
+                    "task_id": task_id,
+                    "remind_at": None,
+                }
 
-            # Validate reminder
-            is_valid, error_msg = task_service.validate_reminder(task, remind_before_minutes)
-            if not is_valid:
-                raise ValueError(error_msg)
+            # Calculate remind_at based on input method
+            calculated_remind_at = None
 
-            # Calculate remind_at
-            remind_at = task_service.calculate_remind_at(task.due_date, remind_before_minutes)
+            if remind_at is not None:
+                # Method 1: Parse ISO timestamp directly
+                from datetime import datetime, time
+
+                try:
+                    dt = datetime.fromisoformat(remind_at.replace("Z", "+00:00"))
+
+                    # If date-only (midnight time), default to current time on that date
+                    # This prevents "in the past" errors for same-day reminders
+                    if dt.time() == time(0, 0, 0):
+                        now = datetime.now(UTC)
+                        dt = dt.replace(hour=now.hour, minute=now.minute, second=now.second)
+                        logger.info(
+                            f"Date-only remind_at detected, using current time: {dt.isoformat()}"
+                        )
+
+                    # Convert to UTC and make naive (as per data model)
+                    if dt.tzinfo is not None:
+                        calculated_remind_at = dt.astimezone(UTC).replace(tzinfo=None)
+                    else:
+                        calculated_remind_at = dt
+                except (ValueError, AttributeError) as e:
+                    return {
+                        "success": False,
+                        "message": f"Invalid remind_at format. Use ISO 8601 (e.g., 2026-01-05T14:00:00Z or 2026-01-05): {str(e)}",
+                        "task_id": task_id,
+                        "remind_at": None,
+                    }
+            else:
+                # Method 2: Use remind_before_minutes method
+                # Validate reminder
+                is_valid, error_msg = task_service.validate_reminder(task, remind_before_minutes)
+                if not is_valid:
+                    return {
+                        "success": False,
+                        "message": error_msg,
+                        "task_id": task_id,
+                        "remind_at": None,
+                    }
+
+                # Calculate remind_at
+                calculated_remind_at = task_service.calculate_remind_at(
+                    task.due_date, remind_before_minutes
+                )
+
+            # Final validation: remind_at must be in the future
+            now = datetime.utcnow()
+            if calculated_remind_at <= now:
+                return {
+                    "success": False,
+                    "message": (
+                        f"Reminder time would be in the past. "
+                        f"Calculated: {calculated_remind_at.isoformat()}Z, "
+                        f"Current time: {now.isoformat()}Z. "
+                        f"Please choose a future time."
+                    ),
+                    "task_id": task_id,
+                    "remind_at": None,
+                }
 
             logger.info(
-                f"Reminder validated: task_id={task_id}, due_date={task.due_date.isoformat()}Z, "
-                f"remind_at={remind_at.isoformat()}Z"
+                f"Reminder validated: task_id={task_id}, due_date={task.due_date.isoformat() if task.due_date else 'None'}Z, "
+                f"remind_at={calculated_remind_at.isoformat()}Z"
             )
 
             # Publish ReminderSentEvent to task-reminders topic (T006)
@@ -1459,10 +1658,13 @@ async def set_reminder(user_id: str, task_id: int, remind_before_minutes: int) -
                 event = ReminderSentEvent(
                     user_id=event_user_id,
                     task_id=task_id,
-                    reminder_time=remind_at,
+                    reminder_time=calculated_remind_at,
                 )
                 await kafka_producer.publish_event("task-reminders", event, wait=False)
-                logger.info(f"Queued ReminderSentEvent for task_id={task_id}")
+                logger.info(
+                    f"Queued ReminderSentEvent for task_id={task_id}, "
+                    f"remind_at={calculated_remind_at.isoformat()}Z"
+                )
             except Exception as e:
                 logger.error(f"Failed to publish ReminderSentEvent for task_id={task_id}: {e}")
                 # Don't fail the request if event publishing fails
@@ -1471,7 +1673,7 @@ async def set_reminder(user_id: str, task_id: int, remind_before_minutes: int) -
                 "success": True,
                 "message": f"Reminder configured for task '{task.title}' and queued for processing",
                 "task_id": task_id,
-                "remind_at": f"{remind_at.isoformat()}Z",
+                "remind_at": f"{calculated_remind_at.isoformat()}Z",
             }
 
         except ValueError as e:
