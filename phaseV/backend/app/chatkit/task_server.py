@@ -14,8 +14,9 @@ from typing import Any
 
 from agents import Agent, Runner
 from agents.extensions.models.litellm_model import LitellmModel
-from agents.mcp import MCPServerStreamableHttp
 from chatkit.server import ChatKitServer
+
+from app.chatkit.context_aware_mcp import ContextAwareMCPClient
 from chatkit.types import (
     AssistantMessageContent,
     AssistantMessageItem,
@@ -115,42 +116,32 @@ class TaskChatServer(ChatKitServer):
         logger.info(f"✅ Processing message for user_id={user_id}, thread_id={thread.id}")
 
         try:
-            # Create MCP server connection (copied from agent_service.py:92-103)
-            logger.info(f"🔌 Connecting to MCP server at {settings.mcp_server_url}")
-            async with MCPServerStreamableHttp(
-                name="Task Manager MCP Server",
-                params={
-                    "url": settings.mcp_server_url,
-                    "timeout": 30,
-                },
-                cache_tools_list=True,
-                max_retry_attempts=3,
-            ) as mcp_server:
-                logger.info("✅ MCP server connected successfully")
+            # Create context-aware MCP client that auto-injects user_id
+            logger.info(f"🔌 Connecting to MCP server at {settings.mcp_server_url} with user_id={user_id}")
+            async with ContextAwareMCPClient(
+                url=settings.mcp_server_url,
+                user_id=user_id,
+                timeout=30,
+            ) as mcp_client:
+                logger.info("✅ Context-aware MCP client connected successfully")
 
-                # Log discovered tools
+                # Log discovered tools (with modified schemas - user_id hidden)
                 try:
-                    tools_list = await mcp_server.list_tools()
-                    logger.info(f"🔍 list_tools() raw response type: {type(tools_list)}")
-                    logger.info(f"🔍 list_tools() response: {tools_list}")
-                    logger.info(f"🔍 has 'tools' attr: {hasattr(tools_list, 'tools')}")
-                    logger.info(f"🔍 dir: {dir(tools_list)}")
-
-                    # tools_list is a plain list of Tool objects, not an object with .tools attribute
+                    tools_list = await mcp_client.list_tools()
                     tool_names = [tool.name for tool in tools_list] if isinstance(tools_list, list) else []
-                    logger.info(f"🔧 MCP tools discovered: {tool_names}")
+                    logger.info(f"🔧 MCP tools discovered (user_id auto-injection enabled): {tool_names}")
                 except Exception as e:
                     logger.error(f"❌ Could not list MCP tools: {str(e)}", exc_info=True)
 
-                # Create agent with MCP tools (copied from agent_service.py:104-111)
-                # The SDK automatically discovers tools from the MCP server
+                # Create agent with context-aware MCP client
+                # The wrapper automatically injects user_id into all tool calls
                 agent = Agent(
                     name="TaskManagerAgent",
                     instructions=self._get_system_instructions(),
                     model=self.model,
-                    mcp_servers=[mcp_server],  # MCP tools auto-discovered!
+                    mcp_servers=[mcp_client.mcp_server],  # Use wrapped MCP server
                 )
-                logger.info("🤖 Agent created with MCP tools")
+                logger.info("🤖 Agent created with context-aware MCP tools (user_id auto-injected)")
 
                 # Load conversation history from thread for agent context
                 conversation_history = []
@@ -185,10 +176,10 @@ class TaskChatServer(ChatKitServer):
                         logger.warning(f"Failed to load conversation history: {str(e)}")
                         # Continue with empty history on error
 
-                # Build context message with user_id and conversation history
+                # Build context message with conversation history
+                # Note: user_id is automatically injected by ContextAwareMCPClient
                 context_message = self._build_context_message(
                     user_message=input_user_message.content,
-                    user_id=user_id,
                     conversation_history=conversation_history,
                 )
 
@@ -429,31 +420,29 @@ General Guidelines:
 23. Be conversational and friendly
 24. Provide helpful suggestions after completing actions
 25. Confirm actions with specific details (e.g., "✓ Task #123 'Buy milk' completed")
-26. **CRITICAL**: Always pass the user_id to ALL tool calls - it's available in the context message
+26. **IMPORTANT**: User authentication is handled automatically - you don't need to worry about user_id
 
 Context Message Format:
 Your input will include:
-- User ID: {user_id} (pass this to every tool call)
 - Recent conversation history (last 10 messages)
 - Current user message
 
-Extract the user_id from the context and use it for ALL tool calls.
+Note: All tools are automatically scoped to the authenticated user.
 """
 
     def _build_context_message(
         self,
         user_message: str,
-        user_id: str,
         conversation_history: list[dict[str, str]] | None = None,
     ) -> str:
         """
-        Build context message with user_id and conversation history.
+        Build context message with conversation history.
 
-        Adapted from agent_service.py:160-192
+        Note: user_id is automatically injected into all tool calls by ContextAwareMCPClient,
+        so there's no need to include it in the prompt or instruct the LLM to pass it.
 
         Args:
             user_message: Current user message
-            user_id: User ID for tool calls
             conversation_history: Optional conversation history
 
         Returns:
@@ -469,17 +458,11 @@ Extract the user_id from the context and use it for ALL tool calls.
             history_text = "\n".join(history_lines)
 
         # Build full context message
-        # IMPORTANT: Include user_id so the LLM knows to pass it to tools
+        # Note: user_id is NOT included - it's auto-injected by the MCP wrapper
         if history_text:
-            return f"""Context:
-- User ID: {user_id} (IMPORTANT: Use this user_id for ALL tool calls)
-
-Recent conversation:
+            return f"""Recent conversation:
 {history_text}
 
 Current user message: {user_message}"""
         else:
-            return f"""Context:
-- User ID: {user_id} (IMPORTANT: Use this user_id for ALL tool calls)
-
-User message: {user_message}"""
+            return f"""User message: {user_message}"""

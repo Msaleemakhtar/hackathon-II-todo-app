@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
@@ -142,6 +142,22 @@ async def health_check():
     }
 
 
+@app.get("/health/kafka")
+async def kafka_health():
+    """Detailed Kafka producer health check with background thread status."""
+    from datetime import datetime, timezone
+    from app.kafka.producer import kafka_producer
+
+    health_ok = await kafka_producer.health_check()
+    status = kafka_producer.get_background_thread_status()
+
+    return {
+        "healthy": health_ok,
+        "status": status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""
@@ -227,6 +243,9 @@ async def chatkit_handler(request: Request):
             # If no .json attribute, return as-is
             return result
 
+    except HTTPException:
+        # Re-raise HTTPException to let FastAPI handle it properly (preserves status codes)
+        raise
     except Exception as e:
         logger.error(f"Error in chatkit_handler: {str(e)}", exc_info=True)
         # Return error response with proper CORS headers

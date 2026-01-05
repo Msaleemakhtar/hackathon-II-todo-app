@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -17,8 +18,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app for health checks
-app = FastAPI(title="Notification Service", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler with graceful Kafka fallback."""
+    # Startup
+    logger.info("Starting Notification Service...")
+
+    # Initialize Kafka producer FIRST (required for publishing events)
+    logger.info("Initializing Kafka producer...")
+    kafka_available = False
+    try:
+        await kafka_producer.start()
+        kafka_available = True
+        logger.info("✅ Kafka producer initialized successfully")
+    except Exception as e:
+        logger.error(f"⚠️  Kafka producer initialization failed: {e}", exc_info=True)
+        logger.warning("Notification service will start in degraded mode (database polling only, no event publishing)")
+        # Don't raise - allow service to start without Kafka
+
+    # Start notification service (database polling loop)
+    await notification_service.start()
+    setup_signal_handlers()
+
+    logger.info(f"Notification service started (Kafka: {'available' if kafka_available else 'unavailable'})")
+
+    yield  # Application is ready
+
+    # Shutdown
+    logger.info("Shutting down notification service...")
+    await notification_service.stop()
+
+    # Stop Kafka producer
+    logger.info("Stopping Kafka producer...")
+    await kafka_producer.stop()
+
+
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="Notification Service",
+    version="0.1.0",
+    lifespan=lifespan,  # ← MODERN PATTERN
+)
 
 
 @app.get("/health")
@@ -64,32 +105,6 @@ async def health_check():
             },
             status_code=503,
         )
-
-
-@app.on_event("startup")
-async def startup():
-    """Start notification service on application startup."""
-    logger.info("Starting notification service...")
-
-    # Initialize Kafka producer FIRST (required for publishing events)
-    logger.info("Initializing Kafka producer...")
-    await kafka_producer.start()
-    logger.info("Kafka producer initialized successfully")
-
-    # Start notification service (database polling loop)
-    await notification_service.start()
-    setup_signal_handlers()
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Stop notification service on application shutdown."""
-    logger.info("Shutting down notification service...")
-    await notification_service.stop()
-
-    # Stop Kafka producer
-    logger.info("Stopping Kafka producer...")
-    await kafka_producer.stop()
 
 
 def main():

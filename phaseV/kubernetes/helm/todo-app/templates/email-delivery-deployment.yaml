@@ -25,12 +25,16 @@ spec:
       - name: email-delivery
         image: {{ .Values.emailDelivery.image }}
         imagePullPolicy: {{ .Values.emailDelivery.imagePullPolicy | default "IfNotPresent" }}
+        command:
+          - "python"
+          - "-m"
+          - "app.services.email_delivery_service_standalone"
         ports:
         - containerPort: 8003
           name: http
           protocol: TCP
         env:
-        # Database Configuration
+        # Database Configuration (needed to fetch user emails)
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -100,19 +104,19 @@ spec:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
 
         readinessProbe:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 2
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
 
         lifecycle:
           preStop:

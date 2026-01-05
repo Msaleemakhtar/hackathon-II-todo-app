@@ -28,19 +28,35 @@ class KafkaProducerManager:
         self._background_loop: Optional[asyncio.AbstractEventLoop] = None
         self._background_thread: Optional[threading.Thread] = None
 
-    async def start(self) -> None:
-        """Initialize Kafka producer in background thread for thread-safe operation."""
-        try:
-            # Start persistent background event loop FIRST
-            self._start_background_loop()
-            logger.info("Kafka background event loop started")
+    async def start(self, max_retries: int = 3, retry_delay: int = 5) -> None:
+        """
+        Initialize Kafka producer in background thread with retry logic.
 
-            # Initialize producer IN the background thread's event loop
-            async def init_producer():
-                # Get SSL context if using SASL_SSL
+        Args:
+            max_retries: Maximum initialization attempts (default: 3)
+            retry_delay: Seconds to wait between retries (default: 5)
+        """
+        logger.info("=" * 80)
+        logger.info("KAFKA PRODUCER INITIALIZATION")
+        logger.info("=" * 80)
+        logger.info(f"Bootstrap Servers: {config.KAFKA_BOOTSTRAP_SERVERS}")
+        logger.info(f"Security Protocol: {config.KAFKA_SECURITY_PROTOCOL}")
+        logger.info(f"SASL Mechanism: {config.KAFKA_SASL_MECHANISM}")
+        logger.info(f"SASL Username: {config.KAFKA_SASL_USERNAME}")
+        logger.info(f"Initialization Timeout: {config.KAFKA_PRODUCER_INIT_TIMEOUT_SECONDS}s")
+        logger.info(f"Max Retries: {max_retries}")
+        logger.info("=" * 80)
+
+        last_exception = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"Kafka producer initialization attempt {attempt}/{max_retries}")
+
+                # Create SSL context
                 ssl_context = config.get_kafka_ssl_context()
 
-                # Initialize producer in background thread's event loop
+                # Initialize producer in MAIN event loop
                 self._producer = AIOKafkaProducer(
                     bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
                     security_protocol=config.KAFKA_SECURITY_PROTOCOL,
@@ -51,19 +67,45 @@ class KafkaProducerManager:
                     **config.KAFKA_PRODUCER_CONFIG,
                 )
                 await self._producer.start()
-                logger.info("Kafka producer started successfully in background thread")
                 self._is_healthy = True
 
-            # Submit producer initialization to background loop and wait for completion
-            future = asyncio.run_coroutine_threadsafe(init_producer(), self._background_loop)
-            future.result(timeout=30)  # Wait up to 30 seconds for initialization
+                # Start background event loop AFTER successful producer initialization
+                if not self._background_loop or not self._background_thread:
+                    self._start_background_loop()
+                    logger.info("Kafka background event loop started")
 
-            logger.info("Skipping topic creation (topics managed externally)")
+                logger.info(f"✅ Kafka producer initialized successfully on attempt {attempt}")
+                logger.info("Skipping topic creation (topics managed externally)")
+                return  # Success - exit retry loop
 
-        except Exception as e:
-            logger.error(f"Failed to start Kafka producer: {e}")
-            self._is_healthy = False
-            raise
+            except Exception as e:
+                last_exception = e
+                logger.error(f"❌ Kafka producer initialization attempt {attempt}/{max_retries} failed: {e}")
+                self._is_healthy = False
+
+                # Don't call stop() on failed producer - just discard it
+                # Calling stop() on a producer that failed to start can corrupt connection state
+                if self._producer:
+                    self._producer = None
+                    logger.debug("Discarded failed producer instance")
+
+                # DON'T clean up background loop between retries - keep it running
+                # Only clean up on final failure
+                if attempt >= max_retries:
+                    logger.error(f"Failed to start Kafka producer after {max_retries} attempts")
+                    # Clean up background loop on final failure
+                    if self._background_loop and self._background_thread:
+                        try:
+                            self._background_loop.call_soon_threadsafe(self._background_loop.stop)
+                            self._background_thread.join(timeout=2.0)
+                        except Exception as cleanup_error:
+                            logger.warning(f"Error cleaning up background loop: {cleanup_error}")
+                    self._background_loop = None
+                    self._background_thread = None
+                    raise last_exception
+                else:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
 
     async def stop(self) -> None:
         """Gracefully shutdown Kafka producer."""
@@ -88,15 +130,45 @@ class KafkaProducerManager:
         self._is_healthy = False
 
     def _start_background_loop(self) -> None:
-        """Start persistent background event loop in separate thread."""
+        """Start persistent background event loop in separate thread with exception handling."""
 
         def run_loop(loop):
-            asyncio.set_event_loop(loop)
-            loop.run_forever()
+            """Run event loop with comprehensive error handling."""
+            try:
+                asyncio.set_event_loop(loop)
+                logger.info(f"Background event loop started in thread: {threading.current_thread().name}")
+
+                # Set exception handler for coroutines
+                def exception_handler(loop, context):
+                    msg = context.get("exception", context["message"])
+                    logger.error(
+                        f"Background loop exception: {msg}",
+                        extra={"context": context},
+                        exc_info=context.get("exception")
+                    )
+
+                loop.set_exception_handler(exception_handler)
+                loop.run_forever()
+
+            except Exception as e:
+                logger.critical(f"Background event loop crashed: {e}", exc_info=True)
+                self._is_healthy = False
+            finally:
+                logger.warning("Background event loop stopped")
+                try:
+                    loop.close()
+                except Exception as e:
+                    logger.error(f"Error closing background loop: {e}")
 
         self._background_loop = asyncio.new_event_loop()
-        self._background_thread = threading.Thread(target=run_loop, args=(self._background_loop,), daemon=True)
+        self._background_thread = threading.Thread(
+            target=run_loop,
+            args=(self._background_loop,),
+            daemon=True,
+            name="kafka-producer-background-loop"
+        )
         self._background_thread.start()
+        logger.info(f"Started background thread: {self._background_thread.name}")
 
     async def _create_topics(self) -> None:
         """Programmatically create Kafka topics if they don't exist."""
@@ -181,23 +253,28 @@ class KafkaProducerManager:
         self, topic: str, event: BaseEvent, key: Optional[str] = None, wait: bool = False
     ) -> bool:
         """
-        Publish event to Kafka topic using true fire-and-forget.
+        Publish event to Kafka topic.
 
-        Uses producer.send() which returns immediately and buffers the message.
-        aiokafka handles delivery in background without blocking the HTTP request.
+        Uses producer.send_and_wait() which waits for broker acknowledgment.
 
         Args:
             topic: Kafka topic name
             event: Pydantic event model
             key: Optional partition key (defaults to task_id if available)
-            wait: Ignored (kept for API compatibility)
+            wait: If True, wait for publish to complete before returning (default: False)
 
         Returns:
-            True if message buffered successfully, False otherwise
+            True if message published successfully, False otherwise
         """
+        # Lazy initialization: initialize producer on first use
         if not self._producer:
-            logger.error("Kafka producer not initialized")
-            return False
+            logger.info("Kafka producer not initialized - attempting lazy initialization...")
+            try:
+                await self.start()
+                logger.info("Lazy initialization successful")
+            except Exception as e:
+                logger.error(f"Lazy initialization failed: {e}")
+                return False
 
         try:
             # Serialize event to JSON
@@ -211,9 +288,11 @@ class KafkaProducerManager:
             # Encode partition key
             key_bytes = partition_key.encode("utf-8") if partition_key else None
 
-            # Submit to persistent background event loop (survives HTTP session termination)
-            async def send_with_logging():
-                logger.info(f"🚀 Background task STARTED for {event.event_type} (event_id: {event.event_id})")
+            # When wait=True, publish directly in current event loop for synchronous behavior
+            # When wait=False, use background thread for fire-and-forget
+            if wait:
+                # Synchronous publish in current event loop
+                logger.info(f"📤 Publishing {event.event_type} synchronously (key: {partition_key}, event_id: {event.event_id})")
                 try:
                     logger.info(f"⏳ Calling send_and_wait for {event.event_type}...")
                     record_metadata = await self._producer.send_and_wait(topic=topic, value=event_json, key=key_bytes)
@@ -222,22 +301,39 @@ class KafkaProducerManager:
                         f"partition {record_metadata.partition} offset {record_metadata.offset} "
                         f"(key: {partition_key})"
                     )
-                except asyncio.CancelledError:
-                    logger.warning(f"❌ Background task CANCELLED for {event.event_type} (event_id: {event.event_id})")
-                    raise
+                    return True
                 except Exception as e:
                     logger.error(f"Failed to publish {event.event_type} to {topic}: {e} (event_id: {event.event_id})")
-                finally:
-                    logger.info(f"🏁 Background task FINISHED for {event.event_type} (event_id: {event.event_id})")
-
-            # Schedule coroutine on persistent background loop (NOT current request loop)
-            if self._background_loop:
-                future = asyncio.run_coroutine_threadsafe(send_with_logging(), self._background_loop)
-                logger.info(f"📤 Queued {event.event_type} for {topic} (key: {partition_key}, event_id: {event.event_id}) [background_thread]")
-                return True
+                    return False
             else:
-                logger.error("Kafka background event loop not initialized")
-                return False
+                # Fire-and-forget: submit to persistent background event loop
+                async def send_with_logging():
+                    logger.info(f"🚀 Background task STARTED for {event.event_type} (event_id: {event.event_id})")
+                    try:
+                        logger.info(f"⏳ Calling send_and_wait for {event.event_type}...")
+                        record_metadata = await self._producer.send_and_wait(topic=topic, value=event_json, key=key_bytes)
+                        logger.info(
+                            f"✅ Published {event.event_type} to {topic} "
+                            f"partition {record_metadata.partition} offset {record_metadata.offset} "
+                            f"(key: {partition_key})"
+                        )
+                        return True
+                    except asyncio.CancelledError:
+                        logger.warning(f"❌ Background task CANCELLED for {event.event_type} (event_id: {event.event_id})")
+                        raise
+                    except Exception as e:
+                        logger.error(f"Failed to publish {event.event_type} to {topic}: {e} (event_id: {event.event_id})")
+                        return False
+                    finally:
+                        logger.info(f"🏁 Background task FINISHED for {event.event_type} (event_id: {event.event_id})")
+
+                if self._background_loop:
+                    future = asyncio.run_coroutine_threadsafe(send_with_logging(), self._background_loop)
+                    logger.info(f"📤 Queued {event.event_type} for {topic} (key: {partition_key}, event_id: {event.event_id}) [background_thread]")
+                    return True
+                else:
+                    logger.error("Kafka background event loop not initialized")
+                    return False
 
         except KafkaError as e:
             logger.error(
@@ -250,12 +346,67 @@ class KafkaProducerManager:
 
     async def health_check(self) -> bool:
         """
-        Check Kafka producer health.
+        Check Kafka producer health including background thread status.
 
-        Returns True if producer is initialized and healthy flag is set.
-        Avoids cross-event-loop complexity by trusting the internal health flag.
+        Returns True if all checks pass:
+        - Producer is initialized
+        - Health flag is set
+        - Background thread is alive
+        - Background event loop is running
         """
-        return self._producer is not None and self._is_healthy
+        try:
+            # Basic checks
+            if self._producer is None:
+                logger.warning("Health check failed: Producer not initialized")
+                return False
+
+            if not self._is_healthy:
+                logger.warning("Health check failed: Health flag is False")
+                return False
+
+            # Background thread checks
+            if self._background_thread is None:
+                logger.error("Health check failed: Background thread is None")
+                return False
+
+            if not self._background_thread.is_alive():
+                logger.error("Health check failed: Background thread is dead")
+                self._is_healthy = False
+                return False
+
+            # Background event loop checks
+            if self._background_loop is None:
+                logger.error("Health check failed: Background loop is None")
+                return False
+
+            if self._background_loop.is_closed():
+                logger.error("Health check failed: Background loop is closed")
+                self._is_healthy = False
+                return False
+
+            if not self._background_loop.is_running():
+                logger.error("Health check failed: Background loop is not running")
+                self._is_healthy = False
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Health check error: {e}", exc_info=True)
+            return False
+
+    def get_background_thread_status(self) -> dict:
+        """Get detailed status of background thread for diagnostics."""
+        return {
+            "thread_exists": self._background_thread is not None,
+            "thread_alive": self._background_thread.is_alive() if self._background_thread else False,
+            "thread_name": self._background_thread.name if self._background_thread else None,
+            "loop_exists": self._background_loop is not None,
+            "loop_running": self._background_loop.is_running() if self._background_loop else False,
+            "loop_closed": self._background_loop.is_closed() if self._background_loop else None,
+            "producer_exists": self._producer is not None,
+            "is_healthy": self._is_healthy,
+        }
 
     def get_pending_tasks_count(self) -> int:
         """

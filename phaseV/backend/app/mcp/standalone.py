@@ -66,14 +66,16 @@ def run_mcp_server() -> NoReturn:
     logger.info(f"Starting MCP Server: {mcp.name}")
     logger.info(f"Listening on {host}:{port}")
 
-    # Initialize Kafka producer before starting server
-    logger.info("Initializing Kafka producer...")
-    asyncio.run(initialize_kafka_producer())
-
     # Setup shutdown handler
+    shutdown_initiated = False
+
     def signal_handler(sig, frame):
+        nonlocal shutdown_initiated
+        if shutdown_initiated:
+            return
+        shutdown_initiated = True
         logger.info(f"Received signal {sig}, shutting down...")
-        asyncio.run(shutdown_kafka_producer())
+        # Kafka producer will be stopped by lifespan handler
         exit(0)
 
     signal.signal(signal.SIGTERM, signal_handler)
@@ -87,6 +89,10 @@ def run_mcp_server() -> NoReturn:
     # Configure host and port via settings
     mcp.settings.host = host
     mcp.settings.port = port
+
+    # NOTE: Kafka producer will be lazy-initialized on first use
+    # Attempting to pre-initialize it here causes event loop conflicts
+    logger.info("Kafka producer will be initialized on first event publish")
 
     # Run using FastMCP's streamable HTTP transport
     # This properly initializes the session manager and task groups

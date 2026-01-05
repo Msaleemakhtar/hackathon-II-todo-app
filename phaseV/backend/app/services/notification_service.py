@@ -199,7 +199,7 @@ class NotificationService:
             )
 
             await kafka_producer.publish_event(
-                topic="task-reminders", event=event, key=str(task.id)
+                topic="task-reminders", event=event, key=str(task.id), wait=True
             )
 
             logger.debug(f"Reminder sent and published to Kafka for task {task.id}")

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import signal
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 
@@ -129,6 +130,24 @@ async def health_check():
             "service": "email-delivery",
             "message": "Service dependencies not ready",
         }
+
+
+@app.get("/metrics")
+async def metrics():
+    """Expose Prometheus-compatible metrics."""
+    return {
+        "email_delivery_messages_processed_total": email_delivery_service._messages_processed,
+        "email_delivery_consecutive_failures": email_delivery_service._consecutive_failures,
+        "email_delivery_last_poll_seconds_ago": (
+            (datetime.now(timezone.utc) - email_delivery_service._last_poll_time).total_seconds()
+            if email_delivery_service._last_poll_time else -1
+        ),
+        "email_delivery_last_commit_seconds_ago": (
+            (datetime.now(timezone.utc) - email_delivery_service._last_commit_time).total_seconds()
+            if email_delivery_service._last_commit_time else -1
+        ),
+        "email_delivery_running": email_delivery_service._running,
+    }
 
 
 @app.get("/")

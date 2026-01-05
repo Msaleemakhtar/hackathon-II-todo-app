@@ -40,6 +40,15 @@ class RecurringTaskService:
             logger.warning("Recurring task service already running")
             return
 
+        # Initialize Kafka producer first (needed to publish TaskCreatedEvent)
+        try:
+            logger.info("Initializing Kafka producer for recurring task service...")
+            await kafka_producer.start()
+            logger.info("✅ Kafka producer initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Kafka producer: {e}")
+            raise
+
         # T028: Initialize Kafka consumer for task-recurrence topic
         try:
             # Get SSL context if using SASL_SSL
@@ -85,6 +94,13 @@ class RecurringTaskService:
         if self._consumer:
             await self._consumer.stop()
             logger.info("Kafka consumer stopped")
+
+        # Stop Kafka producer
+        try:
+            await kafka_producer.stop()
+            logger.info("Kafka producer stopped")
+        except Exception as e:
+            logger.error(f"Error stopping Kafka producer: {e}")
 
     async def health_check(self) -> bool:
         """
@@ -208,11 +224,14 @@ class RecurringTaskService:
                     # Check if next occurrence already exists
                     from sqlalchemy import and_, select
 
+                    # Convert next_due_date to naive datetime (database stores naive datetimes)
+                    next_due_date_naive = next_due_date.replace(tzinfo=None) if next_due_date.tzinfo else next_due_date
+
                     existing_query = select(TaskPhaseIII).where(
                         and_(
                             TaskPhaseIII.user_id == original_task.user_id,
                             TaskPhaseIII.title == original_task.title,
-                            TaskPhaseIII.due_date == next_due_date,
+                            TaskPhaseIII.due_date == next_due_date_naive,
                             TaskPhaseIII.recurrence_rule == original_task.recurrence_rule,
                         )
                     )
@@ -234,7 +253,7 @@ class RecurringTaskService:
                         description=original_task.description,
                         completed=False,  # New task starts incomplete
                         priority=original_task.priority,
-                        due_date=next_due_date,
+                        due_date=next_due_date_naive,  # Use naive datetime for database
                         category_id=original_task.category_id,
                         recurrence_rule=original_task.recurrence_rule,  # Copy recurrence
                         reminder_sent=False,  # Reset reminder

@@ -23,9 +23,99 @@ Phase V is an event-driven AI-powered task management application deployed on Ku
 
 ## 🏗️ Event-Driven Architecture
 
-Phase V implements a robust event-driven architecture using **Kafka (Redpanda Cloud)** for asynchronous task processing with three specialized consumer services:
+Phase V implements a robust event-driven architecture using **Kafka (Redpanda Cloud)** for asynchronous task processing with three specialized consumer services.
 
-### Architecture Diagram
+### Complete System Architecture Flow
+
+```mermaid
+graph TB
+    subgraph "User Layer"
+        User[👤 User]
+    end
+
+    subgraph "Frontend Layer"
+        UI[🌐 Next.js Frontend<br/>ChatKit Interface<br/>Port: 3000<br/>Replicas: 2-5]
+    end
+
+    subgraph "API Layer"
+        Backend[⚡ FastAPI Backend<br/>MCP Tools<br/>Port: 8000<br/>Replicas: 2-5]
+        MCP[🔧 MCP Server<br/>Tool Executor<br/>Port: 8001<br/>Replicas: 1]
+    end
+
+    subgraph "Data Layer"
+        DB[(🗄️ PostgreSQL<br/>Neon Cloud<br/>Full-text Search)]
+        Redis[(💾 Redis<br/>Session Cache<br/>Port: 6379)]
+    end
+
+    subgraph "Event Streaming Layer - Redpanda Cloud"
+        Producer[📤 Kafka Producer<br/>aiokafka<br/>SASL_SSL/SCRAM-SHA-256]
+
+        subgraph "Kafka Topics"
+            T1[📋 task-events<br/>3 partitions<br/>7d retention]
+            T2[⏰ task-reminders<br/>1 partition<br/>1d retention]
+            T3[🔄 task-recurrence<br/>1 partition<br/>7d retention]
+        end
+    end
+
+    subgraph "Consumer Services Layer"
+        NotificationSvc[🔔 Notification Service<br/>Producer + Consumer<br/>Port: 8002<br/>Polls DB every 5s]
+        EmailSvc[📧 Email Delivery Service<br/>Consumer Only<br/>Port: 8003<br/>SMTP Client]
+        RecurringSvc[🔁 Recurring Task Service<br/>Consumer Only<br/>Port: 8004<br/>RRULE Parser]
+    end
+
+    subgraph "External Services"
+        SMTP[📨 Gmail SMTP<br/>smtp.gmail.com:587<br/>TLS/STARTTLS]
+        UserEmail[📬 User Email Inbox]
+    end
+
+    %% User interactions
+    User -->|HTTPS| UI
+    UI <-->|REST API| Backend
+
+    %% Backend connections
+    Backend --> MCP
+    Backend <--> DB
+    Backend <--> Redis
+    Backend --> Producer
+
+    %% Kafka producer to topics
+    Producer -->|TaskCreatedEvent<br/>TaskUpdatedEvent<br/>TaskDeletedEvent| T1
+    Producer -->|TaskCompletedEvent| T3
+    NotificationSvc -->|ReminderSentEvent| T2
+
+    %% Notification Service flow
+    NotificationSvc -.->|Poll every 5s<br/>Find due tasks| DB
+    T2 -->|Consume| EmailSvc
+
+    %% Email Service flow
+    EmailSvc -->|Query task + user| DB
+    EmailSvc -->|Send email| SMTP
+    SMTP -->|Deliver| UserEmail
+
+    %% Recurring Task Service flow
+    T3 -->|Consume| RecurringSvc
+    RecurringSvc -->|Parse RRULE<br/>Create new task| DB
+    RecurringSvc -->|Publish TaskCreatedEvent| Producer
+
+    %% Styling
+    classDef userClass fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef frontendClass fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef backendClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef dataClass fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef kafkaClass fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef consumerClass fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef externalClass fill:#eceff1,stroke:#263238,stroke-width:2px
+
+    class User userClass
+    class UI frontendClass
+    class Backend,MCP backendClass
+    class DB,Redis dataClass
+    class Producer,T1,T2,T3 kafkaClass
+    class NotificationSvc,EmailSvc,RecurringSvc consumerClass
+    class SMTP,UserEmail externalClass
+```
+
+### High-Level Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -84,60 +174,153 @@ Phase V implements a robust event-driven architecture using **Kafka (Redpanda Cl
 ### Event Flows
 
 #### 1. Task Creation Flow
-```
-User creates task via ChatKit
-        ↓
-Backend MCP Tool (add_task)
-        ↓
-Save to PostgreSQL
-        ↓
-Publish TaskCreatedEvent → task-events topic
-        ↓
-(Future: Notification Service could consume for welcome email)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ChatKit as ChatKit UI
+    participant Backend as FastAPI Backend
+    participant DB as PostgreSQL
+    participant Producer as Kafka Producer
+    participant Topic as task-events Topic
+
+    User->>ChatKit: "Create task: Buy groceries"
+    ChatKit->>Backend: POST /mcp/tools/add_task
+    Backend->>DB: INSERT INTO tasks_phaseiii
+    DB-->>Backend: task_id=123
+    Backend->>Producer: Publish TaskCreatedEvent
+    Producer->>Topic: {task_id:123, title:"Buy groceries", ...}
+    Backend-->>ChatKit: Success response
+    ChatKit-->>User: "✅ Task created!"
+
+    Note over Topic: Event stored for 7 days<br/>Available for future consumers
 ```
 
-#### 2. Reminder Flow
-```
-Notification Service (Kafka Producer + Consumer)
-        ↓
-Polls PostgreSQL every 5 seconds
-        ↓
-Finds tasks due within 1 hour (reminder_sent = false)
-        ↓
-Publishes ReminderSentEvent → task-reminders topic
-        ↓
-Email Delivery Service (Kafka Consumer)
-        ↓
-Consumes ReminderSentEvent
-        ↓
-Sends email via SMTP (Gmail)
-        ↓
-Logs delivery status
+#### 2. Email Reminder Flow (End-to-End)
+
+```mermaid
+sequenceDiagram
+    participant DB as PostgreSQL
+    participant NotifSvc as Notification Service
+    participant Producer as Kafka Producer
+    participant Topic as task-reminders Topic
+    participant EmailSvc as Email Delivery Service
+    participant SMTP as Gmail SMTP
+    participant User as User Email Inbox
+
+    loop Every 5 seconds
+        NotifSvc->>DB: SELECT due tasks
+        Note over DB: WHERE due_date - NOW() < 1 hour
+        Note over DB: AND reminder_sent = false
+    end
+
+    DB-->>NotifSvc: Task ID=188 due in 30 min
+    NotifSvc->>Producer: ReminderSentEvent{task_id:188}
+    Producer->>Topic: Publish event (partition 0)
+    NotifSvc->>DB: UPDATE reminder_sent=true
+
+    Topic->>EmailSvc: Consume ReminderSentEvent
+    EmailSvc->>DB: SELECT task and user email
+    Note over DB: JOIN users ON task.user_id
+    DB-->>EmailSvc: Email and task details
+    Note over EmailSvc: email: "user@gmail.com"
+    Note over EmailSvc: title: "Buy groceries"
+
+    EmailSvc->>SMTP: SMTP STARTTLS connection
+    SMTP-->>EmailSvc: 220 Ready
+    EmailSvc->>SMTP: Send email (TLS encrypted)
+    SMTP-->>EmailSvc: 250 OK
+    EmailSvc->>EmailSvc: Log success + commit offset
+
+    SMTP->>User: 📧 Email delivered
+
+    Note over EmailSvc,SMTP: ✅ Verified working<br/>E2E test successful<br/>2026-01-03
 ```
 
 #### 3. Recurring Task Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Backend as FastAPI Backend
+    participant DB as PostgreSQL
+    participant Producer as Kafka Producer
+    participant Topic as task-recurrence Topic
+    participant RecurringSvc as Recurring Task Service
+
+    User->>Backend: "Complete task: Daily standup"
+    Backend->>DB: UPDATE tasks SET completed=true
+    Note over DB: WHERE id=42
+    DB-->>Backend: Task with recurrence
+    Note over DB: recurrence_rule: FREQ=DAILY;COUNT=5
+
+    Backend->>Producer: TaskCompletedEvent
+    Note over Producer: task_id: 42
+    Note over Producer: recurrence_rule: FREQ=DAILY;COUNT=5
+    Producer->>Topic: Publish event
+
+    Topic->>RecurringSvc: Consume TaskCompletedEvent
+    RecurringSvc->>RecurringSvc: Parse RRULE with dateutil
+    RecurringSvc->>RecurringSvc: Calculate next occurrence
+    Note over RecurringSvc: tomorrow same time
+
+    RecurringSvc->>DB: INSERT new task instance
+    Note over DB: due_date = tomorrow
+    DB-->>RecurringSvc: new_task_id=43
+
+    RecurringSvc->>Producer: TaskCreatedEvent{task_id:43}
+    Producer->>Topic: Publish to task-events
+
+    Note over RecurringSvc: Cycle repeats until<br/>COUNT limit reached
 ```
-User completes recurring task via ChatKit
-        ↓
-Backend MCP Tool (complete_task)
-        ↓
-Mark task complete in PostgreSQL
-        ↓
-Publish TaskCompletedEvent → task-recurrence topic
-        ↓
-Recurring Task Service (Kafka Consumer)
-        ↓
-Consumes TaskCompletedEvent
-        ↓
-Parse iCalendar RRULE (e.g., FREQ=DAILY;COUNT=5)
-        ↓
-Calculate next occurrence date
-        ↓
-Create new task instance in PostgreSQL
-        ↓
-Publish TaskCreatedEvent → task-events topic
-        ↓
-(Cycle continues automatically)
+
+#### 4. Complete System Flow (All Events)
+
+```mermaid
+flowchart TB
+    Start([👤 User Interaction]) --> Action{Action Type}
+
+    Action -->|Create Task| Create[Backend: add_task MCP]
+    Action -->|Update Task| Update[Backend: update_task MCP]
+    Action -->|Complete Task| Complete[Backend: complete_task MCP]
+    Action -->|Delete Task| Delete[Backend: delete_task MCP]
+
+    Create --> SaveDB[(💾 Save to PostgreSQL)]
+    Update --> SaveDB
+    Complete --> SaveDB
+    Delete --> SaveDB
+
+    SaveDB --> PubEvents{Publish Events}
+
+    PubEvents -->|TaskCreatedEvent| TE[📋 task-events topic]
+    PubEvents -->|TaskUpdatedEvent| TE
+    PubEvents -->|TaskDeletedEvent| TE
+    PubEvents -->|TaskCompletedEvent<br/>if has recurrence_rule| TR[🔄 task-recurrence topic]
+
+    %% Notification Service Loop
+    DBPoll[🔔 Notification Service<br/>Polls DB every 5s] -.->|Find due tasks| SaveDB
+    DBPoll -->|Publish| TReminder[⏰ task-reminders topic]
+
+    %% Consumers
+    TReminder --> EmailConsumer[📧 Email Delivery Service]
+    TR --> RecurringConsumer[🔁 Recurring Task Service]
+
+    EmailConsumer --> QueryDB[(Query task + user)]
+    QueryDB --> SMTP[📨 Send via Gmail SMTP]
+    SMTP --> UserInbox([📬 User Email])
+
+    RecurringConsumer --> ParseRRULE[Parse RRULE]
+    ParseRRULE --> CreateNext[Create next task instance]
+    CreateNext --> SaveDB
+
+    style Start fill:#e1f5ff,stroke:#01579b
+    style SaveDB fill:#e8f5e9,stroke:#1b5e20
+    style TE fill:#fff9c4,stroke:#f57f17
+    style TR fill:#fff9c4,stroke:#f57f17
+    style TReminder fill:#fff9c4,stroke:#f57f17
+    style EmailConsumer fill:#fce4ec,stroke:#880e4f
+    style RecurringConsumer fill:#fce4ec,stroke:#880e4f
+    style UserInbox fill:#eceff1,stroke:#263238
 ```
 
 ### Services Overview
@@ -211,6 +394,82 @@ All consumer services implement:
 - ✅ **Manual commit**: Consumers manually commit offsets for exactly-once processing
 - ✅ **Error handling**: Failed messages are logged, service continues
 - ✅ **Background consumption**: Non-blocking event consumption in separate asyncio tasks
+
+### ✅ E2E Verification & Testing
+
+The complete event-driven pipeline has been **verified working end-to-end** on **2026-01-03**:
+
+```bash
+# Test Results Summary
+✅ Kafka Producer: Connected to Redpanda Cloud (SASL_SSL/SCRAM-SHA-256)
+✅ Event Publishing: ReminderSentEvent published to task-reminders (offset 44)
+✅ Consumer Processing: Email delivery service consumed event
+✅ Database Query: Retrieved task 188 + user email (saleemakhtar864@gmail.com)
+✅ SMTP Connection: TLS connection established to smtp.gmail.com:587
+✅ Email Delivery: Email sent successfully and delivered to inbox
+
+# Test Logs
+2026-01-03 04:24:09 - Received ReminderSentEvent for task 188
+2026-01-03 04:24:12 - Email sent successfully to saleemakhtar864@gmail.com
+2026-01-03 04:24:12 - ✅ Email reminder sent for task 188 ('✅ VERIFIED Email Test - SUCCESS')
+```
+
+#### Critical Fixes Applied (January 2026)
+
+During E2E testing, the following issues were identified and resolved:
+
+1. **Kafka Authentication (SASL_SSL)**
+   - **Issue**: Incorrect password in Kubernetes secret
+   - **Fix**: Updated `todo-app-secrets` with correct Redpanda Cloud credentials
+   - **Verification**: Connection established, events flowing
+
+2. **SMTP TLS Configuration**
+   - **Issue**: `SMTPException: Connection already using TLS` (manual `starttls()` call)
+   - **Fix**: Changed to `start_tls=True` parameter in `aiosmtplib.SMTP` initialization
+   - **Location**: `app/services/email_delivery_service.py:136-151`
+
+3. **SMTP Credentials**
+   - **Issue**: Empty username/password in `email-delivery-secret`
+   - **Fix**: Populated with Gmail app password from `redpanda.md`
+   - **Credentials**: saleemakhtar864@gmail.com / Gmail app password
+
+4. **Database SSL Connection (Neon PostgreSQL)**
+   - **Issue**: `asyncpg.exceptions.InvalidPasswordError` with asyncpg SSL configuration
+   - **Root Cause**: asyncpg doesn't accept `sslmode` as URL parameter (psycopg2 only)
+   - **Fix**: Strip `?sslmode=require` from URL, provide SSL context via `connect_args`
+   - **Implementation**:
+     ```python
+     import ssl as ssl_module
+     ssl_context = ssl_module.create_default_context()
+     ssl_context.check_hostname = False
+     ssl_context.verify_mode = ssl_module.CERT_NONE
+
+     engine = create_async_engine(
+         db_url,  # URL without sslmode parameter
+         connect_args={"ssl": ssl_context}
+     )
+     ```
+
+5. **Database URL Mismatch**
+   - **Issue**: Email service using old database (`phaseiii_db@ep-nameless-hill`)
+   - **Fix**: Updated to active database (`neondb@ep-green-shape-advm09wo-pooler`)
+   - **Result**: All queries working, no auth errors
+
+#### Testing Scripts
+
+Two test scripts are available in `phaseV/backend/`:
+
+1. **`publish_reminder_event.py`** - Manual event publisher
+   - Fetches real task from database
+   - Publishes ReminderSentEvent to Kafka
+   - Monitors email delivery logs
+   - **Usage**: `kubectl exec -n todo-phasev deployment/backend -- python publish_reminder_event.py`
+
+2. **`test_e2e_email_reminder.py`** - End-to-end automated test
+   - Creates test event with dummy data
+   - Verifies consumer processing
+   - Checks email delivery logs
+   - **Usage**: `python test_e2e_email_reminder.py`
 
 ---
 
@@ -767,11 +1026,20 @@ Before deploying to production:
 
 ## 🆘 Support & Documentation
 
+- **📊 Architecture Flow Diagrams**: [`ARCHITECTURE_FLOW.md`](./ARCHITECTURE_FLOW.md) - Comprehensive visual documentation with Mermaid diagrams
 - **Kubernetes Guide**: `kubernetes/docs/KUBERNETES_GUIDE.md`
 - **Runbook**: `kubernetes/docs/RUNBOOK.md`
 - **Architecture**: `kubernetes/docs/architecture-diagram.md`
 - **ADRs**: `history/adr/*.md`
 - **Issues**: [GitHub Issues](https://github.com/your-org/your-repo/issues)
+
+### Quick Links to Diagrams
+
+- [Complete System Architecture Flow](./ARCHITECTURE_FLOW.md#complete-system-architecture)
+- [Email Reminder Flow (E2E Verified)](./ARCHITECTURE_FLOW.md#email-reminder-flow-verified-e2e)
+- [Recurring Task Flow](./ARCHITECTURE_FLOW.md#recurring-task-flow)
+- [Security Architecture](./ARCHITECTURE_FLOW.md#security-architecture)
+- [Failure & Recovery Flows](./ARCHITECTURE_FLOW.md#failure--recovery-flows)
 
 ---
 

@@ -45,13 +45,21 @@ KAFKA_PRODUCER_CONFIG = {
     "retry_backoff_ms": 100,  # Exponential backoff
 }
 
+# Producer initialization timeout (SASL_SSL handshake can be slow)
+KAFKA_PRODUCER_INIT_TIMEOUT_SECONDS = int(os.getenv("KAFKA_PRODUCER_INIT_TIMEOUT", "90"))
+
+# Producer retry configuration
+KAFKA_PRODUCER_MAX_RETRIES = int(os.getenv("KAFKA_PRODUCER_MAX_RETRIES", "3"))
+KAFKA_PRODUCER_RETRY_DELAY_SECONDS = int(os.getenv("KAFKA_PRODUCER_RETRY_DELAY", "5"))
+
 # Consumer configuration
 KAFKA_CONSUMER_CONFIG = {
     "auto_offset_reset": "earliest",  # Start from beginning on first run
     "enable_auto_commit": False,  # Manual commit for control
-    "max_poll_records": 100,  # Batch size for efficiency
-    "session_timeout_ms": 30000,  # 30 seconds
-    "heartbeat_interval_ms": 10000,  # 10 seconds
+    "max_poll_records": 10,  # Reduced from 100 to 10 (faster batch processing, prevents timeout)
+    "max_poll_interval_ms": 300000,  # 5 minutes (time allowed to process batch before eviction)
+    "session_timeout_ms": 60000,  # 60 seconds (increased from 30s to allow longer processing)
+    "heartbeat_interval_ms": 3000,  # 3 seconds (increased frequency from 10s for faster failure detection)
     "request_timeout_ms": 90000,  # 90 seconds (increased from default 30s for slow SASL handshake)
     "connections_max_idle_ms": 300000,  # 5 minutes (keep connections alive longer)
     "metadata_max_age_ms": 300000,  # 5 minutes (refresh metadata less frequently)
