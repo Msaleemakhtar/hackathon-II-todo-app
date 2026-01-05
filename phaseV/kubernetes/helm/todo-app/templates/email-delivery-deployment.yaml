@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.emailDelivery.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.emailDelivery.name }}
+    component: consumer
+    tier: backend
+spec:
+  replicas: 1  # Single replica to prevent duplicate email sends
+  selector:
+    matchLabels:
+      app: {{ .Values.emailDelivery.name }}
+  strategy:
+    type: Recreate  # Ensure clean shutdown before new pod starts
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.emailDelivery.name }}
+        component: consumer
+        tier: backend
+    spec:
+      containers:
+      - name: email-delivery
+        image: {{ .Values.emailDelivery.image }}
+        imagePullPolicy: {{ .Values.emailDelivery.imagePullPolicy | default "IfNotPresent" }}
+        command:
+          - "python"
+          - "-m"
+          - "app.services.email_delivery_service_standalone"
+        ports:
+        - containerPort: 8003
+          name: http
+          protocol: TCP
+        env:
+        # Database Configuration (needed to fetch user emails)
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.secretName }}
+              key: DATABASE_URL
+
+        # Kafka Configuration
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.kafka.secretName }}
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: KAFKA_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: KAFKA_SASL_MECHANISM
+          value: "SCRAM-SHA-256"
+        - name: KAFKA_SASL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.kafka.secretName }}
+              key: KAFKA_SASL_USERNAME
+        - name: KAFKA_SASL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.kafka.secretName }}
+              key: KAFKA_SASL_PASSWORD
+
+        # SMTP Configuration
+        - name: SMTP_HOST
+          value: {{ .Values.emailDelivery.smtp.host | quote }}
+        - name: SMTP_PORT
+          value: {{ .Values.emailDelivery.smtp.port | quote }}
+        - name: SMTP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.emailDelivery.secretName }}
+              key: smtp-username
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.emailDelivery.secretName }}
+              key: smtp-password
+        - name: SMTP_FROM_EMAIL
+          value: {{ .Values.emailDelivery.smtp.fromEmail | quote }}
+        - name: SMTP_FROM_NAME
+          value: {{ .Values.emailDelivery.smtp.fromName | quote }}
+
+        # Email Delivery Consumer Configuration
+        - name: EMAIL_DELIVERY_GROUP_ID
+          value: {{ .Values.emailDelivery.consumerGroup | quote }}
+
+        # Application Settings
+        - name: ENVIRONMENT
+          value: {{ .Values.environment | default "production" | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.emailDelivery.logLevel | default "INFO" | quote }}
+
+        resources:
+          requests:
+            cpu: {{ .Values.emailDelivery.resources.requests.cpu | default "100m" }}
+            memory: {{ .Values.emailDelivery.resources.requests.memory | default "128Mi" }}
+          limits:
+            cpu: {{ .Values.emailDelivery.resources.limits.cpu | default "200m" }}
+            memory: {{ .Values.emailDelivery.resources.limits.memory | default "256Mi" }}
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 10"]  # Allow graceful shutdown (Kafka offset commit)
+
+      terminationGracePeriodSeconds: 30  # Wait for Kafka consumer to commit offsets
+
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.emailDelivery.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.emailDelivery.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.emailDelivery.name }}
+  ports:
+  - protocol: TCP
+    port: 8003
+    targetPort: http
+    name: http

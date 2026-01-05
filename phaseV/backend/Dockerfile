@@ -13,6 +13,9 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml uv.lock README.md ./
 
+# Set UV timeout to 5 minutes for slow network
+ENV UV_HTTP_TIMEOUT=300
+
 # Install dependencies in a virtual environment
 RUN uv sync --frozen --no-dev
 
@@ -35,7 +38,10 @@ WORKDIR /app
 # Copy virtual environment from builder
 COPY --from=builder --chown=appuser:appuser /app/.venv ./.venv
 
-# Copy application code
+# Cache-bust argument to force app layer rebuild
+ARG CACHE_BUST=unknown
+
+# Copy application code (this layer will rebuild when CACHE_BUST changes)
 COPY --chown=appuser:appuser ./app ./app
 COPY --chown=appuser:appuser ./alembic ./alembic
 COPY --chown=appuser:appuser alembic.ini ./

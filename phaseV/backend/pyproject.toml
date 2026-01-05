@@ -22,6 +22,8 @@ dependencies = [
     "litellm>=1.80.10",
     "openai-chatkit",
     "python-dateutil>=2.8.2",
+    "aiokafka>=0.11.0",
+    "aiosmtplib>=3.0.0",
 ]
 
 [project.optional-dependencies]

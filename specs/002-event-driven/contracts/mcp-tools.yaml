@@ -1,0 +1,367 @@
+# MCP Tool Interfaces for Event-Driven Architecture
+# Feature: 002-event-driven
+# Version: 1.0
+# MCP SDK: https://github.com/modelcontextprotocol/python-sdk
+
+mcp_server:
+  name: task-management-mcp
+  version: 1.0.0
+  description: MCP server for task management with event-driven architecture
+
+tools:
+  # Enhanced existing tool: add_task
+  - name: add_task
+    description: Create a new task with optional priority, due date, and recurrence
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - title
+      properties:
+        user_id:
+          type: integer
+          description: User ID (from JWT token)
+          minimum: 1
+        title:
+          type: string
+          description: Task title
+          maxLength: 255
+        description:
+          type: string
+          description: Optional task description
+        priority:
+          type: string
+          enum: [low, medium, high]
+          description: Task priority level
+        due_date:
+          type: string
+          format: date-time
+          description: Task due date (ISO 8601 UTC)
+        recurrence_rule:
+          type: string
+          description: iCalendar RRULE format (e.g., FREQ=DAILY, FREQ=WEEKLY;BYDAY=MO)
+          pattern: ^FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)
+        category_id:
+          type: integer
+          description: Category ID
+          minimum: 1
+        tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: List of tag IDs to associate
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        task_id:
+          type: integer
+        message:
+          type: string
+    side_effects:
+      - Insert task into tasks_phaseiii table
+      - Publish TaskCreatedEvent to task-events Kafka topic (async, non-blocking)
+      - Return immediately to user (fire-and-forget event publishing)
+
+  # Enhanced existing tool: complete_task
+  - name: complete_task
+    description: Mark a task as completed and trigger recurring task regeneration if applicable
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: integer
+          description: User ID (from JWT token)
+          minimum: 1
+        task_id:
+          type: integer
+          description: Task ID to complete
+          minimum: 1
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+    side_effects:
+      - Update task.completed = true in database
+      - Publish TaskCompletedEvent to task-recurrence Kafka topic (async)
+      - Recurring Task Service consumes event and creates next occurrence
+
+  # Enhanced existing tool: update_task
+  - name: update_task
+    description: Update task metadata (title, description, priority, due_date, etc.)
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+        task_id:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        due_date:
+          type: string
+          format: date-time
+        recurrence_rule:
+          type: string
+        category_id:
+          type: integer
+          minimum: 1
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+    side_effects:
+      - Update task fields in database
+      - Publish TaskUpdatedEvent to task-events Kafka topic (async)
+
+  # Enhanced existing tool: delete_task
+  - name: delete_task
+    description: Delete a task (soft delete)
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+        task_id:
+          type: integer
+          minimum: 1
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+    side_effects:
+      - Set task.deleted_at = now() in database
+      - Publish TaskDeletedEvent to task-events Kafka topic (async)
+
+  # Enhanced existing tool: list_tasks (no event publishing)
+  - name: list_tasks
+    description: List all tasks for a user with optional filtering
+    input_schema:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+        completed:
+          type: boolean
+          description: Filter by completion status
+        priority:
+          type: string
+          enum: [low, medium, high]
+          description: Filter by priority
+        category_id:
+          type: integer
+          description: Filter by category
+    output_schema:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            type: object
+    side_effects: []
+
+  # NEW tool: search_tasks
+  - name: search_tasks
+    description: Full-text search for tasks by keywords in title/description
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - query
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+        query:
+          type: string
+          description: Search query (natural language)
+          maxLength: 500
+    output_schema:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              description:
+                type: string
+              rank:
+                type: number
+                description: Relevance score (ts_rank)
+    implementation:
+      query: |
+        SELECT id, title, description,
+               ts_rank(search_vector, plainto_tsquery('english', :query)) AS rank
+        FROM tasks_phaseiii
+        WHERE user_id = :user_id
+          AND search_vector @@ plainto_tsquery('english', :query)
+        ORDER BY rank DESC
+        LIMIT 50
+    side_effects: []
+
+# Event Publishing Flow
+event_flow:
+  add_task:
+    - step: 1
+      action: Validate input (priority, recurrence_rule whitelist)
+      error_on_failure: Return 400 Bad Request
+    - step: 2
+      action: Insert task into database
+      error_on_failure: Return 500 Internal Server Error
+    - step: 3
+      action: Publish TaskCreatedEvent to Kafka (async, non-blocking)
+      error_on_failure: Log error, continue (fire-and-forget)
+    - step: 4
+      action: Return success response to user
+      latency_target: <500ms p95
+
+  complete_task:
+    - step: 1
+      action: Update task.completed = true in database
+      error_on_failure: Return 500 Internal Server Error
+    - step: 2
+      action: Publish TaskCompletedEvent to Kafka (async)
+      error_on_failure: Log error, continue
+    - step: 3
+      action: Return success response to user
+      latency_target: <500ms p95
+    - step: 4_async
+      action: Recurring Task Service consumes event
+      async: true
+      actions:
+        - Parse recurrence_rule with dateutil.rrule
+        - Calculate next occurrence
+        - Create new task in database
+        - Publish TaskCreatedEvent
+
+  update_task:
+    - step: 1
+      action: Update task fields in database
+      error_on_failure: Return 500 Internal Server Error
+    - step: 2
+      action: Publish TaskUpdatedEvent to Kafka (async)
+      error_on_failure: Log error, continue
+    - step: 3
+      action: Return success response to user
+      latency_target: <500ms p95
+
+  delete_task:
+    - step: 1
+      action: Soft delete task (set deleted_at)
+      error_on_failure: Return 500 Internal Server Error
+    - step: 2
+      action: Publish TaskDeletedEvent to Kafka (async)
+      error_on_failure: Log error, continue
+    - step: 3
+      action: Return success response to user
+      latency_target: <500ms p95
+
+# Validation Rules
+validation:
+  recurrence_rule:
+    description: Whitelist of allowed RRULE patterns
+    allowed_patterns:
+      - ^FREQ=DAILY$
+      - ^FREQ=DAILY;COUNT=\d+$
+      - ^FREQ=DAILY;INTERVAL=\d+$
+      - ^FREQ=WEEKLY;BYDAY=[A-Z,]+$
+      - ^FREQ=WEEKLY;INTERVAL=\d+;BYDAY=[A-Z,]+$
+      - ^FREQ=MONTHLY;BYMONTHDAY=\d+$
+      - ^FREQ=MONTHLY;BYDAY=\d+[A-Z]{2}$
+      - ^FREQ=YEARLY;BYMONTH=\d+;BYMONTHDAY=\d+$
+    validation_logic: |
+      import re
+      from dateutil.rrule import rrulestr
+
+      def validate_rrule(rule: str) -> bool:
+          allowed_patterns = [...]  # See above
+          try:
+              rrulestr(rule, dtstart=datetime.now())
+              return any(re.match(p, rule) for p in allowed_patterns)
+          except ValueError:
+              return False
+
+  priority:
+    allowed_values: [low, medium, high]
+    validation_logic: |
+      priority in ['low', 'medium', 'high'] or priority is None
+
+  search_query:
+    max_length: 500
+    validation_logic: |
+      len(query) <= 500
+
+# Error Handling
+error_handling:
+  kafka_publish_failure:
+    strategy: fire-and-forget
+    action: Log error, do not fail user request
+    rationale: Kafka unavailability should not block task operations
+    monitoring: Alert if publish failures exceed 10% rate
+
+  database_failure:
+    strategy: fail-fast
+    action: Return 500 Internal Server Error to user
+    rationale: Database is source of truth, must be available
+
+  rrule_parsing_failure:
+    strategy: skip-and-log
+    action: Log error, skip recurring task creation
+    rationale: Invalid RRULE should not crash service
+    monitoring: Alert if parsing failures exceed 5% rate
+
+# Performance Targets
+performance:
+  add_task:
+    latency_p95: <500ms
+    breakdown:
+      database_insert: <100ms
+      kafka_publish_async: <50ms
+      validation: <10ms
+
+  search_tasks:
+    latency_p95: <200ms
+    breakdown:
+      database_query: <150ms
+      result_serialization: <20ms
+
+  event_publishing:
+    latency_p95: <50ms
+    throughput: 1000 events/sec minimum

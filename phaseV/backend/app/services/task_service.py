@@ -1,12 +1,14 @@
 """Task service layer for Phase V advanced task management."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.kafka.events import TaskCompletedEvent, TaskCreatedEvent, TaskUpdatedEvent
+from app.kafka.producer import kafka_producer
 from app.models.task import PriorityLevel, TaskPhaseIII
 from app.utils.rrule_parser import validate_rrule
 
@@ -79,7 +81,7 @@ async def create_task(
     recurrence_rule: str | None = None,
 ) -> TaskPhaseIII:
     """
-    Create a new task with validation.
+    Create a new task with validation and idempotency check.
 
     Args:
         session: Database session
@@ -92,7 +94,7 @@ async def create_task(
         recurrence_rule: Optional RRULE string
 
     Returns:
-        Created task instance
+        Created task instance (or existing if duplicate detected)
 
     Raises:
         ValueError: If validation fails
@@ -107,6 +109,31 @@ async def create_task(
         is_valid, error = validate_recurrence_rule(recurrence_rule)
         if not is_valid:
             raise ValueError(error)
+
+    # Idempotency check: prevent duplicate tasks created within 60 seconds
+    # Check for existing task with same title, user_id, recurrence_rule created recently
+    from sqlalchemy import and_
+    from datetime import timedelta
+
+    recent_threshold = datetime.utcnow() - timedelta(seconds=60)
+    duplicate_query = select(TaskPhaseIII).where(
+        and_(
+            TaskPhaseIII.user_id == user_id,
+            TaskPhaseIII.title == title.strip(),
+            TaskPhaseIII.recurrence_rule == recurrence_rule,
+            TaskPhaseIII.created_at >= recent_threshold,
+        )
+    )
+    result = await session.execute(duplicate_query)
+    existing_task = result.scalars().first()
+
+    if existing_task:
+        logger.warning(
+            f"Duplicate task detected! Returning existing task_id={existing_task.id} "
+            f"(created {(datetime.utcnow() - existing_task.created_at).total_seconds():.1f}s ago) "
+            f"instead of creating duplicate"
+        )
+        return existing_task
 
     # Create task
     task = TaskPhaseIII(
@@ -128,6 +155,30 @@ async def create_task(
     logger.info(
         f"Task created: user={user_id}, task_id={task.id}, title={title}, priority={priority.value}"
     )
+
+    # Publish TaskCreatedEvent to Kafka (T004)
+    try:
+        # Convert user_id: if numeric string, parse it; otherwise hash it
+        if isinstance(user_id, str):
+            event_user_id = int(user_id) if user_id.isdigit() else hash(user_id)
+        else:
+            event_user_id = user_id
+
+        event = TaskCreatedEvent(
+            user_id=event_user_id,
+            task_id=task.id,
+            title=task.title,
+            description=task.description,
+            priority=priority.value if priority else None,
+            due_date=due_date,
+            recurrence_rule=recurrence_rule,
+            category_id=category_id,
+        )
+        await kafka_producer.publish_event("task-events", event, wait=True)
+        logger.info(f"Published TaskCreatedEvent for task_id={task.id}")
+    except Exception as e:
+        logger.error(f"Failed to publish TaskCreatedEvent for task_id={task.id}: {e}")
+        # Don't fail the request if event publishing fails
 
     return task
 
@@ -197,11 +248,66 @@ async def update_task(
             raise ValueError(error)
         task.recurrence_rule = recurrence_rule
 
+    # Track if task was marked as completed (for event publishing)
+    was_completed = completed is not None and completed is True
+
     task.updated_at = datetime.utcnow()
     await session.commit()
     await session.refresh(task)
 
     logger.info(f"Task updated: task_id={task.id}, user={task.user_id}")
+
+    # Convert user_id for event publishing
+    if isinstance(task.user_id, str):
+        event_user_id = int(task.user_id) if task.user_id.isdigit() else hash(task.user_id)
+    else:
+        event_user_id = task.user_id
+
+    # Publish TaskUpdatedEvent to Kafka (T005)
+    try:
+        # Build updated_fields dict from function parameters that were actually changed
+        updated_fields = {}
+        if title is not None:
+            updated_fields["title"] = task.title
+        if description is not None:
+            updated_fields["description"] = task.description
+        if priority is not None:
+            updated_fields["priority"] = task.priority.value if task.priority else None
+        if due_date is not None:
+            updated_fields["due_date"] = task.due_date.isoformat() if task.due_date else None
+        if completed is not None:
+            updated_fields["completed"] = task.completed
+        if recurrence_rule is not None:
+            updated_fields["recurrence_rule"] = task.recurrence_rule
+        if category_id is not None:
+            updated_fields["category_id"] = task.category_id
+
+        event = TaskUpdatedEvent(
+            user_id=event_user_id,
+            task_id=task.id,
+            updated_fields=updated_fields,
+        )
+        await kafka_producer.publish_event("task-events", event, wait=True)
+        logger.info(f"Published TaskUpdatedEvent for task_id={task.id}")
+    except Exception as e:
+        logger.error(f"Failed to publish TaskUpdatedEvent for task_id={task.id}: {e}")
+
+    # If task was marked completed and has recurrence rule, publish to task-recurrence topic (T027)
+    if was_completed and task.recurrence_rule:
+        try:
+            completed_event = TaskCompletedEvent(
+                user_id=event_user_id,
+                task_id=task.id,
+                recurrence_rule=task.recurrence_rule,
+                completed_at=datetime.now(timezone.utc),
+            )
+            await kafka_producer.publish_event("task-recurrence", completed_event, wait=True)
+            logger.info(
+                f"Published TaskCompletedEvent to task-recurrence for task_id={task.id} "
+                f"(recurrence_rule={task.recurrence_rule})"
+            )
+        except Exception as e:
+            logger.error(f"Failed to publish TaskCompletedEvent for task_id={task.id}: {e}")
 
     return task
 

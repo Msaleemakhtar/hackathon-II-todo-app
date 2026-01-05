@@ -206,6 +206,8 @@ If ALL true, suggest:
 - YAML (Kubernetes manifests), Helm 3.13+ (templating), Bash (deployment scripts) (001-kubernetes-deployment)
 - Python 3.11+ + FastAPI 0.109+, SQLModel 0.0.14+, Alembic 1.13+, asyncpg 0.29+, openai-agents 0.6.3+, openai-chatkit, mcp[cli] 1.24+ (001-foundation-api)
 - Neon Serverless PostgreSQL (shared database instance with Phase II/III/IV, separate tables_phaseiii table + new Phase V tables) (001-foundation-api)
+- Python 3.11+ + FastAPI 0.109+, aiokafka 0.11.0, python-dateutil 2.8.2, asyncpg 0.29.0, pydantic 2.5.0 (002-event-driven)
+- Neon PostgreSQL Serverless (shared database with Phase III/IV, enhanced tasks_phaseiii table with priority, due_date, category_id, recurrence_rule, reminder_sent fields; new tables: categories, tags_phasev, task_tags; tsvector search_vector with GIN index) (002-event-driven)
 
 ## Recent Changes
 - 003-fix-chatkit-auth: Added Neon Serverless PostgreSQL (shared database instance with Phase II)

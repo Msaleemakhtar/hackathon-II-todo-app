@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
@@ -46,12 +46,21 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded) ->
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    logger.info("Starting Phase IV Backend...")
+    logger.info("Starting Phase V Backend with Event-Driven Architecture...")
+
     # Import and create database tables
     from app.database import create_db_and_tables
-
     await create_db_and_tables()
     logger.info("Database tables created/verified")
+
+    # Initialize Kafka producer
+    from app.kafka.producer import kafka_producer
+    try:
+        await kafka_producer.start()
+        logger.info("Kafka producer initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Kafka producer: {e}")
+        logger.warning("Continuing without Kafka - event publishing will be disabled")
 
     # MCP tools are defined in app/mcp/tools.py and run in a separate MCP server service
     logger.info("MCP tools defined (running in separate mcp-server service)")
@@ -59,7 +68,14 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Shutting down Phase IV Backend...")
+    logger.info("Shutting down Phase V Backend...")
+
+    # Stop Kafka producer gracefully
+    try:
+        await kafka_producer.stop()
+        logger.info("Kafka producer stopped gracefully")
+    except Exception as e:
+        logger.error(f"Error stopping Kafka producer: {e}")
 
 
 # Create FastAPI application
@@ -123,6 +139,22 @@ async def health_check():
         "version": "0.1.0",
         "environment": settings.environment,
         "adapters": ["chatkit"],
+    }
+
+
+@app.get("/health/kafka")
+async def kafka_health():
+    """Detailed Kafka producer health check with background thread status."""
+    from datetime import datetime, timezone
+    from app.kafka.producer import kafka_producer
+
+    health_ok = await kafka_producer.health_check()
+    status = kafka_producer.get_background_thread_status()
+
+    return {
+        "healthy": health_ok,
+        "status": status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -211,6 +243,9 @@ async def chatkit_handler(request: Request):
             # If no .json attribute, return as-is
             return result
 
+    except HTTPException:
+        # Re-raise HTTPException to let FastAPI handle it properly (preserves status codes)
+        raise
     except Exception as e:
         logger.error(f"Error in chatkit_handler: {str(e)}", exc_info=True)
         # Return error response with proper CORS headers

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy Todo App Phase IV to Kubernetes via Helm
+# Deploy Todo App Phase V to Kubernetes via Helm
 # Implements incremental rollout: Redis → MCP → Backend → Frontend → Ingress
 
 set -euo pipefail
@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 RELEASE_NAME="todo-app"
-NAMESPACE="todo-phaseiv"
-CHART_PATH="./phaseIV/kubernetes/helm/todo-app"
+NAMESPACE="todo-phasev"
+CHART_PATH="./phaseV/kubernetes/helm/todo-app"
 VALUES_FILE="${VALUES_FILE:-values-local.yaml}"
 TIMEOUT="10m"
 
@@ -86,11 +86,11 @@ build_images() {
 
     # Build frontend image
     log_info "Building frontend image..."
-    docker build -t todo-frontend:latest phaseIV/frontend
+    docker build -t todo-frontend:latest phaseV/frontend
 
     # Build backend image
     log_info "Building backend image..."
-    docker build -t todo-backend:latest phaseIV/backend
+    docker build -t todo-backend:latest phaseV/backend
 
     log_success "Docker images built successfully"
 }
@@ -220,7 +220,7 @@ display_status() {
 
 # Main execution
 main() {
-    log_info "Starting deployment of Todo App Phase IV..."
+    log_info "Starting deployment of Todo App Phase V..."
     echo ""
 
     preflight_checks

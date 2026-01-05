@@ -1,15 +1,23 @@
+import ssl
+
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 from app.config import settings
 
-# Create async engine
+# Create SSL context for Neon PostgreSQL (asyncpg requires SSL via connect_args)
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+
+# Create async engine with SSL context
 engine: AsyncEngine = create_async_engine(
     settings.database_url,
     echo=settings.environment == "development",
     future=True,
     pool_pre_ping=True,
+    connect_args={"ssl": ssl_context},
 )
 
 # Create async session maker

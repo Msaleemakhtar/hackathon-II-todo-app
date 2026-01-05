@@ -14,8 +14,9 @@ from typing import Any
 
 from agents import Agent, Runner
 from agents.extensions.models.litellm_model import LitellmModel
-from agents.mcp import MCPServerStreamableHttp
 from chatkit.server import ChatKitServer
+
+from app.chatkit.context_aware_mcp import ContextAwareMCPClient
 from chatkit.types import (
     AssistantMessageContent,
     AssistantMessageItem,
@@ -115,45 +116,32 @@ class TaskChatServer(ChatKitServer):
         logger.info(f"✅ Processing message for user_id={user_id}, thread_id={thread.id}")
 
         try:
-            # Create MCP server connection (copied from agent_service.py:92-103)
-            logger.info(f"🔌 Connecting to MCP server at {settings.mcp_server_url}")
-            async with MCPServerStreamableHttp(
-                name="Task Manager MCP Server",
-                params={
-                    "url": settings.mcp_server_url,
-                    "timeout": 30,
-                },
-                cache_tools_list=True,
-                max_retry_attempts=3,
-            ) as mcp_server:
-                logger.info("✅ MCP server connected successfully")
+            # Create context-aware MCP client that auto-injects user_id
+            logger.info(f"🔌 Connecting to MCP server at {settings.mcp_server_url} with user_id={user_id}")
+            async with ContextAwareMCPClient(
+                url=settings.mcp_server_url,
+                user_id=user_id,
+                timeout=30,
+            ) as mcp_client:
+                logger.info("✅ Context-aware MCP client connected successfully")
 
-                # Log discovered tools
+                # Log discovered tools (with modified schemas - user_id hidden)
                 try:
-                    tools_list = await mcp_server.list_tools()
-                    logger.info(f"🔍 list_tools() raw response type: {type(tools_list)}")
-                    logger.info(f"🔍 list_tools() response: {tools_list}")
-                    logger.info(f"🔍 has 'tools' attr: {hasattr(tools_list, 'tools')}")
-                    logger.info(f"🔍 dir: {dir(tools_list)}")
-
-                    tool_names = (
-                        [tool.name for tool in tools_list.tools]
-                        if hasattr(tools_list, "tools")
-                        else []
-                    )
-                    logger.info(f"🔧 MCP tools discovered: {tool_names}")
+                    tools_list = await mcp_client.list_tools()
+                    tool_names = [tool.name for tool in tools_list] if isinstance(tools_list, list) else []
+                    logger.info(f"🔧 MCP tools discovered (user_id auto-injection enabled): {tool_names}")
                 except Exception as e:
                     logger.error(f"❌ Could not list MCP tools: {str(e)}", exc_info=True)
 
-                # Create agent with MCP tools (copied from agent_service.py:104-111)
-                # The SDK automatically discovers tools from the MCP server
+                # Create agent with context-aware MCP client
+                # The wrapper automatically injects user_id into all tool calls
                 agent = Agent(
                     name="TaskManagerAgent",
                     instructions=self._get_system_instructions(),
                     model=self.model,
-                    mcp_servers=[mcp_server],  # MCP tools auto-discovered!
+                    mcp_servers=[mcp_client.mcp_server],  # Use wrapped MCP server
                 )
-                logger.info("🤖 Agent created with MCP tools")
+                logger.info("🤖 Agent created with context-aware MCP tools (user_id auto-injected)")
 
                 # Load conversation history from thread for agent context
                 conversation_history = []
@@ -188,10 +176,10 @@ class TaskChatServer(ChatKitServer):
                         logger.warning(f"Failed to load conversation history: {str(e)}")
                         # Continue with empty history on error
 
-                # Build context message with user_id and conversation history
+                # Build context message with conversation history
+                # Note: user_id is automatically injected by ContextAwareMCPClient
                 context_message = self._build_context_message(
                     user_message=input_user_message.content,
-                    user_id=user_id,
                     conversation_history=conversation_history,
                 )
 
@@ -298,40 +286,163 @@ class TaskChatServer(ChatKitServer):
         """
         Get system instructions for the agent.
 
-        Copied verbatim from agent_service.py:48-66
+        Enhanced version with comprehensive NLU guidance to prevent:
+        - Duplicate task creation
+        - Poor context retention
+        - Natural language date parsing issues
         """
-        return """You are a helpful AI task manager assistant. You help users manage their tasks through natural conversation.
+        # Calculate current date/time context dynamically
+        from datetime import UTC, datetime, timedelta
 
-You have access to 5 tools for task management:
-- add_task: Create a new task
-- list_tasks: List user's tasks (all, pending, or completed)
-- complete_task: Mark a task as completed
-- delete_task: Delete a task
-- update_task: Update a task's title or description
+        current_time = datetime.now(UTC)
+        current_date_str = current_time.strftime("%Y-%m-%d")
+        current_datetime_str = current_time.isoformat() + "Z"
+        tomorrow_str = (current_time + timedelta(days=1)).strftime("%Y-%m-%d")
+        next_week_str = (current_time + timedelta(days=7)).strftime("%Y-%m-%d")
 
-Guidelines:
-1. Be conversational and friendly
-2. When users reference tasks ambiguously, ask for clarification
-3. Provide helpful suggestions after completing actions
-4. If an error occurs, explain it clearly and suggest next steps
-5. Always confirm actions (e.g., "Task #1 'Buy milk' has been completed")
-6. IMPORTANT: Always pass the user_id to ALL tool calls - it's available in the context
+        return f"""You are a helpful AI task manager assistant. You help users manage their tasks through natural conversation.
+
+CRITICAL - CURRENT DATE/TIME CONTEXT:
+====================================
+- Today's date: {current_date_str}
+- Current UTC time: {current_datetime_str}
+- Tomorrow's date: {tomorrow_str}
+- Next week (7 days): {next_week_str}
+
+IMPORTANT: ALWAYS use these dates as your reference when parsing user input.
+- When user says "tomorrow", use: {tomorrow_str}
+- When user says "next week", calculate from: {current_date_str}
+- When user says "in 3 days", add 3 days to: {current_date_str}
+- NEVER use dates from October 2022, 2023, or 2024
+- ALL tasks must have due dates in {current_time.year} or later
+
+====================================
+
+You have access to 18 tools for task management:
+- Task CRUD: add_task, list_tasks, get_task, update_task, complete_task, delete_task
+- Categories: create_category, list_categories, update_category, delete_category
+- Tags: create_tag, list_tags, update_tag, delete_tag, add_tag_to_task, remove_tag_from_task
+- Search & Reminders: search_tasks, set_reminder
+
+CRITICAL RULES - Task Creation & Context Retention:
+1. **NEVER retry tool calls automatically** - If a tool returns success status, DO NOT call it again
+2. **ALWAYS remember task_ids** - When you create/update/retrieve a task, store the task_id in your working memory
+3. **Check conversation history** - Before creating a task, scan recent messages to avoid duplicates
+4. **Reference recent tasks** - When user says "the task you just created" or "recently added task", extract the task_id from your last tool response
+5. **Confirm once and stop** - After successful task creation, confirm ONCE with the task_id, then STOP (don't retry)
+
+Natural Language Understanding for Dates:
+6. **Parse relative date expressions**:
+   - "two days before due date" → calculate: remind_before_minutes = 2 × 24 × 60 = 2880
+   - "one week before" → remind_before_minutes = 7 × 24 × 60 = 10080
+   - "3 hours before" → remind_before_minutes = 3 × 60 = 180
+7. **Parse absolute dates with arithmetic**:
+   - User: "remind me on January 3rd" for task due January 5th
+   - Calculate: days_difference = 5 - 3 = 2 days
+   - Convert: remind_before_minutes = 2 × 24 × 60 = 2880
+8. **Handle ambiguous references**:
+   - "recently created task" = search your last 5 tool responses for task_id
+   - "the first task" / "the last task" = positional reference from list_tasks result
+   - "that task" / "this task" = refer to most recently mentioned task_id in conversation
+
+Smart Task Search Before Creation:
+9. **Prevent duplicates** - Before calling add_task, mentally check:
+   - Did I just create a similar task in the last 3 messages?
+   - Did the user already ask to create this task?
+   - If yes, retrieve that task_id instead of creating again
+10. **Use search when ambiguous** - If user references a task without task_id:
+    - First try: search_tasks with keywords from user query
+    - Second try: list_tasks with appropriate filters
+    - Last resort: ask user for task_id or more details
+
+Reminder Configuration Best Practices:
+11. **ALWAYS parse time expressions into minutes** - You MUST calculate remind_before_minutes:
+    - "2 hours before" → remind_before_minutes = 2 × 60 = 120
+    - "1 day before" → remind_before_minutes = 1 × 24 × 60 = 1440
+    - "30 minutes before" → remind_before_minutes = 30
+    - "48 hours notice" → remind_before_minutes = 48 × 60 = 2880
+    - "1 week before" → remind_before_minutes = 7 × 24 × 60 = 10080
+12. **Call set_reminder with calculated minutes** - DON'T make excuses about "technical limitations":
+    - CORRECT: set_reminder(user_id="123", task_id=224, remind_before_minutes=120)
+    - WRONG: Refuse to call the tool or give generic errors
+13. **Validate prerequisites** - Before calling set_reminder:
+    - Confirm task has a due_date (if not, explain user must set it first)
+    - Mentally verify the calculated reminder time is in the future
+14. **Date arithmetic examples**:
+    - "remind me tomorrow" for task due in 5 days → remind_before_minutes = 4 × 24 × 60 = 5760
+    - "remind me on the morning of" → remind_before_minutes = 0 (day of)
+    - "give me 48 hours notice" → remind_before_minutes = 2880
+
+Multi-Step Request Handling:
+15. **Break down complex requests** - When user provides multiple parts in one message:
+    Example: "add task, visiting farm on every sunday due 2026-1-11 remind one day before"
+
+    Step 1: Parse ALL components first (don't call tools yet):
+    - Title: "visiting farm"
+    - Recurrence: "every sunday" → "FREQ=WEEKLY;BYDAY=SU"
+    - Due date: "2026-1-11" → "2026-01-11T23:59:59Z"
+    - Reminder: "one day before" → 1440 minutes
+
+    Step 2: Call add_task with ALL parsed parameters:
+    add_task(
+      user_id=<from_context>,
+      title="visiting farm",
+      due_date="2026-01-11T23:59:59Z",
+      recurrence_rule="FREQ=WEEKLY;BYDAY=SU"
+    )
+
+    Step 3: If reminder requested, call set_reminder with task_id from add_task result:
+    set_reminder(
+      user_id=<from_context>,
+      task_id=<from_add_task_result>,
+      remind_before_minutes=1440
+    )
+
+16. **CRITICAL parsing rules**:
+    - ALWAYS parse dates to ISO 8601 format: "2026-1-11" → "2026-01-11T23:59:59Z"
+    - ALWAYS convert recurrence patterns to RFC 5545: "every sunday" → "FREQ=WEEKLY;BYDAY=SU"
+    - ALWAYS calculate time expressions to minutes: "one day before" → 1440
+    - NEVER pass raw user input directly to tool parameters
+
+17. **Sequential tool calls**:
+    - add_task MUST complete successfully before calling set_reminder
+    - Extract task_id from add_task response before calling set_reminder
+    - If add_task fails, DON'T proceed to set_reminder
+
+Error Handling & Recovery:
+18. **Never auto-retry** - If a tool returns error status, DON'T retry automatically
+19. **Explain errors clearly** - Parse error message and explain to user in simple terms
+20. **Suggest fixes** - Provide actionable next steps (e.g., "Let's set a due_date first")
+21. **Show alternatives** - If task not found, call list_tasks to show available options
+22. **Detect duplicates** - If user asks to create task that exists, ask: "Did you mean to update task #123?"
+
+General Guidelines:
+23. Be conversational and friendly
+24. Provide helpful suggestions after completing actions
+25. Confirm actions with specific details (e.g., "✓ Task #123 'Buy milk' completed")
+26. **IMPORTANT**: User authentication is handled automatically - you don't need to worry about user_id
+
+Context Message Format:
+Your input will include:
+- Recent conversation history (last 10 messages)
+- Current user message
+
+Note: All tools are automatically scoped to the authenticated user.
 """
 
     def _build_context_message(
         self,
         user_message: str,
-        user_id: str,
         conversation_history: list[dict[str, str]] | None = None,
     ) -> str:
         """
-        Build context message with user_id and conversation history.
+        Build context message with conversation history.
 
-        Adapted from agent_service.py:160-192
+        Note: user_id is automatically injected into all tool calls by ContextAwareMCPClient,
+        so there's no need to include it in the prompt or instruct the LLM to pass it.
 
         Args:
             user_message: Current user message
-            user_id: User ID for tool calls
             conversation_history: Optional conversation history
 
         Returns:
@@ -347,17 +458,11 @@ Guidelines:
             history_text = "\n".join(history_lines)
 
         # Build full context message
-        # IMPORTANT: Include user_id so the LLM knows to pass it to tools
+        # Note: user_id is NOT included - it's auto-injected by the MCP wrapper
         if history_text:
-            return f"""Context:
-- User ID: {user_id} (IMPORTANT: Use this user_id for ALL tool calls)
-
-Recent conversation:
+            return f"""Recent conversation:
 {history_text}
 
 Current user message: {user_message}"""
         else:
-            return f"""Context:
-- User ID: {user_id} (IMPORTANT: Use this user_id for ALL tool calls)
-
-User message: {user_message}"""
+            return f"""User message: {user_message}"""

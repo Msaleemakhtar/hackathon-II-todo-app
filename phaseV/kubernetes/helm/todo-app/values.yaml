@@ -1,5 +1,9 @@
-# Helm Values for Todo App Phase IV
+# Helm Values for Todo App Phase V
 # Override these values using --set flag or custom values-local.yaml
+
+# Namespace Configuration
+namespace: "todo-phasev"
+environment: "production"
 
 # Global Configuration
 global:
@@ -52,7 +56,7 @@ backend:
   enabled: true
   replicaCount: 2  # Initial replicas (HPA manages dynamically)
   image:
-    repository: "todo-backend"
+    repository: "todo-app-backend"
     tag: "latest"
     pullPolicy: "IfNotPresent"
   service:
@@ -70,7 +74,7 @@ backend:
     httpGet:
       path: "/health"
       port: 8000
-    initialDelaySeconds: 10
+    initialDelaySeconds: 30  # Increased to allow database + Kafka initialization
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
@@ -78,7 +82,7 @@ backend:
     httpGet:
       path: "/health"
       port: 8000
-    initialDelaySeconds: 10
+    initialDelaySeconds: 45  # Increased to allow Kafka producer initialization (~26s total)
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
@@ -94,7 +98,7 @@ mcpServer:
   enabled: true
   replicaCount: 1  # Fixed single replica
   image:
-    repository: "todo-backend"  # Reuses backend image
+    repository: "todo-app-backend"  # Reuses backend image
     tag: "latest"
     pullPolicy: "IfNotPresent"
   service:
@@ -169,6 +173,71 @@ redis:
     - "--appendonly"
     - "yes"
 
+# Database Configuration
+database:
+  secretName: "todo-app-secrets"
+
+# Kafka Configuration (Redpanda Cloud)
+kafka:
+  secretName: "todo-app-secrets"
+
+# Email Delivery Service Configuration
+emailDelivery:
+  enabled: true
+  name: "email-delivery"
+  replicaCount: 1  # Single replica to prevent duplicate emails
+  image: "todo-email-delivery:latest"
+  imagePullPolicy: "Never"  # Use local image from Minikube
+  secretName: "email-delivery-secret"
+  consumerGroup: "email-delivery-consumer-group-v2"  # Changed to reset offsets and consume from earliest
+  logLevel: "INFO"
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    fromEmail: "your-email@gmail.com"  # Override via --set
+    fromName: "Todo App Reminders"
+    username: ""  # Set via --set emailDelivery.smtp.username=your-email@gmail.com
+    password: ""  # Set via --set emailDelivery.smtp.password=your-app-password
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# Notification Service Configuration
+notificationService:
+  enabled: true
+  name: "notification-service"
+  replicaCount: 1  # Single replica to prevent duplicate notifications
+  imagePullPolicy: "Never"  # Use local image from Minikube
+  consumerGroup: "notification-service-group"
+  logLevel: "INFO"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# Recurring Task Service Configuration
+recurringTaskService:
+  enabled: true
+  name: "recurring-task-service"
+  replicaCount: 1  # Single replica to prevent duplicate task generation
+  imagePullPolicy: "Never"  # Use local image from Minikube
+  consumerGroup: "recurring-task-service-group"
+  logLevel: "INFO"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
 # Ingress Configuration
 ingress:
   enabled: true
@@ -190,6 +259,9 @@ secrets:
   betterAuthSecret: ""  # Base64-encoded Better Auth shared secret
   betterAuthUrl: ""  # Base64-encoded Better Auth URL
   redisPassword: ""  # Base64-encoded Redis password (optional)
+  kafkaBootstrapServers: ""  # Base64-encoded Redpanda Cloud bootstrap servers (e.g., "abc123.c.redpanda.cloud:9092")
+  kafkaSaslUsername: ""  # Base64-encoded Kafka SASL username
+  kafkaSaslPassword: ""  # Base64-encoded Kafka SASL password
 
 # ConfigMap Configuration (Non-sensitive data)
 configMap:
@@ -200,6 +272,12 @@ configMap:
   NEXT_PUBLIC_BETTER_AUTH_URL: "https://todo-app.local"
   NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: ""  # Empty for local development
   CORS_ORIGINS: '["https://todo-app.local", "http://todo-app.local", "http://localhost:3000", "http://127.0.0.1:3000"]'
+  KAFKA_SECURITY_PROTOCOL: "SASL_SSL"
+  KAFKA_SASL_MECHANISM: "SCRAM-SHA-256"
+  # Kafka Producer Configuration
+  KAFKA_PRODUCER_INIT_TIMEOUT: "90"
+  KAFKA_PRODUCER_MAX_RETRIES: "3"
+  KAFKA_PRODUCER_RETRY_DELAY: "5"
 
 # Helm Test Configuration
 tests:

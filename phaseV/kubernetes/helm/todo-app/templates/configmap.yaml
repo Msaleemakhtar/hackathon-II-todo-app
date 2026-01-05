@@ -9,6 +9,16 @@ data:
   REDIS_HOST: {{ .Values.configMap.REDIS_HOST | quote }}
   REDIS_PORT: {{ .Values.configMap.REDIS_PORT | quote }}
   MCP_SERVER_URL: {{ .Values.configMap.MCP_SERVER_URL | quote }}
+
+  # Kafka Configuration
+  KAFKA_SECURITY_PROTOCOL: {{ .Values.configMap.KAFKA_SECURITY_PROTOCOL | default "SASL_SSL" | quote }}
+  KAFKA_SASL_MECHANISM: {{ .Values.configMap.KAFKA_SASL_MECHANISM | default "SCRAM-SHA-256" | quote }}
+
+  # Kafka Producer Configuration
+  KAFKA_PRODUCER_INIT_TIMEOUT: {{ .Values.configMap.KAFKA_PRODUCER_INIT_TIMEOUT | default "90" | quote }}
+  KAFKA_PRODUCER_MAX_RETRIES: {{ .Values.configMap.KAFKA_PRODUCER_MAX_RETRIES | default "3" | quote }}
+  KAFKA_PRODUCER_RETRY_DELAY: {{ .Values.configMap.KAFKA_PRODUCER_RETRY_DELAY | default "5" | quote }}
+
   {{- if .Values.ingress.tls.enabled }}
   NEXT_PUBLIC_API_URL: {{ printf "https://%s/api" .Values.ingress.host | quote }}
   NEXT_PUBLIC_BETTER_AUTH_URL: {{ printf "https://%s" .Values.ingress.host | quote }}
