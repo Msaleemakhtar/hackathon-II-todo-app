@@ -196,47 +196,27 @@ function ChatInterface({ authToken, session }: { authToken: string; session: any
       },
     },
     startScreen: {
-      greeting: 'Welcome! I\'m your AI task assistant. I can help you manage tasks with priorities, categories, tags, due dates, recurring schedules, search, and reminders. Try a suggestion below or just start chatting!',
+      greeting: 'Welcome! I\'m here to help you manage your tasks efficiently. What would you like to do?',
       prompts: [
         {
-          label: 'Create urgent task',
-          prompt: '🔴 Create an urgent task to submit budget proposal by today 5pm',
+          label: '📝 Create a new task',
+          prompt: 'Add a new task: Buy groceries for dinner tonight',
           icon: 'plus',
         },
         {
-          label: 'View work tasks',
-          prompt: '📁 Show me all my work tasks',
+          label: '📋 View all tasks',
+          prompt: 'Show me all my pending tasks organized by priority',
           icon: 'book-open',
         },
         {
-          label: 'Show meeting tasks',
-          prompt: '#meeting Show tasks tagged as meetings',
-          icon: 'book-open',
-        },
-        {
-          label: 'Tasks due this week',
-          prompt: '📅 Show tasks due this week',
+          label: '🎯 Today\'s priorities',
+          prompt: 'What tasks should I focus on today?',
           icon: 'star',
         },
         {
-          label: 'Create recurring task',
-          prompt: '🔄 Create a recurring task to review emails every Monday at 9am',
-          icon: 'plus',
-        },
-        {
-          label: 'Search tasks',
-          prompt: '🔍 Search for tasks about budget',
-          icon: 'book-open',
-        },
-        {
-          label: 'Set reminder',
-          prompt: '⏰ Set a reminder for task #42, 30 minutes before',
-          icon: 'star',
-        },
-        {
-          label: 'Urgent tasks today',
-          prompt: '🔴 Show urgent tasks due today with category Work',
-          icon: 'star',
+          label: '✅ Complete a task',
+          prompt: 'Mark my first task as complete',
+          icon: 'check',
         },
       ],
     },
