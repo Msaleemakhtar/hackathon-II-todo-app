@@ -253,15 +253,15 @@ ingress:
 # All values MUST be base64-encoded
 # Example: echo -n "postgres://..." | base64
 secrets:
-  databaseUrl: ""  # Base64-encoded Neon PostgreSQL URL (backend - asyncpg driver)
-  frontendDatabaseUrl: ""  # Base64-encoded Neon PostgreSQL URL (frontend - plain driver)
-  openaiApiKey: ""  # Base64-encoded OpenAI API key
-  betterAuthSecret: ""  # Base64-encoded Better Auth shared secret
-  betterAuthUrl: ""  # Base64-encoded Better Auth URL
+  databaseUrl: "cG9zdGdyZXNxbCthc3luY3BnOi8vbmVvbmRiX293bmVyOm5wZ196VGtxMUFCSFI4dUNAZXAtZ3JlZW4tc2hhcGUtYWR2bTA5d28tcG9vbGVyLmMtMi51cy1lYXN0LTEuYXdzLm5lb24udGVjaC9uZW9uZGI/c3NsPQ=="  # Base64-encoded Neon PostgreSQL URL (backend - asyncpg driver)
+  frontendDatabaseUrl: "cG9zdGdyZXNxbDovL25lb25kYl9vd25lcjpucGdfelRrcTFBQkhSOHVDQGVwLWdyZWVuLXNoYXBlLWFkdm0wOXdvLXBvb2xlci5jLTIudXMtZWFzdC0xLmF3cy5uZW9uLnRlY2gvbmVvbmRiP3NzbG1vZGU9cmVxdWlyZQ=="  # Base64-encoded Neon PostgreSQL URL (frontend - plain driver)
+  openaiApiKey: "c2stcHJvai0wc3VNdGxzcVdzeHBnTEMtUjVZNlg3VTR2QTgwSFFfSExCZWRWTHA4dllEbG9BdWp2UE9pVDE0d25lRzhUcjdwTDNDSEtITkJ4OFQzQmxia0ZKdWJEMl9Odzk4bGhQcERZZ0UxRnlUZWtncWhSZk5ZMEpIWXp3QnJoYkRTck85WWZSR3gxOW5PNHVvQ1g3VFhham9nd1ltdDN0TUE="  # Base64-encoded OpenAI API key
+  betterAuthSecret: "OWIzMmExZGYyMWQ2NmQxOGZhN2MwMGNkZWJkMjVkOTRhM2YzYjI3YWQwYzEwOTAxNzU2ODMxNDI0YjY3YjAzMw=="  # Base64-encoded Better Auth shared secret
+  betterAuthUrl: "aHR0cHM6Ly90b2RvLWFwcC5sb2NhbA=="  # Base64-encoded Better Auth URL
   redisPassword: ""  # Base64-encoded Redis password (optional)
-  kafkaBootstrapServers: ""  # Base64-encoded Redpanda Cloud bootstrap servers (e.g., "abc123.c.redpanda.cloud:9092")
-  kafkaSaslUsername: ""  # Base64-encoded Kafka SASL username
-  kafkaSaslPassword: ""  # Base64-encoded Kafka SASL password
+  kafkaBootstrapServers: "ZDVrOGNmNnVkdTA1bDl2cmtpc2cuYW55LmFwLXNvdXRoLTEubXB4LnByZC5jbG91ZC5yZWRwYW5kYS5jb206OTA5Mg=="  # Base64-encoded Redpanda Cloud bootstrap servers (e.g., "abc123.c.redpanda.cloud:9092")
+  kafkaSaslUsername: "c2FsZWVt"  # Base64-encoded Kafka SASL username
+  kafkaSaslPassword: "czVmZFVyVTRRMWFaRDU2TFdicjZ0N0xHYkdiWUow"  # Base64-encoded Kafka SASL password
 
 # ConfigMap Configuration (Non-sensitive data)
 configMap:

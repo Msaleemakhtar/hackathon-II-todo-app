@@ -1,5 +1,8 @@
 # Modern Todo Application
 
+**The Evolution of Todo – Mastering Spec-Driven Development & Cloud Native AI**
+
+
 A full-stack, production-ready task management application showcasing Spec-Driven Development (SDD) principles and modern technologies.
 
 ## Project Overview

@@ -149,15 +149,25 @@ class EmailDeliveryService:
     async def _connect_smtp(self) -> None:
         """Establish persistent SMTP connection with retry logic."""
         try:
+            # Create SMTP client with proper TLS configuration for Gmail
             self._smtp_client = aiosmtplib.SMTP(
                 hostname=self.smtp_host,
                 port=self.smtp_port,
-                start_tls=True,  # Use start_tls parameter for automatic STARTTLS on port 587
+                use_tls=False,  # Don't use TLS from start, we'll use STARTTLS
+                start_tls=True,  # Use STARTTLS which is required by Gmail
                 timeout=30,
             )
             await self._smtp_client.connect()
+
+            # Authenticate using the credentials
+            # For Gmail, make sure to use an App Password, not your regular password
             await self._smtp_client.login(self.smtp_username, self.smtp_password)
             logger.info(f"✅ SMTP connection established to {self.smtp_host}:{self.smtp_port}")
+        except aiosmtplib.errors.SMTPAuthenticationError as auth_error:
+            logger.error(f"Gmail authentication failed. Make sure you're using an App Password, not your regular Gmail password: {auth_error}")
+            logger.error("Visit https://myaccount.google.com/apppasswords to generate an App Password")
+            self._smtp_client = None
+            raise
         except Exception as e:
             logger.error(f"Failed to connect to SMTP server: {e}", exc_info=True)
             self._smtp_client = None
