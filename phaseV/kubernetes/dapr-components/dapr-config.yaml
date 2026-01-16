@@ -1,0 +1,61 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: dapr-config
+  namespace: todo-phasev
+spec:
+  # OpenTelemetry Tracing Configuration (T061)
+  tracing:
+    samplingRate: "1"  # Sample 100% of requests for testing (reduce in production)
+    otel:
+      endpointAddress: "http://otel-collector.observability:4318"
+      isSecure: false
+      protocol: http
+    zipkin:
+      endpointAddress: "http://zipkin.observability:9411/api/v2/spans"
+
+  # Metrics Configuration
+  metric:
+    enabled: true
+    http:
+      increasedCardinality: false
+      pathMatching:
+        - /v1.0/publish/*
+        - /v1.0/state/*
+        - /v1.0-alpha1/jobs/*
+
+  # Access Control
+  accessControl:
+    defaultAction: allow
+    trustDomain: "public"
+    policies:
+      - appId: backend
+        defaultAction: allow
+        trustDomain: "public"
+        namespace: "todo-phasev"
+      - appId: notification-service
+        defaultAction: allow
+        trustDomain: "public"
+        namespace: "todo-phasev"
+      - appId: email-delivery
+        defaultAction: allow
+        trustDomain: "public"
+        namespace: "todo-phasev"
+      - appId: recurring-service
+        defaultAction: allow
+        trustDomain: "public"
+        namespace: "todo-phasev"
+
+  # Logging Configuration
+  logging:
+    apiLogging:
+      enabled: true
+      obfuscateURLs: false
+      omitHealthChecks: true
+
+  # Features
+  features:
+    - name: "pubsub.outbox"
+      enabled: false  # Disable outbox pattern for now
+    - name: "actor.typeMetadata"
+      enabled: false

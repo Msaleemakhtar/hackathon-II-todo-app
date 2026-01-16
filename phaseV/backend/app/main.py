@@ -283,6 +283,22 @@ async def delete_all_threads(request: Request):
         )
 
 
+# Include events router for Dapr subscriptions
+try:
+    from app.routers import events
+    app.include_router(events.router)
+    logger.info("Events router for Dapr subscriptions included")
+except ImportError:
+    logger.warning("Events router not found - Dapr subscriptions will not be available")
+
+# Include jobs router for Dapr Jobs API callbacks
+try:
+    from app.routers import jobs
+    app.include_router(jobs.router)
+    logger.info("Jobs router for Dapr Jobs API included")
+except ImportError:
+    logger.warning("Jobs router not found - Dapr Jobs API will not be available")
+
 # MCP Server Architecture Note:
 # The MCP server runs as a standalone Docker service (phaseiii-mcp-server)
 # on port 8001 to avoid routing conflicts with FastAPI.

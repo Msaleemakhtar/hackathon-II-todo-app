@@ -19,6 +19,9 @@ data:
   KAFKA_PRODUCER_MAX_RETRIES: {{ .Values.configMap.KAFKA_PRODUCER_MAX_RETRIES | default "3" | quote }}
   KAFKA_PRODUCER_RETRY_DELAY: {{ .Values.configMap.KAFKA_PRODUCER_RETRY_DELAY | default "5" | quote }}
 
+  # Dapr Configuration
+  USE_DAPR: {{ .Values.configMap.USE_DAPR | default "false" | quote }}
+
   {{- if .Values.ingress.tls.enabled }}
   NEXT_PUBLIC_API_URL: {{ printf "https://%s/api" .Values.ingress.host | quote }}
   NEXT_PUBLIC_BETTER_AUTH_URL: {{ printf "https://%s" .Values.ingress.host | quote }}

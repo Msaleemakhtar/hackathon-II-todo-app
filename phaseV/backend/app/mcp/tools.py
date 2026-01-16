@@ -21,6 +21,15 @@ from app.models.category import Category
 from app.models.task import TaskPhaseIII
 from app.services import task_service
 from app.utils.rrule_parser import validate_rrule
+from app.config import settings
+from app.dapr.client import DaprClient
+from app.dapr.pubsub import (
+    publish_task_created_event,
+    publish_task_updated_event,
+    publish_task_completed_event,
+    publish_task_deleted_event,
+    publish_reminder_event
+)
 
 logger = logging.getLogger(__name__)
 
@@ -488,18 +497,52 @@ async def complete_task(user_id: str, task_id: int) -> dict[str, Any]:
 
             logger.info(f"Task completed: user={user_id}, task_id={task_id}")
 
-            # T024: Publish TaskCompletedEvent to task-recurrence topic
+            # T024: Publish TaskCompletedEvent via Dapr or Kafka based on feature flag
             try:
-                event = TaskCompletedEvent(
-                    user_id=int(user_id) if user_id.isdigit() else hash(user_id),
-                    task_id=task.id,
-                    recurrence_rule=task.recurrence_rule,
-                    completed_at=datetime.now(UTC),
-                )
-                await kafka_producer.publish_event(
-                    topic="task-recurrence", event=event, key=str(task.id)
-                )
-                logger.info(f"Published TaskCompletedEvent for task {task.id}")
+                event_user_id = int(user_id) if user_id.isdigit() else hash(user_id)
+
+                event_data = {
+                    "user_id": event_user_id,
+                    "task_id": task.id,
+                    "task_data": {
+                        "title": task.title,
+                        "description": task.description,
+                        "completed": task.completed,
+                        "priority": task.priority.value,
+                        "due_date": task.due_date.isoformat() if task.due_date else None,
+                        "recurrence_rule": task.recurrence_rule,
+                        "category_id": task.category_id,
+                    },
+                    "recurrence_rule": task.recurrence_rule,
+                    "completed_at": datetime.now(UTC).isoformat(),
+                    "has_recurrence": bool(task.recurrence_rule),
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                if settings.use_dapr:
+                    # Use Dapr client
+                    dapr_client = DaprClient()
+                    await publish_task_completed_event(
+                        dapr_client=dapr_client,
+                        task_id=task.id,
+                        task_data=event_data,
+                        user_id=event_user_id,
+                        has_recurrence=bool(task.recurrence_rule)
+                    )
+                    await dapr_client.close()
+                    logger.info(f"Published TaskCompletedEvent via Dapr for task {task.id}")
+                else:
+                    # Use Kafka producer (existing implementation)
+                    event = TaskCompletedEvent(
+                        user_id=event_user_id,
+                        task_id=task.id,
+                        recurrence_rule=task.recurrence_rule,
+                        completed_at=datetime.now(UTC),
+                    )
+                    await kafka_producer.publish_event(
+                        topic="task-recurrence", event=event, key=str(task.id)
+                    )
+                    logger.info(f"Published TaskCompletedEvent via Kafka for task {task.id}")
             except Exception as e:
                 logger.error(f"Failed to publish TaskCompletedEvent for task {task.id}: {e}")
                 # Continue - event publishing is non-blocking
@@ -660,16 +703,36 @@ async def delete_task(user_id: str, task_id: int) -> dict[str, Any]:
 
             logger.info(f"Task deleted: user={user_id}, task_id={task_id}")
 
-            # T026: Publish TaskDeletedEvent to task-events topic
+            # T026: Publish TaskDeletedEvent via Dapr or Kafka based on feature flag
             try:
-                event = TaskDeletedEvent(
-                    user_id=int(user_id) if user_id.isdigit() else hash(user_id),
-                    task_id=task_id_for_event,
-                )
-                await kafka_producer.publish_event(
-                    topic="task-events", event=event, key=str(task_id_for_event)
-                )
-                logger.info(f"Published TaskDeletedEvent for task {task_id_for_event}")
+                event_user_id = int(user_id) if user_id.isdigit() else hash(user_id)
+
+                event_data = {
+                    "user_id": event_user_id,
+                    "task_id": task_id_for_event,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                if settings.use_dapr:
+                    # Use Dapr client
+                    dapr_client = DaprClient()
+                    await publish_task_deleted_event(
+                        dapr_client=dapr_client,
+                        task_id=task_id_for_event,
+                        user_id=event_user_id
+                    )
+                    await dapr_client.close()
+                    logger.info(f"Published TaskDeletedEvent via Dapr for task {task_id_for_event}")
+                else:
+                    # Use Kafka producer (existing implementation)
+                    event = TaskDeletedEvent(
+                        user_id=event_user_id,
+                        task_id=task_id_for_event,
+                    )
+                    await kafka_producer.publish_event(
+                        topic="task-events", event=event, key=str(task_id_for_event)
+                    )
+                    logger.info(f"Published TaskDeletedEvent via Kafka for task {task_id_for_event}")
             except Exception as e:
                 logger.error(f"Failed to publish TaskDeletedEvent for task {task_id_for_event}: {e}")
                 # Continue - event publishing is non-blocking
@@ -851,7 +914,7 @@ async def update_task(
 
             logger.info(f"Task updated: user={user_id}, task_id={task_id}")
 
-            # T025: Publish TaskUpdatedEvent to task-events topic
+            # T025: Publish TaskUpdatedEvent via Dapr or Kafka based on feature flag
             try:
                 # Build updated_fields dictionary
                 updated_fields = {}
@@ -870,15 +933,47 @@ async def update_task(
                 if update_recurrence:
                     updated_fields["recurrence_rule"] = task.recurrence_rule
 
-                event = TaskUpdatedEvent(
-                    user_id=int(user_id) if user_id.isdigit() else hash(user_id),
-                    task_id=task.id,
-                    updated_fields=updated_fields,
-                )
-                await kafka_producer.publish_event(
-                    topic="task-events", event=event, key=str(task.id)
-                )
-                logger.info(f"Published TaskUpdatedEvent for task {task.id}")
+                event_user_id = int(user_id) if user_id.isdigit() else hash(user_id)
+
+                event_data = {
+                    "user_id": event_user_id,
+                    "task_id": task.id,
+                    "task_data": {
+                        "title": task.title,
+                        "description": task.description,
+                        "completed": task.completed,
+                        "priority": task.priority.value,
+                        "due_date": task.due_date.isoformat() if task.due_date else None,
+                        "recurrence_rule": task.recurrence_rule,
+                        "category_id": task.category_id,
+                    },
+                    "changes": updated_fields,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                if settings.use_dapr:
+                    # Use Dapr client
+                    dapr_client = DaprClient()
+                    await publish_task_updated_event(
+                        dapr_client=dapr_client,
+                        task_id=task.id,
+                        task_data=event_data,
+                        changes=updated_fields,
+                        user_id=event_user_id
+                    )
+                    await dapr_client.close()
+                    logger.info(f"Published TaskUpdatedEvent via Dapr for task {task.id}")
+                else:
+                    # Use Kafka producer (existing implementation)
+                    event = TaskUpdatedEvent(
+                        user_id=event_user_id,
+                        task_id=task.id,
+                        updated_fields=updated_fields,
+                    )
+                    await kafka_producer.publish_event(
+                        topic="task-events", event=event, key=str(task.id)
+                    )
+                    logger.info(f"Published TaskUpdatedEvent via Kafka for task {task.id}")
             except Exception as e:
                 logger.error(f"Failed to publish TaskUpdatedEvent for task {task.id}: {e}")
                 # Continue - event publishing is non-blocking

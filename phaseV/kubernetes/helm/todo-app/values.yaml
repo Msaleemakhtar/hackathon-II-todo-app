@@ -8,7 +8,7 @@ environment: "production"
 # Global Configuration
 global:
   namespace: "todo-phasev"  # Constitutional requirement
-  imagePullPolicy: "IfNotPresent"  # Avoid pulling if image exists locally
+  imagePullPolicy: "IfNotPresent"  # Use cached images in Minikube (only pull if not present)
 
 # Frontend Configuration
 frontend:
@@ -186,18 +186,18 @@ emailDelivery:
   enabled: true
   name: "email-delivery"
   replicaCount: 1  # Single replica to prevent duplicate emails
-  image: "todo-email-delivery:latest"
-  imagePullPolicy: "Never"  # Use local image from Minikube
+  image: "todo-app-backend:latest"
+  imagePullPolicy: "IfNotPresent"
   secretName: "email-delivery-secret"
   consumerGroup: "email-delivery-consumer-group-v2"  # Changed to reset offsets and consume from earliest
   logLevel: "INFO"
   smtp:
     host: "smtp.gmail.com"
     port: 587
-    fromEmail: "your-email@gmail.com"  # Override via --set
+    fromEmail: "saleemakhtar864@gmail.com"
     fromName: "Todo App Reminders"
-    username: ""  # Set via --set emailDelivery.smtp.username=your-email@gmail.com
-    password: ""  # Set via --set emailDelivery.smtp.password=your-app-password
+    username: "saleemakhtar864@gmail.com"
+    password: "izok pnuy nkeu hmoh"
   resources:
     requests:
       cpu: "100m"
@@ -278,6 +278,20 @@ configMap:
   KAFKA_PRODUCER_INIT_TIMEOUT: "90"
   KAFKA_PRODUCER_MAX_RETRIES: "3"
   KAFKA_PRODUCER_RETRY_DELAY: "5"
+  # Dapr Configuration
+  USE_DAPR: "true"  # Set to "true" to enable Dapr event publishing (default: false for safety)
+
+# Dapr Configuration
+# Sidecar resource limits as per T040 requirement
+dapr:
+  enabled: true  # Set to true to enable Dapr sidecar injection (default: false for safety)
+  resources:
+    limits:
+      cpu: "200m"       # Maximum CPU for Dapr sidecar (as per spec)
+      memory: "256Mi"   # Maximum memory for Dapr sidecar (as per spec)
+    requests:
+      cpu: "100m"       # Minimum CPU for Dapr sidecar
+      memory: "128Mi"   # Minimum memory for Dapr sidecar
 
 # Helm Test Configuration
 tests:

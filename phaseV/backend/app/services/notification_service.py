@@ -9,7 +9,11 @@ from typing import Optional
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_session
+from app.dapr.client import DaprClient
+from app.dapr.jobs import register_notification_job
+from app.dapr.pubsub import publish_reminder_event
 from app.kafka.events import ReminderSentEvent
 from app.kafka.producer import kafka_producer
 from app.models.task import TaskPhaseIII
@@ -42,6 +46,19 @@ class NotificationService:
             logger.warning("Notification service already running")
             return
 
+        # If using Dapr, try to register the job, but fall back to polling if it fails
+        if settings.use_dapr:
+            try:
+                dapr_client = DaprClient()
+                await register_notification_job(dapr_client)
+                await dapr_client.close()
+                logger.info("Dapr job registered for notification service")
+                return  # Job registered successfully, no need for polling
+            except Exception as e:
+                logger.warning(f"Failed to register Dapr notification job: {e}")
+                logger.info("Falling back to traditional polling approach")
+
+        # Traditional polling approach (used when Dapr is disabled or job registration fails)
         self._running = True
         self._task = asyncio.create_task(self._run_loop())
         logger.info(
@@ -71,7 +88,7 @@ class NotificationService:
         Returns:
             True if service is running and healthy
         """
-        if not self._running:
+        if not self._running and not settings.use_dapr:
             return False
 
         # Check Kafka producer health (optional - only warn if unhealthy)
@@ -188,21 +205,47 @@ class NotificationService:
             )
 
             # T017: Publish ReminderSentEvent to task-reminders topic (enriched with task details)
-            event = ReminderSentEvent(
-                user_id=int(task.user_id) if task.user_id.isdigit() else hash(task.user_id),
-                task_id=task.id,
-                task_title=task.title,
-                task_description=task.description or "",
-                task_due_date=task.due_date,
-                task_priority=task.priority or "medium",
-                reminder_time=now,
-            )
+            event_data = {
+                "user_id": int(task.user_id) if task.user_id.isdigit() else hash(task.user_id),
+                "task_id": task.id,
+                "title": task.title,
+                "description": task.description or "",
+                "due_at": task.due_date.isoformat() if task.due_date else "",
+                "remind_at": now.isoformat(),
+                "priority": task.priority or "medium",
+                "timestamp": now.isoformat()
+            }
 
-            await kafka_producer.publish_event(
-                topic="task-reminders", event=event, key=str(task.id), wait=True
-            )
+            if settings.use_dapr:
+                # Use Dapr client
+                dapr_client = DaprClient()
+                await publish_reminder_event(
+                    dapr_client=dapr_client,
+                    task_id=task.id,
+                    title=task.title,
+                    due_at=event_data["due_at"],
+                    remind_at=event_data["remind_at"],
+                    user_id=event_data["user_id"]
+                )
+                await dapr_client.close()
+                logger.info(f"Reminder event published via Dapr for task {task.id}")
+            else:
+                # Use Kafka producer (existing implementation)
+                event = ReminderSentEvent(
+                    user_id=event_data["user_id"],
+                    task_id=task.id,
+                    task_title=task.title,
+                    task_description=task.description or "",
+                    task_due_date=task.due_date,
+                    task_priority=task.priority or "medium",
+                    reminder_time=now,
+                )
 
-            logger.debug(f"Reminder sent and published to Kafka for task {task.id}")
+                await kafka_producer.publish_event(
+                    topic="task-reminders", event=event, key=str(task.id), wait=True
+                )
+
+                logger.debug(f"Reminder sent and published to Kafka for task {task.id}")
 
         except Exception as e:
             logger.error(f"Failed to send reminder for task {task.id}: {e}", exc_info=True)
@@ -226,3 +269,14 @@ def setup_signal_handlers():
     # Register signal handlers
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
+
+
+# Function to be called by Dapr Jobs API
+async def check_due_tasks_job():
+    """
+    Function called by Dapr Jobs API to check for due tasks.
+    This replaces the traditional polling loop when using Dapr.
+    """
+    logger.info("Dapr job triggered: checking for due tasks")
+    await notification_service._process_reminders()
+    logger.info("Dapr job completed: checked for due tasks")

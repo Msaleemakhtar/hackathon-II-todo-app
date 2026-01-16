@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from app.config import settings
 from app.kafka import config as kafka_config
 from app.kafka.events import ReminderSentEvent
+from app.dapr.client import DaprClient
+from app.dapr.state import check_reminder_processed, mark_reminder_processed
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +111,13 @@ class EmailDeliveryService:
                 f"Kafka consumer started (topic: task-reminders, group: {settings.email_delivery_group_id})"
             )
 
-            # Initialize persistent SMTP connection
-            await self._connect_smtp()
+            # Initialize persistent SMTP connection (graceful degradation - don't fail startup)
+            try:
+                await self._connect_smtp()
+            except Exception as smtp_error:
+                logger.warning(f"SMTP connection failed during startup (will retry later): {smtp_error}")
+                logger.info("Service will start without SMTP - emails will fail until SMTP is configured")
+                self._smtp_client = None
 
             self._running = True
 
@@ -251,6 +258,17 @@ class EmailDeliveryService:
                         exc_info=True,
                         extra={"message_value": message.value if message else None},
                     )
+
+                    # Check if it's a validation error (malformed message)
+                    from pydantic import ValidationError
+                    if isinstance(e, ValidationError):
+                        logger.warning(
+                            f"Skipping malformed message (validation error) and committing offset to move forward"
+                        )
+                        # Commit offset to skip this bad message
+                        await self._consumer.commit()
+                        consecutive_failures = 0  # Don't count validation errors as failures
+                        continue
 
                     # Increment failure counters
                     consecutive_failures += 1
@@ -517,6 +535,49 @@ Hackathon II Event-Driven Notifications
                     else:
                         # Final attempt failed - raise exception to prevent offset commit
                         raise Exception(f"Failed to send email to {to_email} after {max_retries} attempts") from e
+
+
+async def process_reminder_event(task_id: int, user_id: int, event_data: dict):
+    """
+    Process reminder event received via Dapr subscription.
+
+    Args:
+        task_id: ID of the task to send reminder for
+        user_id: ID of the user who owns the task
+        event_data: Full event data from CloudEvent
+    """
+    try:
+        # Check if reminder has already been processed (idempotency)
+        dapr_client = DaprClient()
+        if await check_reminder_processed(dapr_client, task_id):
+            logger.info(f"Reminder for task {task_id} already processed, skipping")
+            await dapr_client.close()
+            return
+
+        # Mark reminder as processed
+        await mark_reminder_processed(dapr_client, task_id, user_id)
+        await dapr_client.close()
+
+        # Create a mock ReminderSentEvent from the event_data
+        # This allows us to reuse the existing email sending logic
+        class MockReminderSentEvent:
+            def __init__(self, task_id, user_id, event_data):
+                self.task_id = task_id
+                self.user_id = user_id
+                self.task_title = event_data.get("title", f"Task {task_id}")
+                self.task_description = event_data.get("description", "")
+                self.task_due_date = datetime.fromisoformat(event_data.get("due_at")) if event_data.get("due_at") else None
+                self.task_priority = event_data.get("priority", "medium")
+
+        mock_event = MockReminderSentEvent(task_id, user_id, event_data)
+
+        # Process the reminder using the existing logic
+        await email_delivery_service._process_reminder(mock_event)
+
+        logger.info(f"Processed reminder event for task {task_id} via Dapr")
+    except Exception as e:
+        logger.error(f"Failed to process reminder event for task {task_id} via Dapr: {e}", exc_info=True)
+        raise
 
 
 # Global email delivery service instance
