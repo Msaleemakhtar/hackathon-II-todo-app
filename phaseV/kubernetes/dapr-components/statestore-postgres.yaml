@@ -1,0 +1,23 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore-postgres
+  namespace: todo-phasev
+  labels:
+    app: backend
+spec:
+  type: state.postgresql
+  version: v2
+  metadata:
+    - name: connectionString
+      secretKeyRef:
+        name: todo-app-secrets
+        key: DATABASE_URL
+    - name: tableName
+      value: "dapr_state_store"
+    - name: metadataTableName
+      value: "dapr_state_metadata"
+    - name: cleanupIntervalInSeconds
+      value: "3600"
+auth:
+  secretStore: kubernetes-secrets

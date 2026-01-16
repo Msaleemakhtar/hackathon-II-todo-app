@@ -315,6 +315,164 @@ class RecurringTaskService:
                 logger.error(f"Failed to commit offset: {commit_error}")
 
 
+async def process_task_completion(task_id: int, user_id: int, event_data: dict):
+    """
+    Process task completion event received via Dapr subscription.
+
+    Args:
+        task_id: ID of the completed task
+        user_id: ID of the user who owns the task
+        event_data: Full event data from CloudEvent
+    """
+    try:
+        # Extract recurrence rule from event data
+        recurrence_rule = event_data.get("recurrence_rule")
+
+        # Skip if no recurrence rule
+        if not recurrence_rule:
+            logger.debug(f"Task {task_id} has no recurrence rule, skipping")
+            return
+
+        # Parse RRULE and calculate next occurrence
+        from datetime import datetime
+        completed_at_str = event_data.get("completed_at", datetime.utcnow().isoformat())
+        completed_at = datetime.fromisoformat(completed_at_str.replace("Z", "+00:00"))
+
+        next_due_date = get_next_occurrence(
+            rule=recurrence_rule,
+            from_date=completed_at,
+            base_due_date=completed_at,
+        )
+
+        # Handle invalid RRULE or past occurrences
+        if next_due_date is None:
+            logger.warning(
+                f"No future occurrence for task {task_id} "
+                f"with rule {recurrence_rule}, skipping"
+            )
+            return
+
+        # Create new recurring task instance
+        async for session in get_session():
+            try:
+                # Get original task details
+                from app.models.task import TaskPhaseIII
+                original_task = await session.get(TaskPhaseIII, task_id)
+
+                if not original_task:
+                    logger.error(f"Original task {task_id} not found, skipping")
+                    return
+
+                # Implement idempotent event processing (duplicate detection)
+                # Check if next occurrence already exists
+                from sqlalchemy import and_, select
+
+                # Convert next_due_date to naive datetime (database stores naive datetimes)
+                next_due_date_naive = next_due_date.replace(tzinfo=None) if next_due_date.tzinfo else next_due_date
+
+                existing_query = select(TaskPhaseIII).where(
+                    and_(
+                        TaskPhaseIII.user_id == original_task.user_id,
+                        TaskPhaseIII.title == original_task.title,
+                        TaskPhaseIII.due_date == next_due_date_naive,
+                        TaskPhaseIII.recurrence_rule == original_task.recurrence_rule,
+                    )
+                )
+                existing_result = await session.execute(existing_query)
+                existing_task = existing_result.scalars().first()
+
+                if existing_task:
+                    logger.info(
+                        f"Next occurrence for task {task_id} already exists "
+                        f"(task_id={existing_task.id}), skipping (idempotent)"
+                    )
+                    return
+
+                # Create new task with same properties
+                from app.config import settings
+                from app.dapr.client import DaprClient
+                from app.dapr.pubsub import publish_task_created_event
+
+                new_task = TaskPhaseIII(
+                    user_id=original_task.user_id,
+                    title=original_task.title,
+                    description=original_task.description,
+                    completed=False,  # New task starts incomplete
+                    priority=original_task.priority,
+                    due_date=next_due_date_naive,  # Use naive datetime for database
+                    category_id=original_task.category_id,
+                    recurrence_rule=original_task.recurrence_rule,  # Copy recurrence
+                    reminder_sent=False,  # Reset reminder
+                )
+
+                session.add(new_task)
+                await session.commit()
+                await session.refresh(new_task)
+
+                logger.info(
+                    f"Created new recurring task {new_task.id} from {task_id} "
+                    f"(due: {next_due_date.isoformat()})"
+                )
+
+                # Publish TaskCreatedEvent via Dapr or Kafka based on feature flag
+                event_data_new = {
+                    "user_id": user_id,
+                    "task_id": new_task.id,
+                    "title": new_task.title,
+                    "description": new_task.description,
+                    "priority": new_task.priority.value if new_task.priority else None,
+                    "due_date": new_task.due_date.isoformat() if new_task.due_date else None,
+                    "recurrence_rule": new_task.recurrence_rule,
+                    "category_id": new_task.category_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                if settings.use_dapr:
+                    # Use Dapr client
+                    dapr_client = DaprClient()
+                    await publish_task_created_event(
+                        dapr_client=dapr_client,
+                        task_id=new_task.id,
+                        task_data=event_data_new,
+                        user_id=user_id
+                    )
+                    await dapr_client.close()
+                    logger.info(f"Published TaskCreatedEvent via Dapr for new recurring task {new_task.id}")
+                else:
+                    # Use Kafka producer (existing implementation)
+                    created_event = TaskCreatedEvent(
+                        user_id=user_id,
+                        task_id=new_task.id,
+                        title=new_task.title,
+                        description=new_task.description,
+                        priority=new_task.priority.value,
+                        due_date=new_task.due_date.replace(tzinfo=timezone.utc)
+                        if new_task.due_date
+                        else None,
+                        recurrence_rule=new_task.recurrence_rule,
+                        category_id=new_task.category_id,
+                        tag_ids=[],  # Tags not copied in MVP
+                    )
+
+                    await kafka_producer.publish_event(
+                        topic="task-events", event=created_event, key=str(new_task.id)
+                    )
+
+                    logger.info(
+                        f"Published TaskCreatedEvent via Kafka for new recurring task {new_task.id}"
+                    )
+
+            except Exception as e:
+                logger.error(f"Failed to create recurring task: {e}", exc_info=True)
+                await session.rollback()
+                raise
+
+        logger.info(f"Processed task completion event for task {task_id} via Dapr")
+    except Exception as e:
+        logger.error(f"Failed to process task completion event for task {task_id} via Dapr: {e}", exc_info=True)
+        raise
+
+
 # Global recurring task service instance
 recurring_task_service = RecurringTaskService()
 

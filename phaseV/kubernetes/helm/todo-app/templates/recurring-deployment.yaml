@@ -16,7 +16,17 @@ spec:
       labels:
         app: recurring-service
         {{- include "todo-app.labels" . | nindent 8 }}
+      annotations:
+        dapr.io/enabled: "{{ .Values.dapr.enabled }}"
+        dapr.io/app-id: "recurring-task-service"
+        dapr.io/app-port: "8004"
+        dapr.io/log-level: "info"
+        dapr.io/sidecar-cpu-limit: "{{ .Values.dapr.resources.limits.cpu }}"
+        dapr.io/sidecar-memory-limit: "{{ .Values.dapr.resources.limits.memory }}"
+        dapr.io/sidecar-cpu-request: "{{ .Values.dapr.resources.requests.cpu }}"
+        dapr.io/sidecar-memory-request: "{{ .Values.dapr.resources.requests.memory }}"
     spec:
+      serviceAccountName: todo-app-sa
       containers:
       - name: recurring-service
         image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
@@ -59,6 +69,12 @@ spec:
               configMapKeyRef:
                 name: todo-app-config
                 key: KAFKA_SASL_MECHANISM
+          # Dapr configuration
+          - name: USE_DAPR
+            valueFrom:
+              configMapKeyRef:
+                name: todo-app-config
+                key: USE_DAPR
         resources:
           requests:
             cpu: "200m"

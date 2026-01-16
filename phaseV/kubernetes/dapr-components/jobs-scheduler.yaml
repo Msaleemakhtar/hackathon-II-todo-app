@@ -1,0 +1,17 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: jobs-scheduler
+  namespace: todo-phasev
+spec:
+  type: jobs.scheduled
+  version: v1
+  metadata:
+    - name: schedulerAddress
+      value: "dapr-scheduler-server:50006"
+    - name: caCert
+      value: ""
+    - name: clientCert
+      value: ""
+    - name: clientKey
+      value: ""

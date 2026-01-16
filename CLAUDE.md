@@ -1,4 +1,4 @@
-# Gemini Code Rules
+# Claude Code Rules
 
 You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
 
@@ -212,6 +212,8 @@ If ALL true, suggest:
 - Neon Serverless PostgreSQL (shared with Phase II/III/IV/V, using `tasks_phaseiii`, `categories`, `tags_phasev`, `task_tags` tables - all schema already complete from Feature 002) (003-chatkit-ui)
 - TypeScript 5.x (frontend), Python 3.11+ (backend - config only) + Next.js 15 (frontend), OpenAI ChatKit SDK, OpenAI Agents SDK 0.6.3+ (backend system prompt) (003-chatkit-ui)
 - N/A (no database changes - all data models exist from Features 001/002) (003-chatkit-ui)
+- Python 3.11+ (backend services), YAML (Dapr components) + FastAPI 0.109+, httpx (Dapr HTTP client), Dapr v1.12+ runtime, aiokafka 0.11.0 (to be removed) (004-dapr-integration)
+- Neon Serverless PostgreSQL (application data + Dapr State Store v2), Kafka/Redpanda Cloud (message broker backend for Dapr Pub/Sub) (004-dapr-integration)
 
 ## Recent Changes
 - 003-fix-chatkit-auth: Added Neon Serverless PostgreSQL (shared database instance with Phase II)

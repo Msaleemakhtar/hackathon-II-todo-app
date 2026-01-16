@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: Dapr State Store HTTP API
+  description: |
+    API contract for Dapr State Store operations used by the Todo application.
+    Used for idempotency tracking and notification service state management.
+  version: 1.0.0
+  contact:
+    name: Dapr Documentation
+    url: https://docs.dapr.io/reference/api/state_api/
+
+servers:
+  - url: http://localhost:3500
+    description: Dapr sidecar
+
+paths:
+  /v1.0/state/{storename}:
+    post:
+      summary: Save state entries
+      description: |
+        Saves one or more state entries to the specified state store.
+        Supports TTL (time-to-live) for automatic expiration.
+      operationId: saveState
+      parameters:
+        - name: storename
+          in: path
+          required: true
+          description: Name of the Dapr State Store component
+          schema:
+            type: string
+            example: statestore-postgres
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/StateEntry'
+            examples:
+              lastPollTimestamp:
+                summary: Save last poll timestamp
+                value:
+                  - key: "notification:last_poll"
+                    value:
+                      timestamp: "2026-01-15T12:00:00Z"
+                    metadata:
+                      ttl: "3600"
+              idempotencyCheck:
+                summary: Save idempotency marker
+                value:
+                  - key: "reminder:task:123"
+                    value:
+                      processed_at: "2026-01-15T12:00:00Z"
+                      user_id: 1
+                    metadata:
+                      ttl: "86400"
+      responses:
+        '204':
+          description: State saved successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+        '500':
+          description: State store error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+  /v1.0/state/{storename}/{key}:
+    get:
+      summary: Get state entry
+      description: Retrieves a single state entry by key
+      operationId: getState
+      parameters:
+        - name: storename
+          in: path
+          required: true
+          schema:
+            type: string
+            example: statestore-postgres
+        - name: key
+          in: path
+          required: true
+          description: State key (e.g., "notification:last_poll")
+          schema:
+            type: string
+      responses:
+        '200':
+          description: State value retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+              examples:
+                lastPoll:
+                  summary: Last poll timestamp
+                  value:
+                    timestamp: "2026-01-15T12:00:00Z"
+        '204':
+          description: Key not found (empty state)
+        '500':
+          description: State store error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+    delete:
+      summary: Delete state entry
+      description: Deletes a single state entry by key
+      operationId: deleteState
+      parameters:
+        - name: storename
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: State deleted successfully
+        '500':
+          description: State store error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+  /v1.0/state/{storename}/bulk:
+    post:
+      summary: Get multiple state entries
+      description: Retrieves multiple state entries in a single request
+      operationId: bulkGetState
+      parameters:
+        - name: storename
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keys:
+                  type: array
+                  items:
+                    type: string
+              example:
+                keys:
+                  - "notification:last_poll"
+                  - "reminder:task:123"
+      responses:
+        '200':
+          description: Bulk state retrieval result
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BulkStateItem'
+
+components:
+  schemas:
+    StateEntry:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+          description: Unique state key (namespace:identifier format recommended)
+          example: "notification:last_poll"
+        value:
+          type: object
+          description: State value (any JSON-serializable object)
+          additionalProperties: true
+        etag:
+          type: string
+          description: Optional ETag for optimistic concurrency control
+        metadata:
+          type: object
+          description: Optional metadata (e.g., ttl for auto-expiration)
+          properties:
+            ttl:
+              type: string
+              description: Time-to-live in seconds (e.g., "3600" for 1 hour)
+              example: "3600"
+          additionalProperties: true
+
+    BulkStateItem:
+      type: object
+      properties:
+        key:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        etag:
+          type: string
+
+    DaprError:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: ERR_STATE_SAVE
+        message:
+          type: string
+          example: "failed to save state to PostgreSQL"

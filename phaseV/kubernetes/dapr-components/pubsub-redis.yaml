@@ -1,0 +1,27 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub-kafka
+  namespace: todo-phasev
+  labels:
+    app: backend
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      value: "redis.todo-phasev.svc.cluster.local:6379"
+    - name: redisPassword
+      value: ""
+    - name: consumerID
+      value: "dapr-redis-consumer"
+    - name: enableTLS
+      value: "false"
+    - name: processingTimeout
+      value: "60s"
+    - name: redeliverInterval
+      value: "30s"
+    - name: queueDepth
+      value: "100"
+    - name: concurrency
+      value: "10"

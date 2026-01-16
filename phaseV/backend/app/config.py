@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # Email Delivery Service Configuration
     email_delivery_group_id: str = "email-delivery-consumer-group"
 
+    # Dapr Configuration
+    use_dapr: bool = False
+
     class Config:
         env_file = ".env"
         case_sensitive = False

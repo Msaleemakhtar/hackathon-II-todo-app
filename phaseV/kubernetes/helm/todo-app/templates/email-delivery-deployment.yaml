@@ -20,7 +20,17 @@ spec:
         app: {{ .Values.emailDelivery.name }}
         component: consumer
         tier: backend
+      annotations:
+        dapr.io/enabled: "{{ .Values.dapr.enabled }}"
+        dapr.io/app-id: "email-delivery-service"
+        dapr.io/app-port: "8003"
+        dapr.io/log-level: "info"
+        dapr.io/sidecar-cpu-limit: "{{ .Values.dapr.resources.limits.cpu }}"
+        dapr.io/sidecar-memory-limit: "{{ .Values.dapr.resources.limits.memory }}"
+        dapr.io/sidecar-cpu-request: "{{ .Values.dapr.resources.requests.cpu }}"
+        dapr.io/sidecar-memory-request: "{{ .Values.dapr.resources.requests.memory }}"
     spec:
+      serviceAccountName: todo-app-sa
       containers:
       - name: email-delivery
         image: {{ .Values.emailDelivery.image }}
@@ -91,6 +101,13 @@ spec:
           value: {{ .Values.environment | default "production" | quote }}
         - name: LOG_LEVEL
           value: {{ .Values.emailDelivery.logLevel | default "INFO" | quote }}
+
+        # Dapr configuration
+        - name: USE_DAPR
+          valueFrom:
+            configMapKeyRef:
+              name: todo-app-config
+              key: USE_DAPR
 
         resources:
           requests:

@@ -1,0 +1,218 @@
+openapi: 3.0.3
+info:
+  title: Dapr Jobs (Scheduler) HTTP API
+  description: |
+    API contract for Dapr Jobs API (alpha) used for scheduled notification checks.
+    Replaces the database polling loop with guaranteed single-execution scheduling.
+  version: 1.0.0-alpha1
+  contact:
+    name: Dapr Documentation
+    url: https://docs.dapr.io/reference/api/scheduler_api/
+
+servers:
+  - url: http://localhost:3500
+    description: Dapr sidecar
+
+paths:
+  /v1.0-alpha1/jobs/{name}:
+    post:
+      summary: Schedule or update a job
+      description: |
+        Creates or updates a scheduled job. Dapr guarantees at-most-once
+        execution across multiple service replicas.
+      operationId: scheduleJob
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Unique job name (e.g., "check-due-tasks")
+          schema:
+            type: string
+            example: check-due-tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobDefinition'
+            examples:
+              notificationJob:
+                summary: Notification service job (every 5 seconds)
+                value:
+                  schedule: "@every 5s"
+                  repeats: -1
+                  dueTime: "0s"
+                  ttl: "3600s"
+                  data:
+                    type: "notification_check"
+      responses:
+        '204':
+          description: Job scheduled successfully
+        '400':
+          description: Invalid job definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+        '500':
+          description: Scheduler error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+    get:
+      summary: Get job details
+      description: Retrieves the current configuration of a scheduled job
+      operationId: getJob
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobDefinition'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+    delete:
+      summary: Delete a scheduled job
+      description: Stops and removes a scheduled job
+      operationId: deleteJob
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Job deleted successfully
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+  /jobs/{name}:
+    post:
+      summary: Job callback endpoint
+      description: |
+        This endpoint is implemented by the application service.
+        Dapr Scheduler invokes this endpoint when the job triggers.
+      operationId: jobCallback
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Job name (matches the registered job)
+          schema:
+            type: string
+            example: check-due-tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobTriggerData'
+            example:
+              type: "notification_check"
+      responses:
+        '200':
+          description: Job executed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: SUCCESS
+        '500':
+          description: Job execution failed (Dapr will retry)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: FAILURE
+                  error:
+                    type: string
+
+components:
+  schemas:
+    JobDefinition:
+      type: object
+      required:
+        - schedule
+      properties:
+        schedule:
+          type: string
+          description: |
+            Schedule expression in one of these formats:
+            - Cron: "0 */5 * * *" (every 5 minutes)
+            - @every: "@every 5s" (every 5 seconds)
+            - @hourly, @daily, @weekly, @monthly
+          example: "@every 5s"
+        repeats:
+          type: integer
+          description: |
+            Number of times to repeat:
+            - -1: infinite (default)
+            - 0: one-time execution
+            - N: repeat N times
+          default: -1
+          example: -1
+        dueTime:
+          type: string
+          description: |
+            ISO 8601 duration until first execution:
+            - "0s": immediate
+            - "10m": 10 minutes from now
+            - "2026-01-15T12:00:00Z": absolute time
+          default: "0s"
+          example: "0s"
+        ttl:
+          type: string
+          description: |
+            Job expiration duration (ISO 8601):
+            - "3600s": expire after 1 hour
+            - "0s": never expire
+          default: "0s"
+          example: "3600s"
+        data:
+          type: object
+          description: Payload passed to job callback endpoint
+          additionalProperties: true
+          example:
+            type: "notification_check"
+
+    JobTriggerData:
+      type: object
+      description: Data payload sent to job callback endpoint (matches job.data)
+      additionalProperties: true
+      example:
+        type: "notification_check"
+
+    DaprError:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: ERR_JOB_SCHEDULE
+        message:
+          type: string
+          example: "failed to schedule job check-due-tasks"

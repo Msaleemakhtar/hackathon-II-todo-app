@@ -1,0 +1,39 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub-kafka
+  namespace: todo-phasev
+  labels:
+    app: backend
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "d5k8cf6udu05l9vrkisg.any.ap-south-1.mpx.prd.cloud.redpanda.com:9092"
+    - name: authType
+      value: "password"
+    - name: saslMechanism
+      value: "SHA-256"
+    - name: saslUsername
+      secretKeyRef:
+        name: kafka-secrets
+        key: username
+    - name: saslPassword
+      secretKeyRef:
+        name: kafka-secrets
+        key: password
+    - name: clientConnectionTopicMetadataRefreshInterval
+      value: "15s"
+    - name: enableIdempotence
+      value: "true"
+    - name: acks
+      value: "all"
+    - name: consumerID
+      value: "backend"
+    - name: clientID
+      value: "backend-dapr-client"
+    - name: version
+      value: "2.8.0"
+    - name: maxMessageBytes
+      value: "1048576"

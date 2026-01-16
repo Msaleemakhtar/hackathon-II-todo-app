@@ -1,0 +1,275 @@
+openapi: 3.0.3
+info:
+  title: Dapr Pub/Sub HTTP API
+  description: |
+    API contract for Dapr Pub/Sub operations used by the Todo application.
+    This contract documents the Dapr HTTP API calls made by application services.
+  version: 1.0.0
+  contact:
+    name: Dapr Documentation
+    url: https://docs.dapr.io/reference/api/pubsub_api/
+
+servers:
+  - url: http://localhost:3500
+    description: Dapr sidecar (injected into each pod)
+
+paths:
+  /v1.0/publish/{pubsubname}/{topic}:
+    post:
+      summary: Publish event to topic
+      description: |
+        Publishes an event to the specified topic via Dapr Pub/Sub component.
+        Dapr automatically wraps the payload in CloudEvents 1.0 format.
+      operationId: publishEvent
+      parameters:
+        - name: pubsubname
+          in: path
+          required: true
+          description: Name of the Dapr Pub/Sub component (e.g., "pubsub-kafka")
+          schema:
+            type: string
+            example: pubsub-kafka
+        - name: topic
+          in: path
+          required: true
+          description: Kafka topic name (e.g., "task-events", "task-reminders", "task-recurrence")
+          schema:
+            type: string
+            enum:
+              - task-events
+              - task-reminders
+              - task-recurrence
+      requestBody:
+        required: true
+        description: Event payload (will be wrapped in CloudEvents by Dapr)
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/TaskCreatedEvent'
+                - $ref: '#/components/schemas/TaskUpdatedEvent'
+                - $ref: '#/components/schemas/TaskCompletedEvent'
+                - $ref: '#/components/schemas/TaskDeletedEvent'
+                - $ref: '#/components/schemas/ReminderEvent'
+            examples:
+              taskCreated:
+                summary: Task created event
+                value:
+                  event_type: created
+                  task_id: 123
+                  task_data:
+                    id: 123
+                    user_id: 1
+                    title: Complete Dapr migration
+                    priority: high
+                    due_date: "2026-01-20T17:00:00Z"
+                    completed: false
+                  user_id: 1
+                  timestamp: "2026-01-15T12:00:00Z"
+              reminderEvent:
+                summary: Reminder event
+                value:
+                  task_id: 123
+                  title: Complete Dapr migration
+                  due_at: "2026-01-20T17:00:00Z"
+                  remind_at: "2026-01-20T16:00:00Z"
+                  user_id: 1
+      responses:
+        '204':
+          description: Event published successfully
+        '400':
+          description: Invalid request (malformed JSON or missing required fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+        '403':
+          description: Forbidden (component not scoped to this app-id)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+        '500':
+          description: Internal Dapr error (Kafka connection failure, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DaprError'
+
+  /dapr/subscribe:
+    get:
+      summary: List subscriptions for this service
+      description: |
+        Dapr calls this endpoint on service startup to discover which topics
+        the service wants to subscribe to. This is declarative subscription registration.
+      operationId: listSubscriptions
+      responses:
+        '200':
+          description: List of subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+              example:
+                - pubsubname: pubsub-kafka
+                  topic: task-reminders
+                  route: /events/reminder-sent
+                - pubsubname: pubsub-kafka
+                  topic: task-recurrence
+                  route: /events/task-completed
+
+components:
+  schemas:
+    TaskCreatedEvent:
+      type: object
+      required:
+        - event_type
+        - task_id
+        - task_data
+        - user_id
+        - timestamp
+      properties:
+        event_type:
+          type: string
+          enum: [created]
+        task_id:
+          type: integer
+          example: 123
+        task_data:
+          type: object
+          description: Full task object
+          additionalProperties: true
+        user_id:
+          type: integer
+          example: 1
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-15T12:00:00Z"
+
+    TaskUpdatedEvent:
+      type: object
+      required:
+        - event_type
+        - task_id
+        - task_data
+        - changes
+        - user_id
+        - timestamp
+      properties:
+        event_type:
+          type: string
+          enum: [updated]
+        task_id:
+          type: integer
+        task_data:
+          type: object
+          description: Updated task object
+        changes:
+          type: object
+          description: Changed fields only
+          additionalProperties: true
+        user_id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    TaskCompletedEvent:
+      type: object
+      required:
+        - event_type
+        - task_id
+        - task_data
+        - user_id
+        - timestamp
+        - has_recurrence
+      properties:
+        event_type:
+          type: string
+          enum: [completed]
+        task_id:
+          type: integer
+        task_data:
+          type: object
+        user_id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        has_recurrence:
+          type: boolean
+          description: True if task has recurrence_rule set
+
+    TaskDeletedEvent:
+      type: object
+      required:
+        - event_type
+        - task_id
+        - user_id
+        - timestamp
+      properties:
+        event_type:
+          type: string
+          enum: [deleted]
+        task_id:
+          type: integer
+        user_id:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    ReminderEvent:
+      type: object
+      required:
+        - task_id
+        - title
+        - due_at
+        - remind_at
+        - user_id
+      properties:
+        task_id:
+          type: integer
+        title:
+          type: string
+        due_at:
+          type: string
+          format: date-time
+        remind_at:
+          type: string
+          format: date-time
+        user_id:
+          type: integer
+
+    Subscription:
+      type: object
+      required:
+        - pubsubname
+        - topic
+        - route
+      properties:
+        pubsubname:
+          type: string
+          description: Dapr Pub/Sub component name
+          example: pubsub-kafka
+        topic:
+          type: string
+          description: Kafka topic name
+          example: task-reminders
+        route:
+          type: string
+          description: HTTP endpoint to receive events
+          example: /events/reminder-sent
+
+    DaprError:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: ERR_PUBSUB_PUBLISH_MESSAGE
+        message:
+          type: string
+          example: "failed to publish message to topic task-events"
