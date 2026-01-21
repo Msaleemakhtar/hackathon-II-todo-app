@@ -225,7 +225,9 @@ class NotificationService:
                     title=task.title,
                     due_at=event_data["due_at"],
                     remind_at=event_data["remind_at"],
-                    user_id=event_data["user_id"]
+                    user_id=event_data["user_id"],
+                    description=task.description,
+                    priority=task.priority
                 )
                 await dapr_client.close()
                 logger.info(f"Reminder event published via Dapr for task {task.id}")

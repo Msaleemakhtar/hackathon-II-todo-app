@@ -1,6 +1,7 @@
 """Email delivery service for task reminder notifications."""
 
 import asyncio
+import json
 import logging
 import ssl
 from datetime import datetime, timezone
@@ -235,8 +236,19 @@ class EmailDeliveryService:
                 self._last_poll_time = datetime.now(timezone.utc)  # Track poll time
 
                 try:
-                    # Deserialize event
-                    event = ReminderSentEvent.model_validate_json(message.value)
+                    # Deserialize event - handle both raw and CloudEvents (Dapr) formats
+                    raw_data = json.loads(message.value)
+
+                    # Check if this is a CloudEvents envelope (from Dapr pub/sub)
+                    if isinstance(raw_data, dict) and "data" in raw_data:
+                        # Extract the actual event data from CloudEvents envelope
+                        logger.debug("Unwrapping CloudEvents envelope from Dapr")
+                        event_data = raw_data["data"]
+                    else:
+                        # Direct event format (legacy/direct Kafka producer)
+                        event_data = raw_data
+
+                    event = ReminderSentEvent.model_validate(event_data)
                     logger.info(f"Received ReminderSentEvent for task {event.task_id}")
 
                     # Process reminder email

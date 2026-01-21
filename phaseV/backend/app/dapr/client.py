@@ -18,18 +18,43 @@ class DaprClient:
         pubsub_name: str,
         topic: str,
         data: Dict[str, Any],
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
+        raw_payload: bool = True,
+        message_key: Optional[str] = None
     ) -> None:
         """
         Publish event to Dapr Pub/Sub.
-        Dapr wraps the event in CloudEvents 1.0 format automatically.
+
+        Args:
+            pubsub_name: Name of the pub/sub component (e.g., "pubsub-kafka")
+            topic: Topic name to publish to
+            data: Event data to publish
+            metadata: Optional metadata for the message
+            raw_payload: If True, publish raw JSON without CloudEvents wrapping (default: True)
+            message_key: Optional Kafka message key for partitioning
         """
         url = f"{self.base_url}/v1.0/publish/{pubsub_name}/{topic}"
+
+        # Build headers
+        headers = {"Content-Type": "application/json"}
+
+        # Add rawPayload header to bypass CloudEvents wrapping
+        if raw_payload:
+            headers["rawPayload"] = "true"
+
+        # Build query parameters for Kafka metadata
+        # Dapr Kafka pub/sub requires partition key as query parameter, not header
+        # See: https://docs.dapr.io/reference/components-reference/supported-pubsub/setup-apache-kafka/
+        params = {}
+        if message_key:
+            params["metadata.partitionKey"] = message_key
+
         try:
             response = await self.client.post(
                 url,
                 json=data,
-                headers={"Content-Type": "application/json"}
+                headers=headers,
+                params=params
             )
             response.raise_for_status()
             logger.info(f"Published event to {topic}: {data.get('event_type', 'unknown')}")
