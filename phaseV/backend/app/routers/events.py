@@ -16,7 +16,7 @@ async def get_subscriptions():
     """
     return [
         {
-            "pubsubname": "pubsub-kafka",
+            "pubsubname": "pubsub",
             "topic": "task-reminders",
             "route": "/events/reminder-sent",
             "metadata": {
@@ -24,7 +24,7 @@ async def get_subscriptions():
             }
         },
         {
-            "pubsubname": "pubsub-kafka",
+            "pubsubname": "pubsub",
             "topic": "task-recurrence",
             "route": "/events/task-completed",
             "metadata": {

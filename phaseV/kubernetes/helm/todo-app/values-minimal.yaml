@@ -1,0 +1,279 @@
+# Minimal Resource Configuration for Phase V - Oracle Cloud Free Tier
+# All services enabled and fully functional, optimized for resource efficiency
+# Use: helm install -f values.yaml -f values-minimal.yaml
+
+# Namespace Configuration
+namespace: "todo-phasev"
+environment: "production"
+
+# Global Configuration
+global:
+  namespace: "todo-phasev"
+  imagePullPolicy: "IfNotPresent"
+
+# Frontend Configuration - Minimal but functional
+frontend:
+  enabled: true
+  replicaCount: 1  # Single replica to save resources
+  image:
+    repository: "todo-frontend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 3000
+    targetPort: 3000
+  resources:
+    requests:
+      cpu: "200m"      # Reduced from 500m
+      memory: "256Mi"  # Reduced from 512Mi
+    limits:
+      cpu: "500m"      # Reduced from 1000m
+      memory: "512Mi"  # Reduced from 1024Mi
+  livenessProbe:
+    httpGet:
+      path: "/"
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/"
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  autoscaling:
+    enabled: false  # Disable HPA to save resources
+
+# Backend Configuration - Minimal but functional
+backend:
+  enabled: true
+  replicaCount: 1  # Single replica to save resources
+  image:
+    repository: "todo-app-backend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 8000
+    targetPort: 8000
+  resources:
+    requests:
+      cpu: "300m"      # Reduced from 500m (needs more than frontend for DB/Redis operations)
+      memory: "384Mi"  # Reduced from 512Mi
+    limits:
+      cpu: "600m"      # Reduced from 1000m
+      memory: "768Mi"  # Reduced from 1024Mi
+  livenessProbe:
+    httpGet:
+      path: "/health"
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: "/health"
+      port: 8000
+    initialDelaySeconds: 45
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  autoscaling:
+    enabled: false  # Disable HPA to save resources
+
+# MCP Server Configuration - Minimal but functional
+mcpServer:
+  enabled: true
+  replicaCount: 1  # Must be 1
+  image:
+    repository: "todo-app-backend"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 8001
+    targetPort: 8001
+  resources:
+    requests:
+      cpu: "150m"      # Reduced from 250m
+      memory: "192Mi"  # Reduced from 256Mi
+    limits:
+      cpu: "300m"      # Reduced from 500m
+      memory: "384Mi"  # Reduced from 512Mi
+  livenessProbe:
+    tcpSocket:
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    tcpSocket:
+      port: 8001
+    initialDelaySeconds: 30
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Redis Configuration - Minimal but functional
+redis:
+  enabled: true
+  image:
+    repository: "redis"
+    tag: "7-alpine"
+    pullPolicy: "IfNotPresent"
+  service:
+    type: "ClusterIP"
+    port: 6379
+    targetPort: 6379
+  resources:
+    requests:
+      cpu: "100m"      # Reduced from 250m
+      memory: "128Mi"  # Keep same (already minimal)
+    limits:
+      cpu: "200m"      # Reduced from 500m
+      memory: "256Mi"  # Keep same (already minimal)
+  livenessProbe:
+    exec:
+      command:
+        - "redis-cli"
+        - "ping"
+    initialDelaySeconds: 10
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    exec:
+      command:
+        - "redis-cli"
+        - "ping"
+    initialDelaySeconds: 10
+    periodSeconds: 15  # Less frequent checks
+    timeoutSeconds: 5
+    failureThreshold: 3
+  persistence:
+    enabled: true
+    storageClassName: "oci-bv"  # Oracle Cloud Block Volume (Free tier: 200GB total)
+    accessMode: "ReadWriteOnce"
+    size: "2Gi"  # Minimal size for Redis persistence
+
+# Database Configuration (Neon Serverless - external, no resource impact)
+database:
+  secretName: "todo-app-secrets"
+
+# Email Delivery Service Configuration - Minimal but functional
+emailDelivery:
+  enabled: true
+  name: "email-delivery"
+  replicaCount: 1  # Must be 1 to prevent duplicate emails
+  image: "todo-app-backend:latest"
+  imagePullPolicy: "IfNotPresent"
+  secretName: "email-delivery-secret"
+  consumerGroup: "email-delivery-consumer-group-v2"
+  logLevel: "INFO"
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    fromEmail: "saleemakhtar864@gmail.com"
+    fromName: "Todo App Reminders"
+    username: "saleemakhtar864@gmail.com"
+    password: "izok pnuy nkeu hmoh"
+  resources:
+    requests:
+      cpu: "50m"       # Reduced from 100m (lightweight consumer)
+      memory: "128Mi"  # Keep same (already minimal)
+    limits:
+      cpu: "150m"      # Reduced from 200m
+      memory: "256Mi"  # Keep same (already minimal)
+
+# Notification Service Configuration - Minimal but functional
+notificationService:
+  enabled: true
+  name: "notification-service"
+  replicaCount: 1  # Must be 1 to prevent duplicate notifications
+  imagePullPolicy: "IfNotPresent"
+  consumerGroup: "notification-service-group"
+  logLevel: "INFO"
+  resources:
+    requests:
+      cpu: "50m"       # Reduced from 100m
+      memory: "128Mi"  # Keep same (already minimal)
+    limits:
+      cpu: "150m"      # Reduced from 200m
+      memory: "256Mi"  # Keep same (already minimal)
+
+# Recurring Task Service Configuration - Minimal but functional
+recurringTaskService:
+  enabled: true
+  name: "recurring-task-service"
+  replicaCount: 1  # Must be 1 to prevent duplicate task generation
+  imagePullPolicy: "IfNotPresent"
+  consumerGroup: "recurring-task-service-group"
+  logLevel: "INFO"
+  resources:
+    requests:
+      cpu: "50m"       # Reduced from 100m
+      memory: "128Mi"  # Keep same (already minimal)
+    limits:
+      cpu: "150m"      # Reduced from 200m
+      memory: "256Mi"  # Keep same (already minimal)
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "todo-app.local"
+  tls:
+    enabled: true
+
+# Dapr Configuration - Minimal resources for sidecars
+dapr:
+  enabled: true
+  resources:
+    limits:
+      cpu: "100m"      # Reduced from 200m
+      memory: "128Mi"  # Reduced from 256Mi
+    requests:
+      cpu: "50m"       # Reduced from 100m
+      memory: "64Mi"   # Reduced from 128Mi
+
+# ConfigMap Configuration - Using Redis instead of Kafka
+configMap:
+  REDIS_HOST: "redis-service.todo-phasev.svc.cluster.local"
+  REDIS_PORT: "6379"
+  MCP_SERVER_URL: "http://mcp-service.todo-phasev.svc.cluster.local:8001/mcp"
+  NEXT_PUBLIC_API_URL: "https://todo-app.local/api"
+  NEXT_PUBLIC_BETTER_AUTH_URL: "https://todo-app.local"
+  NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: ""
+  CORS_ORIGINS: '["https://todo-app.local", "http://todo-app.local", "http://localhost:3000", "http://127.0.0.1:3000"]'
+  # REMOVED: Kafka configuration (now using Redis)
+  # USE_DAPR configuration - now uses Redis pubsub instead of Kafka
+  USE_DAPR: "true"  # Enable Dapr with Redis pub/sub
+
+# Helm Test Configuration
+tests:
+  enabled: true
+  image:
+    repository: "busybox"
+    tag: "latest"
+
+# Resource Summary for Oracle Cloud Free Tier
+# =============================================
+# Total CPU Requests: ~1.15 cores (Frontend: 200m, Backend: 300m, MCP: 150m, Redis: 100m,
+#                                   3x Services: 50m each, 4x Dapr sidecars: 50m each)
+# Total Memory Requests: ~1.6 GB
+# Total CPU Limits: ~2.5 cores
+# Total Memory Limits: ~3.3 GB
+#
+# Oracle Cloud Free Tier includes:
+# - 2x AMD-based Compute VMs (1/8 OCPU + 1GB RAM each) OR
+# - 4x Arm-based Ampere A1 cores + 24GB RAM (RECOMMENDED for this deployment)
+#
+# Recommendation: Use Arm-based Ampere A1 instances (4 cores, 24GB RAM total)
+# This configuration fits comfortably within those limits with room for system overhead

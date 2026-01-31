@@ -16,7 +16,7 @@ async def publish_task_created_event(
 ) -> None:
     """Publish TaskCreatedEvent via Dapr with message key for partitioning."""
     await dapr_client.publish_event(
-        pubsub_name="pubsub-kafka",
+        pubsub_name="pubsub",
         topic="task-events",
         data={
             "event_type": "created",
@@ -38,7 +38,7 @@ async def publish_task_updated_event(
 ) -> None:
     """Publish TaskUpdatedEvent via Dapr with message key for partitioning."""
     await dapr_client.publish_event(
-        pubsub_name="pubsub-kafka",
+        pubsub_name="pubsub",
         topic="task-events",
         data={
             "event_type": "updated",
@@ -64,7 +64,7 @@ async def publish_task_completed_event(
     Note: Publishes to task-recurrence topic for recurring task processing.
     """
     await dapr_client.publish_event(
-        pubsub_name="pubsub-kafka",
+        pubsub_name="pubsub",
         topic="task-recurrence",
         data={
             "event_type": "completed",
@@ -85,7 +85,7 @@ async def publish_task_deleted_event(
 ) -> None:
     """Publish TaskDeletedEvent via Dapr with message key for partitioning."""
     await dapr_client.publish_event(
-        pubsub_name="pubsub-kafka",
+        pubsub_name="pubsub",
         topic="task-events",
         data={
             "event_type": "deleted",
@@ -126,7 +126,7 @@ async def publish_reminder_event(
     now = datetime.now(timezone.utc)
 
     await dapr_client.publish_event(
-        pubsub_name="pubsub-kafka",
+        pubsub_name="pubsub",
         topic="task-reminders",
         data={
             # BaseEvent fields

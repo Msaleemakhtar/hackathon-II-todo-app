@@ -1,7 +1,7 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: pubsub-kafka
+  name: pubsub  # Changed from pubsub-kafka to generic pubsub name
   namespace: todo-phasev
   labels:
     app: backend
@@ -10,7 +10,7 @@ spec:
   version: v1
   metadata:
     - name: redisHost
-      value: "redis.todo-phasev.svc.cluster.local:6379"
+      value: "redis-service.todo-phasev.svc.cluster.local:6379"  # Updated to match service name
     - name: redisPassword
       value: ""
     - name: consumerID

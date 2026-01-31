@@ -26,7 +26,7 @@ class DaprClient:
         Publish event to Dapr Pub/Sub.
 
         Args:
-            pubsub_name: Name of the pub/sub component (e.g., "pubsub-kafka")
+            pubsub_name: Name of the pub/sub component (e.g., "pubsub")
             topic: Topic name to publish to
             data: Event data to publish
             metadata: Optional metadata for the message
